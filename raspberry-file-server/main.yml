@@ -4,10 +4,13 @@
   hosts: all
 
   pre_tasks:
-    - name: Make sure the apt cache is updated
+    - name: Make sure the apt cache is updated.
       apt:
         update_cache: true
         cache_valid_time: 3600
+    - name: Make sure that the operating system is updated.
+      apt:
+        upgrade: full
 
   tasks:
     - name: Make sure that Samba and file system packages are installed.
@@ -26,12 +29,16 @@
         state: present
     - name: Make sure that the USBMount source code is present on the system.
       git:
-        repo: 'https://github.com/rbrito/usbmount.git'
+        repo: 'https://github.com/Erik142/usbmount.git'
         dest: /opt/usbmount
       register: sourcecode
     - name: Make sure that previous USBMount DEB packages have been removed.
       shell: rm -rf /opt/usbmount_*
       when: sourcecode.changed
+    - name: Make sure that previous USBMount DEB package has been uninstalled.
+      apt:
+        name: usbmount
+        state: absent
     - name: Make sure that the USBMount package has been built.
       shell: dpkg-buildpackage -us -uc -b
       args:
@@ -46,19 +53,39 @@
       apt:
         deb: /opt/{{ usbmount_deb.stdout }}
     - name: Make sure that NTFS and ExFAT file systems are enabled when automounting usb devices
-      replace:
+      lineinfile:
         path: /etc/usbmount/usbmount.conf
-        after: 'FILESYSTEMS='
-        regexp: '^(?!ntfs|3g|exfat|fuseblk\b)(\b\w*)'
-        replace: '"\1 ntfs-3g exfat fuseblk"'
+        regexp: '^FILESYSTEMS='
+        line: 'FILESYSTEMS="ext2 ext3 ext4 ntfs-3g exfat fuseblk"'
+        state: present
     - name: Make sure that usb devices are automatically shared in the network upon connection
       copy:
         src: ./scripts/mount/50_add_samba_export
         dest: /etc/usbmount/mount.d/50_add_samba_export
+        mode: +x
     - name: Make sure that usb devices are automatically unshared in the network upon disconnection
       copy:
         src: ./scripts/unmount/50_remove_samba_export
         dest: /etc/usbmount/umount.d/50_remove_samba_export
+        mode: +x
+    - name: Make sure that the auto usb samba directories exist.
+      file:
+        path: /etc/samba/auto
+        state: directory
+    - name: Make sure that samba is aware of USBMount config files.
+      lineinfile:
+        path: /etc/samba/smb.conf
+        line: "include = /etc/samba/auto/{{ item }}.conf"
+      loop:
+        - usb0
+        - usb1
+        - usb2
+        - usb3
+        - usb4
+        - usb5
+        - usb6
+        - usb7
+      register: smbconf
     - name: Make sure that Cockpit is installed.
       apt:
         name:
@@ -69,3 +96,51 @@
         name: cockpit
         state: started
         enabled: true
+    - name: Make sure that the user erikwahlberger is present.
+      user:
+        name: erikwahlberger
+        password: '$6$kTUSDkztSU8UFQjY$LzKhXOsEe4SVqXo.294IHKrGa7/xxys5hBhX2SS13jsJ6RzpyKnG8OON5.zaMODtgMcHGzecqc8UrMZGcRIDF.'
+        append: true
+        update_password: on_create
+        groups:
+          - sudo
+        state: present
+      register: user
+    - name: Force erikwahlberger to change password
+      shell: chage -d 0 erikwahlberger
+      when: user.changed
+    - name: Make sure that correct ssh keys exist on the server.
+      authorized_key:
+        user: erikwahlberger
+        key: "{{ lookup('file', './files/id_ed25519.pub') }}"
+        state: present
+    - name: Make sure that the Samba smbd service is restarted and enabled at boot.
+      service:
+        name: smbd
+        state: restarted
+        enabled: true
+      when: smbconf.changed
+    - name: Make sure that the Samba nmbd service is restarted and enabled at boot.
+      service:
+        name: nmbd
+        state: restarted
+        enabled: true
+      when: smbconf.changed
+    - name: Make sure that a Udev configuration directory exists.
+      file:
+        path: /etc/systemd/system/systemd-udevd.service.d
+        state: directory
+    - name: Make sure that the custom Udev mount flags exist.
+      copy:
+        src: ./files/00-mount-flags.conf
+        dest: /etc/systemd/system/systemd-udevd.service.d/00-mount-flags.conf
+      register: mountflags
+    - name: Make sure that the Systemd daemon is reloaded.
+      shell: systemctl daemon-reexec
+      when: mountflags.changed
+    - name: Make sure that the Udev service is restarted and enabled on boot.
+      service:
+        name: systemd-udevd
+        state: restarted
+        enabled: true
+      when: mountflags.changed

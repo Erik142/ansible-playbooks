@@ -1,5 +1,6 @@
 #!/bin/bash
-SHARENAME=`basename $UM_MOUNTPOINT`
-rm -f /etc/samba/auto/$SHARENAME.conf
+USBNAME=`basename $UM_MOUNTPOINT`
+rm -f /etc/samba/auto/$USBNAME.conf
  
-/etc/init.d/samba restart
+systemctl restart smbd
+systemctl restart nmbd
