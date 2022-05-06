@@ -1,0 +1,10 @@
+#!/bin/bash
+SHARENAME=`basename $UM_MOUNTPOINT`
+cat > /etc/samba/auto/$SHARENAME.conf <<EOF
+[$SHARENAME]
+   comment = $UM_VENDOR $UM_MODEL
+   path = $UM_MOUNTPOINT
+   read only = no
+EOF
+ 
+/etc/init.d/samba restart

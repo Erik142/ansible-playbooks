@@ -1,0 +1,5 @@
+#!/bin/bash
+SHARENAME=`basename $UM_MOUNTPOINT`
+rm -f /etc/samba/auto/$SHARENAME.conf
+ 
+/etc/init.d/samba restart

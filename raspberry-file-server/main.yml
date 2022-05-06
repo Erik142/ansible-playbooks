@@ -1,0 +1,71 @@
+---
+- name: Install and configure a file server which auto shares connected usb drives using Samba.
+  become: yes
+  hosts: all
+
+  pre_tasks:
+    - name: Make sure the apt cache is updated
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+  tasks:
+    - name: Make sure that Samba and file system packages are installed.
+      apt:
+        name:
+          - samba
+          - ntfs-3g
+          - exfat-fuse
+          - exfatprogs
+        state: present
+    - name: Make sure that the USBMount build tools are installed.
+      apt:
+        name:
+          - debhelper 
+          - build-essential
+        state: present
+    - name: Make sure that the USBMount source code is present on the system.
+      git:
+        repo: 'https://github.com/rbrito/usbmount.git'
+        dest: /opt/usbmount
+      register: sourcecode
+    - name: Make sure that previous USBMount DEB packages have been removed.
+      shell: rm -rf /opt/usbmount_*
+      when: sourcecode.changed
+    - name: Make sure that the USBMount package has been built.
+      shell: dpkg-buildpackage -us -uc -b
+      args:
+        chdir: /opt/usbmount
+      when: sourcecode.changed
+    - name: Get USBMount DEB package name.
+      shell: 
+        cmd: ls | grep *.deb
+        chdir: /opt/
+      register: usbmount_deb
+    - name: Make sure that USBMount is installed.
+      apt:
+        deb: /opt/{{ usbmount_deb.stdout }}
+    - name: Make sure that NTFS and ExFAT file systems are enabled when automounting usb devices
+      replace:
+        path: /etc/usbmount/usbmount.conf
+        after: 'FILESYSTEMS='
+        regexp: '^(?!ntfs|3g|exfat|fuseblk\b)(\b\w*)'
+        replace: '"\1 ntfs-3g exfat fuseblk"'
+    - name: Make sure that usb devices are automatically shared in the network upon connection
+      copy:
+        src: ./scripts/mount/50_add_samba_export
+        dest: /etc/usbmount/mount.d/50_add_samba_export
+    - name: Make sure that usb devices are automatically unshared in the network upon disconnection
+      copy:
+        src: ./scripts/unmount/50_remove_samba_export
+        dest: /etc/usbmount/umount.d/50_remove_samba_export
+    - name: Make sure that Cockpit is installed.
+      apt:
+        name:
+          - cockpit
+        state: present
+    - name: Make sure that the Cockpit service is started and enabled on boot.
+      service:
+        name: cockpit
+        state: started
+        enabled: true
