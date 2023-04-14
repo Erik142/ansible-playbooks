@@ -1,0 +1,33 @@
+---
+
+- name: Wait for master node to be up and running
+  wait_for:
+    host: "{{ master_ip }}"
+    port: 6443
+    delay: 10
+
+- name: Fetch cluster token from master node
+  fetch:
+    src: "{{ k3s_server_location }}/server/node-token"
+    dest: "/tmp/node-token"
+    flat: true
+  delegate_to: "{{ master_ip }}"
+
+- name: Register cluster token variable
+  set_fact:
+    cluster_token: "{{ lookup('ansible.builtin.file', '/tmp/node-token') }}"
+
+- name: Copy K3s service file
+  template:
+    src: "k3s.service.j2"
+    dest: "{{ systemd_dir }}/k3s-node.service"
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Enable and check K3s service
+  systemd:
+    name: k3s-node
+    daemon_reload: yes
+    state: restarted
+    enabled: yes

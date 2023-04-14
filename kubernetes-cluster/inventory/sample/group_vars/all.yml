@@ -1,0 +1,7 @@
+---
+k3s_version: v1.26.3+k3s1
+ansible_user: ansible
+systemd_dir: /etc/systemd/system
+master_ip: ""
+extra_server_args: "--flannel-backend=none --disable-network-policy --cluster-cidr=10.142.0.0/16 --disable traefik --disable servicelb --disable local-storage --tls-san kubectl01.lab.gbg.wahlberger.lan,kubectl02.lab.gbg.wahlberger.lan,kubectl03.lab.gbg.wahlberger.lan,kubectl.lab.gbg.wahlberger.lan"
+extra_agent_args: ""

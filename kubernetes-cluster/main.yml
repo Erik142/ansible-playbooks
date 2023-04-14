@@ -1,0 +1,23 @@
+---
+
+- hosts: all
+  gather_facts: yes
+  become: yes
+  roles:
+    - role: prereq
+    - role: download
+
+- hosts: master
+  become: yes
+  roles:
+    - role: master
+
+- hosts: control-plane
+  become: yes
+  roles:
+    - role: control-plane
+
+- hosts: worker
+  become: yes
+  roles:
+    - role: worker
