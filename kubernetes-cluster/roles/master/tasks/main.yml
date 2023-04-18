@@ -4,7 +4,7 @@
   ansible.posix.authorized_key:
     user: ansible
     state: present
-    key: "{{ lookup('file', '/opt/keys/ansible/ansible.pub') }}"
+    key: "{{ lookup('file', '/opt/keys/ansible/ansible.key.pub') }}"
 
 - name: Copy K3s service file
   register: k3s_service
