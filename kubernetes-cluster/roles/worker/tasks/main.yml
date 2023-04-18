@@ -1,10 +1,11 @@
 ---
 
-- name: Wait for master node to be up and running
+- name: Wait for control plane to be up and running
   wait_for:
-    host: "{{ master_ip }}"
+    host: "{{ item }}"
     port: 6443
     delay: 10
+  loop: "{{ control_plane_ips }}"
 
 - name: Fetch cluster token from master node
   fetch:
