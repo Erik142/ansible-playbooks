@@ -1,5 +1,11 @@
 ---
 
+- name: Add Ansible SSH key
+  ansible.posix.authorized_key:
+    user: ansible
+    state: present
+    key: "{{ lookup('file', '/opt/keys/ansible/ansible.pub') }}"
+
 - name: Copy K3s service file
   register: k3s_service
   template:

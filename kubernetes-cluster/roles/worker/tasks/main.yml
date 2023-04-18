@@ -11,7 +11,7 @@
     src: "{{ k3s_server_location }}/server/node-token"
     dest: "/tmp/node-token"
     flat: true
-  delegate_to: "{{ master_ip }}"
+  delegate_to: master_node
 
 - name: Register cluster token variable
   set_fact:
