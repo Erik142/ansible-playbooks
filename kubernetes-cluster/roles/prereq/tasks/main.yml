@@ -14,3 +14,49 @@
     state: present
     reload: yes
   when: ansible_all_ipv6_addresses
+
+- name: Copy logrotate script
+  copy:
+    src: "daemon.log"
+    dest: "/etc/logrotate.d/daemon.log"
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Remove logrotate from '/etc/logrotate.d/rsyslog'
+  lineinfile:
+    path: /etc/logrotate.d/rsyslog
+    regex: '^/var/log/daemon\.log'
+    state: absent
+
+- name: Create 'cron.minutely' directory
+  file:
+    path: /etc/cron.minutely
+    state: directory
+
+- name: Copy 'logrotate' from 'cron.daily' to 'cron.minutely'
+  copy:
+    remote_src: true
+    src: /etc/cron.daily/logrotate
+    dest: /etc/cron.minutely/logrotate
+
+- name: Remove 'logrotate' from 'cron.daily'
+  file:
+    path: /etc/cron.daily/logrotate
+    state: absent
+
+- name: Check if cron.minutely is already defined in crontab
+  lineinfile:
+    state: absent
+    path: "/etc/crontab"
+    regexp: "crontab.minutely"
+  check_mode: true
+  changed_when: false # This just makes things look prettier in the logs
+  register: check
+
+- name: Define cron.minutely in crontab if not defined
+  lineinfile:
+    state: present
+    path: "/etc/crontab"
+    line: "* *    * * *   root    test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.minutely )"
+  when: check.found == 0

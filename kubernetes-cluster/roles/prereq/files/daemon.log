@@ -1,0 +1,5 @@
+/var/log/daemon.log {
+  size 10M
+  compress
+  rotate 5
+}
