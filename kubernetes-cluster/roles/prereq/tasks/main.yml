@@ -1,5 +1,4 @@
 ---
-
 - name: Enable IPv4 forwarding
   sysctl:
     name: net.ipv4.ip_forward
@@ -21,7 +20,7 @@
     dest: "/etc/logrotate.d/daemon.log"
     owner: root
     group: root
-    mode: '0755'
+    mode: "0755"
 
 - name: Remove logrotate from '/etc/logrotate.d/rsyslog'
   lineinfile:
@@ -60,3 +59,20 @@
     path: "/etc/crontab"
     line: "* *    * * *   root    test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.minutely )"
   when: check.found == 0
+
+- name: Create /etc/containerd/certs.d directory
+  file:
+    path: /etc/containerd/certs.d
+    mode: 0777
+    state: directory
+
+- name: Create /var/lib/rancher/k3s/agent/etc/containerd directory
+  file:
+    path: /var/lib/rancher/k3s/agent/etc/containerd
+    state: directory
+
+- name: Copy containerd configuration template to target
+  copy:
+    src: "config.toml"
+    dest: "/var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl"
+    mode: "0755"
