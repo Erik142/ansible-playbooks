@@ -1,0 +1,18 @@
+---
+- name: Copy {{ container }} Podman Quadlet
+  copy:
+    src: "{{ quadlet_path }}"
+    dest: "/etc/containers/systemd/{{ container }}.container"
+    mode: 0755
+  register: quadlet_copy
+
+- name: Reload Systemd
+  systemd:
+    daemon_reload: true
+  when: quadlet_copy.changed
+
+- name: "Restart {{ container }} Systemd service"
+  systemd:
+    name: "{{ container }}"
+    state: restarted
+  when: quadlet_copy.changed or restart_container | bool

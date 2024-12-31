@@ -1,0 +1,39 @@
+---
+- name: Update system
+  dnf:
+    name: "*"
+    update_cache: true
+    update_only: true
+    state: latest
+
+- name: Install packages
+  package:
+    name:
+      - podman
+      - podman-docker
+      - podman-plugins
+    state: present
+
+- name: Enable use of devices in containers
+  ansible.posix.seboolean:
+    name: container_use_devices
+    state: true
+    persistent: true
+
+- name: Create container data directory
+  file:
+    path: /opt/podman/
+    state: directory
+
+- name: Enable IPv4 forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+    reload: yes
+
+- name: Disable FirewallD
+  systemd:
+    name: "firewalld"
+    enabled: "false"
+    state: "stopped"

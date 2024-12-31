@@ -1,0 +1,6 @@
+---
+roles:
+  - name: bind9
+    src: https://github.com/Erik142/ansible-role-bind9.git
+    version: main
+    scm: git

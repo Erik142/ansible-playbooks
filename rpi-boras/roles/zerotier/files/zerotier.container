@@ -1,0 +1,21 @@
+[Unit]
+Description=A ZeroTier container
+After=network-online.target
+
+[Container]
+Image=docker.io/zerotier/zerotier
+AddCapability=NET_ADMIN
+AddCapability=NET_RAW
+AddDevice=/dev/net/tun:/dev/net/tun:rw
+Network=host
+Volume=/opt/podman/zerotier/var/lib/zerotier-one:/var/lib/zerotier-one:Z
+SecurityLabelDisable=true
+Exec=8056c2e21cc5c789
+ContainerName=zerotier-vpn
+
+[Service]
+# Restart service when sleep finishes
+Restart=always
+
+[Install]
+WantedBy=default.target

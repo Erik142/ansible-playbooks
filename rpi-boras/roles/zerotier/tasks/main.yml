@@ -1,0 +1,15 @@
+---
+- name: Create ZeroTier Container Data Directory
+  file:
+    path: /opt/podman/zerotier/var/lib/zerotier-one
+    mode: 0777
+    state: directory
+  register: zerotier
+
+- name: Include container role
+  include_role:
+    name: container
+  vars:
+    container: zerotier
+    quadlet_path: "{{ playbook_dir }}/roles/zerotier/files/zerotier.container"
+    restart_container: "{{ zerotier.changed | bool }}"

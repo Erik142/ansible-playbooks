@@ -1,0 +1,51 @@
+---
+- name: Create ISC Kea Container Data Directory
+  file:
+    path: /opt/podman/isc-kea/
+    mode: 0777
+    state: directory
+  register: kea_data
+
+- name: Create ISC Kea Container logging Directory
+  file:
+    path: /opt/podman/isc-kea/kea/logs
+    mode: 0777
+    state: directory
+  register: kea_logging
+
+- name: Create ISC Kea Container leases Directory
+  file:
+    path: /opt/podman/isc-kea/kea/leases
+    mode: 0777
+    state: directory
+  register: kea_leases
+
+- name: Create ISC Kea Container sockets Directory
+  file:
+    path: /opt/podman/isc-kea/kea/sockets
+    mode: 0777
+    state: directory
+  register: kea_sockets
+
+- name: Copy ISC Kea configuration data
+  copy:
+    src: "kea/config/"
+    dest: "/opt/podman/isc-kea/kea/config"
+    mode: "0755"
+  register: kea_config
+
+- name: Include container role
+  include_role:
+    name: container
+  vars:
+    container: isc-kea-ddns
+    quadlet_path: "{{ playbook_dir }}/roles/isc-kea/files/isc-kea-ddns.container"
+    restart_container: kea_data.changed or kea_logging.changed or kea_leases.changed or kea_sockets.changed or kea_config.changed | bool
+
+- name: Include container role
+  include_role:
+    name: container
+  vars:
+    container: isc-kea
+    quadlet_path: "{{ playbook_dir }}/roles/isc-kea/files/isc-kea.container"
+    restart_container: "{{ kea_data.changed or kea_logging.changed or kea_leases.changed or kea_sockets.changed or kea_config.changed | bool }}"

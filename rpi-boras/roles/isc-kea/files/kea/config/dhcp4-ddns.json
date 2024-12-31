@@ -1,0 +1,38 @@
+{
+  "DhcpDdns": {
+    "ip-address": "127.0.0.1",
+    "port": 53001,
+    "dns-server-timeout": 500,
+    "ncr-protocol": "UDP",
+    "ncr-format": "JSON",
+    "tsig-keys": [],
+    "forward-ddns": {
+      "ddns-domains": [
+        {
+          "name": "boras.int.wahlberger.dev.",
+          "key-name": "",
+          "dns-servers": [
+            {
+              "ip-address": "127.0.0.1",
+              "port": 53
+            }
+          ]
+        }
+      ]
+    },
+    "reverse-ddns": {
+      "ddns-domains": [
+        {
+          "name": "86.168.192.in-addr.arpa.",
+          "key-name": "",
+          "dns-servers": [
+            {
+              "ip-address": "127.0.0.1",
+              "port": 53
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

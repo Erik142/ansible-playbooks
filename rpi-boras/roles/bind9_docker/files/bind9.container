@@ -1,0 +1,21 @@
+[Unit]
+Description=A BIND9 container
+After=network-online.target
+
+[Container]
+Image=docker.io/ubuntu/bind9
+Network=host
+Volume=/opt/podman/bind9/etc/bind:/etc/bind:ro
+Volume=/opt/podman/bind9/var/lib/bind:/var/lib/bind:Z
+SecurityLabelDisable=true
+Environment=TZ=UTC
+PublishPort=53:53
+PublishPort=53:53/udp
+ContainerName=bind9-dns01
+
+[Service]
+# Restart service when sleep finishes
+Restart=always
+
+[Install]
+WantedBy=default.target

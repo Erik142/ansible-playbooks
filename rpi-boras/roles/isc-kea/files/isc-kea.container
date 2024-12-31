@@ -1,0 +1,20 @@
+[Unit]
+Description=A isc-kea DHCP Server container
+After=network-online.target
+
+[Container]
+Image=docker.io/jonasal/kea-dhcp4:2
+AddCapability=NET_ADMIN
+AddCapability=NET_RAW
+SecurityLabelDisable=true
+Network=host
+Volume=/opt/podman/isc-kea/kea:/kea:Z
+Exec="-c /kea/config/dhcp4.json"
+ContainerName=isc-kea-dhcp4-server
+
+[Service]
+# Restart service when sleep finishes
+Restart=always
+
+[Install]
+WantedBy=default.target

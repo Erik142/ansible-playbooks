@@ -1,0 +1,102 @@
+---
+- name: Include bind9 role
+  import_role:
+    name: bind9
+  tags:
+    - role::bind9:config
+  vars:
+    user: root
+    group: root
+    bind9_service: "bind9_podman"
+    zones_dir: "/var/lib/bind"
+    conf_dir: "/etc/bind"
+    include_conf_dir: "/etc/bind/conf.d"
+    host_dir_prefix: "/opt/podman/bind9"
+    extra_config_files:
+      - "{{ playbook_dir }}/roles/bind9_docker/files/named.root.key"
+    listen_addresses:
+      - 127.0.0.1
+      - "{{ ansible_default_ipv4.address }}"
+    forwarding: True
+    forwarders:
+      - 76.76.2.2
+      - 76.76.10.2
+    dnssec_validate: False
+    rndc_sync: False
+    allow_query:
+      - localhost
+      - 192.168.86.0/24
+      - 10.243.0.0/16
+      - 10.10.0.0/16
+    ddns_keys:
+      - name: "vyos-router.gbg.wahlberger.lan"
+        algorithm: HMAC-MD5
+        secret: "KHFvdr5gvaShehvtOLFB1e4ageVxPpWtr8Gw6Gl4t04E+OzKKwQ8fdUYZj7OLbYZxrvh3NRvKGaZuKh4Q/hSbw=="
+      - name: "dns01.boras.int.wahlberger.dev"
+        algorithm: HMAC-MD5
+        secret: "t6TB6YsoFMja2zj19WMFcJ2eaNwoywx/ovg0dl7NfVik5JIJiDM88BK2RQwagNornjWMWMdfIER6He6UCF2ECg=="
+      - name: "dnsupdate.cloud.wahlberger.dev."
+        algorithm: HMAC-SHA512
+        secret: "9Mjv6OXVzqYrNRyqZCn8lwtmQh6mbNOa4wsM/y3ngTndA55usfL8OHmxPgd4/jcqk8Vi6bSz8AxR2XTMHuhdJA=="
+    zone_transfer_servers:
+      - ip: 10.243.0.4
+        keys:
+          - dnsupdate.cloud.wahlberger.dev.
+
+    zones:
+      - name: boras.int.wahlberger.dev
+        type: master
+        ddns: True
+        ddns_update_keys:
+          - dnsupdate.cloud.wahlberger.dev.
+        ddns_update_servers:
+          - 127.0.0.1
+        transfer_keys:
+          - dnsupdate.cloud.wahlberger.dev.
+        notify_servers:
+          - 10.243.0.4
+        records:
+          - name: truenas
+            type: A
+            dest: 192.168.86.2
+      - name: 86.168.192.in-addr.arpa
+        type: master
+        ddns: True
+        ddns_update_keys:
+          - dnsupdate.cloud.wahlberger.dev.
+        ddns_update_servers:
+          - 127.0.0.1
+        transfer_keys:
+          - dnsupdate.cloud.wahlberger.dev.
+        notify_servers:
+          - 10.243.0.4
+      - name: gbg.int.wahlberger.dev
+        type: slave
+        masters:
+          - 10.243.0.4
+      - name: lab.gbg.int.wahlberger.dev
+        type: slave
+        masters:
+          - 10.243.0.4
+      - name: int.wahlberger.dev
+        type: slave
+        masters:
+          - 10.243.0.4
+      - name: vpn.wahlberger.dev
+        type: slave
+        masters:
+          - 10.243.0.4
+
+- name: Disable BIND9 native service
+  systemd:
+    name: "named"
+    enabled: "false"
+    state: "stopped"
+
+- name: Include container role
+  include_role:
+    name: container
+  vars:
+    container: bind9_podman
+    quadlet_path: "{{ playbook_dir }}/roles/bind9_docker/files/bind9.container"
+    restart_container: False
