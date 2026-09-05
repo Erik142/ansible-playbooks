@@ -3,7 +3,10 @@
 
 semaphore_image: docker.io/semaphoreui/semaphore:v2.19.12
 
-semaphore_data_dir: /opt/podman/semaphore
+# Derived from podman_data_dir (the storage role's mounted external drive on
+# this host), not hardcoded, so it always lands on the same disk as every
+# other service's data.
+semaphore_data_dir: "{{ podman_data_dir }}/semaphore"
 
 # REQUIRED: public https:// URL Semaphore is served on (set in group_vars).
 semaphore_url: ""

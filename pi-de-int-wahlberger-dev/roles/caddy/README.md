@@ -22,7 +22,7 @@ before deploying the container — no external/third-party image required.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `caddy_image` | `localhost/caddy-cloudflare:2` | Tag of the locally built image. |
-| `caddy_data_dir` | `/opt/podman/caddy` | Host dir for the build context, Caddyfile, and state (certs in `data/`). |
+| `caddy_data_dir` | `{{ podman_data_dir }}/caddy` | Host dir for the build context, Caddyfile, and state (certs in `data/`) — on the external drive the `storage` role mounts. |
 | `caddy_build_dir` | `{{ caddy_data_dir }}/build` | Host dir holding the Containerfile build context. |
 | `caddy_http_port` | `80` | Host port → container 80. |
 | `caddy_https_port` | `443` | Host port → container 443. |
@@ -48,4 +48,4 @@ caddy_sites:
 Each `host` needs a DNS **A/AAAA record** pointing at wherever clients
 actually reach this host (its LAN or ZeroTier IP) — DNS-01 doesn't require it
 to resolve to a public IP, unlike HTTP-01. Certificates persist in
-`/opt/podman/caddy/data` — back that up.
+`{{ caddy_data_dir }}/data` — back that up.

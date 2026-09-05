@@ -8,8 +8,10 @@ caddy_image: localhost/caddy-cloudflare:2
 
 # Host directory holding the build context, the rendered Caddyfile, and
 # Caddy's persistent state. Issued certificates live in <dir>/data — back
-# that up.
-caddy_data_dir: /opt/podman/caddy
+# that up. Derived from podman_data_dir (the storage role's mounted external
+# drive on this host), not hardcoded, so it always lands on the same disk as
+# every other service's data.
+caddy_data_dir: "{{ podman_data_dir }}/caddy"
 caddy_build_dir: "{{ caddy_data_dir }}/build"
 
 # Host ports Caddy publishes. The container always uses 80/443 internally.
