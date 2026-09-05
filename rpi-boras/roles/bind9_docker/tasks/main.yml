@@ -19,8 +19,8 @@
       - "{{ ansible_default_ipv4.address }}"
     forwarding: True
     forwarders:
-      - 76.76.2.2
-      - 76.76.10.2
+      - 1.1.1.1
+      - 1.0.0.1
     dnssec_validate: False
     rndc_sync: False
     allow_query:
