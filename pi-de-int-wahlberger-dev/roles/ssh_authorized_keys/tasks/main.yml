@@ -1,0 +1,16 @@
+---
+- name: Validate at least one authorized key is configured
+  ansible.builtin.assert:
+    that:
+      - ssh_authorized_keys_list | length > 0
+    fail_msg: >-
+      ssh_authorized_keys_list is empty. Set it in group_vars. See
+      roles/ssh_authorized_keys/README.md.
+    quiet: true
+
+- name: Authorize the configured SSH keys for {{ ssh_authorized_keys_user }}
+  ansible.posix.authorized_key:
+    user: "{{ ssh_authorized_keys_user }}"
+    key: "{{ item }}"
+    state: present
+  loop: "{{ ssh_authorized_keys_list }}"

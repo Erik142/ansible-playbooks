@@ -1,0 +1,14 @@
+---
+argument_specs:
+  main:
+    short_description: Authorize one or more SSH public keys for manual and unattended access.
+    options:
+      ssh_authorized_keys_user:
+        type: str
+        required: false
+        description: Unix account the keys are authorized for.
+      ssh_authorized_keys_list:
+        type: list
+        elements: str
+        required: true
+        description: Public key lines (ssh-ed25519/ssh-rsa ... comment) to authorize.

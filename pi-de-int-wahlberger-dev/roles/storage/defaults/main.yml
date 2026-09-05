@@ -1,0 +1,19 @@
+---
+# Default variables for the `storage` role.
+
+# Stable by-id path — survives reboots and USB re-enumeration, unlike
+# /dev/sdX (which can change depending on enumeration order).
+storage_device: "/dev/disk/by-id/ata-WDC_WD50NDZW-11BCSS0_WD-WX52D448WU91-part1"
+
+storage_mount_path: /mnt/data
+
+# REQUIRED: the filesystem ALREADY on the drive — this role does not format
+# it (there's existing, unrelated data on it). Check with
+# `sudo blkid {{ storage_device }}` or `lsblk -f`.
+storage_fstype: ""
+
+# nofail matters specifically for a USB drive: without it, a missing/
+# unplugged drive at boot blocks the ENTIRE boot (systemd waits on
+# local-fs.target for every non-nofail fstab entry), not just this mount.
+# The device-timeout keeps that wait short if it really is missing.
+storage_mount_options: "defaults,nofail,x-systemd.device-timeout=10"

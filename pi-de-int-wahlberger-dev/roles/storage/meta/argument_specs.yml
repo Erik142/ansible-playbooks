@@ -1,0 +1,26 @@
+---
+argument_specs:
+  main:
+    short_description: Mount an existing external drive by stable path, for container data.
+    description:
+      - Mounts an already-formatted external drive at storage_mount_path
+        (persisted in /etc/fstab, nofail so a missing drive can't block
+        boot), and creates a "containers" subdirectory within it. Does NOT
+        format the device.
+    options:
+      storage_device:
+        type: path
+        required: false
+        description: Stable /dev/disk/by-id path to the partition.
+      storage_mount_path:
+        type: path
+        required: false
+        description: Where to mount the device.
+      storage_fstype:
+        type: str
+        required: true
+        description: Filesystem already on the device (this role does not format it).
+      storage_mount_options:
+        type: str
+        required: false
+        description: /etc/fstab mount options.

@@ -1,0 +1,32 @@
+# EXAMPLE Vault contents — copy the structure, NOT the placeholder values.
+#
+# This file is a committed, plaintext template. The REAL file is the encrypted
+# sibling `vault.yml` (same directory). Create it with:
+#
+#     ansible-vault create inventories/production/group_vars/all/vault.yml
+#
+# then paste real values in. Every key is referenced from vars.yml under a
+# friendly (non-vault_) name.
+
+# Cloudflare DNS API token for Caddy's DNS-01 challenge. Reuse the SAME token
+# already used by the NAS's Caddy and rpi-karlsruhe's Traefik for the
+# wahlberger.dev zone — don't mint a new one.
+vault_cloudflare_dns_api_token: "REPLACE-with-the-existing-cloudflare-token"
+
+# Semaphore's break-glass local admin password.
+#     LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 24; echo
+vault_semaphore_admin_password: "REPLACE-with-a-24-char-alnum-password"
+
+# Semaphore's database encryption key. MUST stay stable once set — rotating
+# it makes previously stored SSH keys/vault passwords in Semaphore's own
+# database unrecoverable.
+#     head -c32 /dev/urandom | base64
+vault_semaphore_access_key_encryption: "REPLACE-32-random-bytes-base64"
+
+# Semaphore's session cookie keys. Same generation command as above.
+vault_semaphore_cookie_hash: "REPLACE-32-random-bytes-base64"
+vault_semaphore_cookie_encryption: "REPLACE-32-random-bytes-base64"
+
+# Semaphore's OIDC client secret, issued by Pocket ID when you register the
+# app (the client_id lives in vars.yml).
+vault_semaphore_oidc_client_secret: "REPLACE-with-pocket-id-client-secret"

@@ -1,0 +1,21 @@
+---
+# Default variables for the `firewall` role.
+
+# Inbound TCP ports to allow: SSH, HTTP, HTTPS (the Caddy ingress).
+firewall_allowed_tcp_ports:
+  - 22
+  - 80
+  - 443
+
+# Default policies for traffic that matches no rule.
+firewall_default_incoming: deny
+firewall_default_outgoing: allow
+
+# Forwarded/routed traffic policy (written to /etc/default/ufw). Must be ACCEPT:
+# rootful Podman publishes container ports via DNAT through the FORWARD chain, so
+# a DROP here would break published ports (e.g. Caddy on 80/443). The INPUT
+# default-deny above still protects host services.
+firewall_forward_policy: ACCEPT
+
+# ufw logging level: off | low | medium | high | full.
+firewall_logging: low

@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  role_name: podman
+  author: Erik Wahlberger
+  description: Install Podman and Quadlet support on a Debian host.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+  galaxy_tags:
+    - podman
+    - containers
+    - debian
+
+dependencies: []

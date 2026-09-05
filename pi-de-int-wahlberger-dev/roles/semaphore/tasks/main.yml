@@ -1,0 +1,47 @@
+---
+- name: Validate Semaphore inputs are present
+  ansible.builtin.assert:
+    that:
+      - semaphore_url | length > 0
+      - semaphore_oidc_client_id | length > 0
+      - semaphore_oidc_client_secret | length > 0
+      - semaphore_admin_password | length > 0
+      - semaphore_access_key_encryption | length > 0
+    fail_msg: >-
+      Semaphore is not fully configured. Set semaphore_oidc_client_id in
+      group_vars and provide the Vault secrets vault_semaphore_admin_password,
+      vault_semaphore_access_key_encryption, and
+      vault_semaphore_oidc_client_secret (run with --ask-vault-pass). See
+      roles/semaphore/README.md.
+    quiet: true
+
+# world-writable (0777): matches this repo's established pattern for Podman
+# data directories where the exact in-container UID isn't pinned down — see
+# nas-de-int-wahlberger-dev's mealie/paperless_ngx roles for the history of
+# why this is the safer default over guessing at a tighter mode.
+- name: Create the Semaphore config directory
+  ansible.builtin.file:
+    path: "{{ semaphore_data_dir }}/config"
+    state: directory
+    owner: root
+    group: root
+    mode: "0777"
+
+# All config + secrets (DB path, admin bootstrap, encryption keys, OIDC
+# client secret) go through this single root-only env file — none of it lands
+# in the world-readable Quadlet unit. A change here restarts the container.
+- name: Render the Semaphore environment file
+  ansible.builtin.template:
+    src: semaphore.env.j2
+    dest: "{{ semaphore_data_dir }}/semaphore.env"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart semaphore
+
+- name: Deploy the Semaphore container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: semaphore
+    container_quadlet_src: semaphore.container.j2

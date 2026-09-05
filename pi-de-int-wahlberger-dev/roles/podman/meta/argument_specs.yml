@@ -1,0 +1,22 @@
+---
+argument_specs:
+  main:
+    short_description: Install Podman and Quadlet support on a Debian host.
+    options:
+      podman_packages:
+        type: list
+        elements: str
+        required: false
+        description: Packages that provide Podman, the Docker-compat CLI, and Quadlet.
+      podman_data_dir:
+        type: path
+        required: false
+        description: Root directory for persistent container data.
+      podman_quadlet_dir:
+        type: path
+        required: false
+        description: Directory systemd reads Quadlet unit files from.
+      podman_enable_socket:
+        type: bool
+        required: false
+        description: Whether to enable and start podman.socket.

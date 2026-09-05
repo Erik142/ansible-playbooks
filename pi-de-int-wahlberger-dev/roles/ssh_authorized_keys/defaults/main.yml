@@ -1,0 +1,11 @@
+---
+# Default variables for the `ssh_authorized_keys` role.
+
+# Unix account the keys are authorized for.
+ssh_authorized_keys_user: erikwahlberger
+
+# REQUIRED: list of public key lines ("ssh-ed25519 AAAA... comment") to
+# authorize for ssh_authorized_keys_user — your personal key(s) for manual
+# access, plus Semaphore UI's dedicated automation key. Not secret (public
+# keys), so this lives in vars.yml, not Vault.
+ssh_authorized_keys_list: []

@@ -1,0 +1,18 @@
+---
+# Default variables for the `podman` role.
+
+# Packages providing Podman, the Docker-compat CLI, and Quadlet support.
+podman_packages:
+  - podman
+  - podman-docker
+
+# Root directory for persistent container (bind-mount) data. A subdirectory
+# of the external USB drive the `storage` role mounts — NOT the root of that
+# drive, which already holds unrelated data.
+podman_data_dir: /mnt/data/containers
+
+# Directory systemd reads Quadlet unit files from (system-wide / rootful).
+podman_quadlet_dir: /etc/containers/systemd
+
+# Enable podman.socket so tools that speak the Docker-compatible API work.
+podman_enable_socket: true

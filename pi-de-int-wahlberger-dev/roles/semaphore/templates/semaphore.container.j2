@@ -1,0 +1,20 @@
+[Unit]
+Description=Semaphore UI (Ansible automation)
+After=network-online.target caddy-network.service
+Wants=network-online.target
+Requires=caddy-network.service
+
+[Container]
+ContainerName=semaphore
+Image={{ semaphore_image }}
+Network=caddy.network
+Volume={{ semaphore_data_dir }}/config:/etc/semaphore:Z
+# DB path, admin bootstrap, encryption keys, and OIDC config all come from
+# this root-only file, rendered by the semaphore role from Ansible Vault.
+EnvironmentFile={{ semaphore_data_dir }}/semaphore.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

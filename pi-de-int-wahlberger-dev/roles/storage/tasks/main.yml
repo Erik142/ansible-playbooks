@@ -1,0 +1,39 @@
+---
+- name: Validate the storage device filesystem type is set
+  ansible.builtin.assert:
+    that:
+      - storage_fstype | length > 0
+    fail_msg: >-
+      storage_fstype is empty. This role does not format the device — set
+      storage_fstype to the filesystem ALREADY on {{ storage_device }} (check
+      with `sudo blkid {{ storage_device }}` or `lsblk -f`). See
+      roles/storage/README.md.
+    quiet: true
+
+- name: Ensure the mount point directory exists
+  ansible.builtin.file:
+    path: "{{ storage_mount_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# Mounts it now AND writes/updates the /etc/fstab entry, so it's remounted
+# automatically on every future boot.
+- name: Mount the external storage device
+  ansible.posix.mount:
+    path: "{{ storage_mount_path }}"
+    src: "{{ storage_device }}"
+    fstype: "{{ storage_fstype }}"
+    opts: "{{ storage_mount_options }}"
+    state: mounted
+
+# The drive already holds unrelated data — this playbook only owns the
+# "containers" subdirectory within it (see podman_data_dir).
+- name: Create the containers subdirectory
+  ansible.builtin.file:
+    path: "{{ storage_mount_path }}/containers"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"

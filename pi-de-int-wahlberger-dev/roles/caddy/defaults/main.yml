@@ -1,0 +1,28 @@
+---
+# Default variables for the `caddy` role.
+
+# Locally built image (see files/Containerfile): the official caddy:2 image
+# has no DNS provider plugins, but this host needs DNS-01 (no public inbound
+# port for HTTP-01), which requires the caddy-dns/cloudflare module baked in.
+caddy_image: localhost/caddy-cloudflare:2
+
+# Host directory holding the build context, the rendered Caddyfile, and
+# Caddy's persistent state. Issued certificates live in <dir>/data — back
+# that up.
+caddy_data_dir: /opt/podman/caddy
+caddy_build_dir: "{{ caddy_data_dir }}/build"
+
+# Host ports Caddy publishes. The container always uses 80/443 internally.
+caddy_http_port: 80
+caddy_https_port: 443
+
+# Email for Let's Encrypt registration (expiry notices). Empty = no account email.
+caddy_acme_email: ""
+
+# Sites Caddy serves. Each item is a dict:
+#   host:     public hostname (must resolve to this host's LAN/ZeroTier IP —
+#             DNS-01 doesn't need it reachable from the public internet)
+#   upstream: container_name:port to reverse_proxy to
+#   extra:    (optional) raw Caddy directives inserted into the site block
+# Set the real list in inventory group_vars.
+caddy_sites: []

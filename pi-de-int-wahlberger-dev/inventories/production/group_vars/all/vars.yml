@@ -1,0 +1,102 @@
+---
+# Variables applied to every host in the production inventory.
+#
+# group_vars/all/ is a *directory* (not a single file) on purpose: it lets a
+# plaintext `vars.yml` sit next to an encrypted `vault.yml`, so secrets and
+# non-secrets live side by side without mixing.
+
+# --- Connection -------------------------------------------------------------
+# SSH login user. Privilege escalation (become) is turned on in site.yml.
+ansible_user: erikwahlberger
+
+# --- Hardening (geerlingguy.security) ---------------------------------------
+# These mirror the role's secure defaults, set explicitly so the security
+# posture is auditable in one place.
+security_ssh_port: 22
+security_ssh_permit_root_login: "no"
+security_ssh_password_authentication: "no"
+security_fail2ban_enabled: true
+security_autoupdate_enabled: true
+# Passwordless sudo for Semaphore UI's own unattended playbook runs against
+# THIS host (as well as cloud-wahlberger-dev and the NAS) — it can't type a
+# sudo password interactively.
+security_sudoers_passwordless:
+  - erikwahlberger
+
+# --- SSH access (ssh_authorized_keys role) ----------------------------------
+# Your personal key (manual access) plus Semaphore UI's dedicated automation
+# key, kept separate on purpose — see roles/ssh_authorized_keys/README.md.
+# Neither is secret (public keys). The SAME two keys are authorized on
+# cloud-wahlberger-dev and the NAS too, so Semaphore (once running here) can
+# reach all three from one identity, and you can SSH into all three yourself.
+ssh_authorized_keys_list:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJSKdeHoK+WkyBI69OSZqn0sVqZPPDRs082S/IVoOeSu erikwahlberger@personal"
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMixf1vPbDUankXYuMO0bJFXjQ+Cmh3QsrwC6TzGPkda semaphore-automation@pi.de.int.wahlberger.dev"
+
+# --- Storage (storage role) --------------------------------------------------
+# External USB drive holding container data (see roles/storage/README.md).
+# REQUIRED: set this to whatever filesystem is ALREADY on the drive — check
+# with `sudo blkid /dev/disk/by-id/ata-WDC_WD50NDZW-11BCSS0_WD-WX52D448WU91-part1`
+# or `lsblk -f` on the Pi. This role does not format the device.
+storage_fstype: "ext4"
+
+# --- Reverse proxy (caddy role) ----------------------------------------------
+# DNS-01 via Cloudflare (not HTTP-01): this host has no public inbound port
+# (a Pi at home, same as the NAS), so certificates are issued via a
+# Cloudflare DNS API token instead. See roles/caddy/README.md.
+caddy_acme_email: "ewahlberger@gmail.com"
+caddy_sites:
+  - host: semaphore.de.int.wahlberger.dev
+    upstream: "semaphore:3000"
+
+# --- Identity provider (Pocket ID) -------------------------------------------
+# Public issuer URL of the Pocket ID instance (served by cloud-wahlberger-dev)
+# that Semaphore authenticates against.
+pocket_id_app_url: "https://id.wahlberger.dev"
+
+# --- Semaphore UI -------------------------------------------------------------
+semaphore_url: "https://semaphore.de.int.wahlberger.dev"
+# REQUIRED: OAuth2 client ID issued by Pocket ID when you register the
+# Semaphore app (redirect URI:
+# "{{ semaphore_url }}/api/auth/oidc/pocketid/redirect/"). Not secret (a
+# UUID), so it lives here in plaintext.
+semaphore_oidc_client_id: "63093482-d2cc-4c77-89df-9f6ff78b160e"
+
+# --- Secrets (Ansible Vault) ---------------------------------------------------
+# Never put secrets in plaintext. They live in an encrypted sibling file
+# `vault.yml` in this directory, each with a `vault_` prefix, surfaced here
+# under a friendly name. `| default('')` keeps roles failing with a clear
+# assert (rather than a bare "undefined variable") when the Vault is absent.
+#
+# Scaffold and the exact contents are in `vault.yml.example`. Create the real,
+# encrypted file with:
+#
+#     ansible-vault create inventories/production/group_vars/all/vault.yml
+#
+# and run plays with `--ask-vault-pass` (or --vault-password-file .vault_pass).
+# See README.md -> "Secrets with Ansible Vault" for the full workflow.
+
+# Cloudflare DNS API token for Caddy's DNS-01 challenge (Zone:DNS:Edit on
+# wahlberger.dev). Same token the NAS's Caddy and rpi-karlsruhe's Traefik
+# already use for the same zone — reused rather than minted fresh.
+cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token | default('') }}"
+
+# Semaphore's break-glass local admin password. Kept even though Pocket ID
+# OIDC is the intended way in — Semaphore has no "OIDC-only" switch, and a
+# newly auto-created OIDC user gets no project access until this admin grants
+# it. See roles/semaphore/README.md.
+semaphore_admin_password: "{{ vault_semaphore_admin_password | default('') }}"
+
+# Encrypts SSH keys/vault passwords Semaphore stores in its own database.
+# MUST stay stable — a new value makes previously stored credentials
+# unrecoverable. Generate with: head -c32 /dev/urandom | base64
+semaphore_access_key_encryption: "{{ vault_semaphore_access_key_encryption | default('') }}"
+
+# Session cookie keys. Not as critical as the encryption key above (a new
+# value just logs everyone out), but kept stable anyway for a consistent
+# experience across restarts. Generate the same way.
+semaphore_cookie_hash: "{{ vault_semaphore_cookie_hash | default('') }}"
+semaphore_cookie_encryption: "{{ vault_semaphore_cookie_encryption | default('') }}"
+
+# OIDC client secret from Pocket ID (pairs with semaphore_oidc_client_id above).
+semaphore_oidc_client_secret: "{{ vault_semaphore_oidc_client_secret | default('') }}"

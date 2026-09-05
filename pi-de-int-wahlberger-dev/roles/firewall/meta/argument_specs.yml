@@ -1,0 +1,26 @@
+---
+argument_specs:
+  main:
+    short_description: Host firewall via ufw, default-deny inbound.
+    options:
+      firewall_allowed_tcp_ports:
+        type: list
+        elements: int
+        required: false
+        description: Inbound TCP ports to allow.
+      firewall_default_incoming:
+        type: str
+        required: false
+        description: Default inbound policy.
+      firewall_default_outgoing:
+        type: str
+        required: false
+        description: Default outbound policy.
+      firewall_forward_policy:
+        type: str
+        required: false
+        description: /etc/default/ufw forward policy.
+      firewall_logging:
+        type: str
+        required: false
+        description: ufw logging level.

@@ -1,0 +1,47 @@
+---
+argument_specs:
+  main:
+    short_description: Caddy reverse proxy with automatic HTTPS.
+    options:
+      caddy_image:
+        type: str
+        required: false
+        description: Locally built Caddy image tag (with the Cloudflare DNS module).
+      caddy_data_dir:
+        type: path
+        required: false
+        description: Host directory for the build context, Caddyfile, and Caddy state (certs).
+      caddy_build_dir:
+        type: path
+        required: false
+        description: Host directory holding the Containerfile build context.
+      caddy_http_port:
+        type: int
+        required: false
+        description: Host port mapped to the container's port 80.
+      caddy_https_port:
+        type: int
+        required: false
+        description: Host port mapped to the container's port 443.
+      caddy_acme_email:
+        type: str
+        required: false
+        description: Email for Let's Encrypt registration (optional).
+      caddy_sites:
+        type: list
+        elements: dict
+        required: false
+        description: Sites to serve.
+        options:
+          host:
+            type: str
+            required: true
+            description: Public hostname to serve.
+          upstream:
+            type: str
+            required: true
+            description: container_name:port to reverse_proxy to.
+          extra:
+            type: str
+            required: false
+            description: Optional raw Caddy directives for the site block.

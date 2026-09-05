@@ -1,0 +1,21 @@
+---
+# Default variables for the `common` role.
+# Every variable is prefixed with the role name (best practice: avoids
+# collisions) and can be overridden from inventory group_vars/host_vars.
+
+# Baseline packages installed on every host.
+common_packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - htop
+  - vim
+
+# System timezone as an IANA name.
+common_timezone: Europe/Berlin
+
+# Run a full `apt upgrade` during the play.
+common_upgrade: true
+
+# How long (seconds) a previously refreshed apt cache is considered fresh.
+common_apt_cache_valid_time: 3600

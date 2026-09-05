@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: storage
+  author: Erik Wahlberger
+  description: Mount an existing external USB drive (by stable /dev/disk/by-id path) for container data.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+  galaxy_tags:
+    - storage
+    - mount
+
+dependencies: []

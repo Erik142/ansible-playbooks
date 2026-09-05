@@ -1,0 +1,37 @@
+---
+argument_specs:
+  main:
+    short_description: Semaphore UI behind Caddy, with Pocket ID OIDC login.
+    options:
+      semaphore_image:
+        type: str
+        required: false
+        description: Semaphore container image.
+      semaphore_data_dir:
+        type: path
+        required: false
+        description: Host directory for Semaphore's SQLite database and env file.
+      semaphore_url:
+        type: str
+        required: true
+        description: Public https:// URL Semaphore is served on.
+      semaphore_admin_username:
+        type: str
+        required: false
+        description: Break-glass local admin username, created on first boot.
+      semaphore_admin_name:
+        type: str
+        required: false
+        description: Break-glass local admin display name.
+      semaphore_admin_email:
+        type: str
+        required: false
+        description: Break-glass local admin email.
+      semaphore_oidc_provider_name:
+        type: str
+        required: false
+        description: Label shown on the Semaphore login button.
+      semaphore_oidc_client_id:
+        type: str
+        required: true
+        description: OAuth2 client ID issued by Pocket ID.

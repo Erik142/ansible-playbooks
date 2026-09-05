@@ -1,0 +1,25 @@
+---
+argument_specs:
+  main:
+    short_description: Baseline OS configuration for Debian hosts.
+    description:
+      - Refreshes apt, optionally runs a full upgrade, installs a baseline
+        package set, and sets the system timezone.
+    options:
+      common_packages:
+        type: list
+        elements: str
+        required: false
+        description: Baseline packages installed on every host.
+      common_timezone:
+        type: str
+        required: false
+        description: IANA timezone name to configure (for example Etc/UTC).
+      common_upgrade:
+        type: bool
+        required: false
+        description: Whether to run a full apt upgrade.
+      common_apt_cache_valid_time:
+        type: int
+        required: false
+        description: Seconds a previously refreshed apt cache is considered fresh.

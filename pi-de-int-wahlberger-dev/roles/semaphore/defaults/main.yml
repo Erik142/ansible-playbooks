@@ -1,0 +1,21 @@
+---
+# Default variables for the `semaphore` role.
+
+semaphore_image: docker.io/semaphoreui/semaphore:v2.19.12
+
+semaphore_data_dir: /opt/podman/semaphore
+
+# REQUIRED: public https:// URL Semaphore is served on (set in group_vars).
+semaphore_url: ""
+
+# Break-glass local admin, created on first boot. Kept deliberately — see
+# README.md for why Pocket ID can't fully replace it here.
+semaphore_admin_username: erikwahlberger
+semaphore_admin_name: "Erik Wahlberger"
+semaphore_admin_email: "ewahlberger@gmail.com"
+
+# --- Pocket ID OIDC login -----------------------------------------------------
+semaphore_oidc_provider_name: "Pocket ID"
+# REQUIRED: OAuth2 client ID issued by Pocket ID. Not secret (a UUID), so it
+# lives in group_vars in plaintext.
+semaphore_oidc_client_id: ""
