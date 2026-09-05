@@ -1,0 +1,13 @@
+---
+
+- hosts: bind9
+  gather_facts: yes
+  become: yes
+  roles:
+    - bind9
+
+- hosts: pi-hole
+  gather_facts: yes
+  become: yes
+  roles:
+    - pi-hole
