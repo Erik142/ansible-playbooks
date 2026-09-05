@@ -49,3 +49,24 @@ Each `host` needs a DNS **A/AAAA record** pointing at wherever clients
 actually reach this host (its LAN or ZeroTier IP) — DNS-01 doesn't require it
 to resolve to a public IP, unlike HTTP-01. Certificates persist in
 `{{ caddy_data_dir }}/data` — back that up.
+
+## Changing `files/caddy.network` (e.g. the `DNS=` lines)
+
+`DNS=10.10.0.1`/`DNS=10.10.10.1` are the LAN resolvers, so that containers on
+`caddy.network` (Caddy, Semaphore) can resolve internal-only records like
+`nas.de.int.wahlberger.dev`, not just public hostnames — Semaphore needs this
+to SSH into the other two hosts. They also forward public lookups fine, so
+Caddy's own ACME/Cloudflare calls are unaffected.
+
+Re-running the playbook after editing this file is **not enough** on its
+own: Quadlet's generated `caddy-network.service` creates the Podman network
+with `--ignore`, which no-ops if it already exists — Podman does not
+retroactively apply new settings to a live network. After re-running,
+recreate it by hand and restart everything attached to it:
+
+```sh
+sudo podman stop semaphore caddy
+sudo podman network rm caddy
+sudo systemctl restart caddy-network.service
+sudo systemctl restart caddy.service semaphore.service
+```

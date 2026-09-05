@@ -3,5 +3,10 @@ Description=Caddy reverse-proxy network
 
 [Network]
 Driver=bridge
-DNS=1.1.1.1
-DNS=8.8.8.8
+# LAN nameservers (same ones the Pi host itself uses, see /etc/resolv.conf),
+# not public resolvers: Semaphore needs to resolve internal-only records
+# like nas.de.int.wahlberger.dev, which only exist on the router's DNS.
+# These also forward public lookups fine, so Caddy's ACME/Cloudflare calls
+# are unaffected.
+DNS=10.10.0.1
+DNS=10.10.10.1
