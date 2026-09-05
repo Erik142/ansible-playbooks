@@ -1,0 +1,9 @@
+---
+# Restarts FreshRSS when its environment file changes (the container role's own
+# handler only fires when the .container unit changes, not the env file). Both
+# get flushed by the flush_handlers inside the container role include.
+- name: Restart freshrss
+  ansible.builtin.systemd:
+    name: freshrss.service
+    state: restarted
+    daemon_reload: true

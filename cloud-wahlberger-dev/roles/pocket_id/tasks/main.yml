@@ -1,0 +1,37 @@
+---
+# The pocket-id.container template reads this role's variables (pocket_id_*)
+# plus pocket_id_app_url from group_vars. Data lives in a named volume, which
+# Podman creates on first start. The encryption key comes from Ansible Vault
+# (surfaced as pocket_id_encryption_key in group_vars) and is written to a
+# root-only file the container mounts read-only.
+#
+# IMPORTANT: this key encrypts Pocket ID's data. It must stay constant — putting
+# a different value here makes existing encrypted data unrecoverable.
+- name: Validate the Pocket ID encryption key is provided
+  ansible.builtin.assert:
+    that:
+      - pocket_id_encryption_key | length >= 32
+    fail_msg: >-
+      pocket_id_encryption_key is missing or too short. Provide
+      vault_pocket_id_encryption_key in Vault (run with --ask-vault-pass).
+      Migrating an existing instance? Use the CURRENT key value from
+      secret_files/pocket_id_encryption.key — a new value loses encrypted data.
+    quiet: true
+
+- name: Write the encryption key to the target host
+  ansible.builtin.copy:
+    content: "{{ pocket_id_encryption_key }}\n"
+    dest: "{{ pocket_id_data_dir }}/encryption.key"
+    owner: root
+    group: root
+    # 0644 (not 0600): the container may run as a non-root user and mounts this
+    # read-only, so it must be world-readable to be loaded. The host dir is
+    # root-owned and the real secret-at-rest protection is Vault + the VM itself.
+    mode: '0644'
+
+- name: Deploy the Pocket ID container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: pocket-id
+    container_quadlet_src: pocket-id.container.j2

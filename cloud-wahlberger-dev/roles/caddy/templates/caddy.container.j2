@@ -1,0 +1,21 @@
+[Unit]
+Description=Caddy reverse proxy
+After=network-online.target caddy-network.service
+Wants=network-online.target
+Requires=caddy-network.service
+
+[Container]
+ContainerName=caddy
+Image={{ caddy_image }}
+Network=caddy.network
+PublishPort={{ caddy_http_port }}:80
+PublishPort={{ caddy_https_port }}:443
+Volume={{ caddy_data_dir }}/Caddyfile:/etc/caddy/Caddyfile:Z,ro
+Volume={{ caddy_data_dir }}/data:/data:Z
+Volume={{ caddy_data_dir }}/config:/config:Z
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,69 @@
+---
+argument_specs:
+  main:
+    short_description: Run FreshRSS as a Podman Quadlet with Pocket ID OIDC login.
+    options:
+      freshrss_image:
+        type: str
+        required: false
+        description: FreshRSS container image (pin a version).
+      freshrss_volume:
+        type: str
+        required: false
+        description: Named Podman volume mounted at /var/www/FreshRSS/data (DB + config).
+      freshrss_data_dir:
+        type: path
+        required: false
+        description: Host directory for the root-only (0600) environment file.
+      freshrss_app_url:
+        type: str
+        required: true
+        description: Public https URL FreshRSS is served on (must match DNS and the Caddy site).
+      freshrss_admin_user:
+        type: str
+        required: true
+        description: >-
+          FreshRSS admin username. MUST match the Pocket ID username exactly
+          (lowercase), or OIDC login fails with a 403.
+      freshrss_admin_email:
+        type: str
+        required: false
+        description: Optional email stamped on the admin account.
+      freshrss_language:
+        type: str
+        required: false
+        description: UI/install language code (e.g. en).
+      freshrss_timezone:
+        type: str
+        required: false
+        description: Container timezone (TZ).
+      freshrss_cron_min:
+        type: str
+        required: false
+        description: >-
+          Minutes field of the built-in feed-refresh cron (e.g. "13,43").
+          Empty string disables auto-refresh.
+      freshrss_trusted_proxy:
+        type: str
+        required: false
+        description: CIDR(s) FreshRSS trusts as the reverse proxy (mod_remoteip).
+      freshrss_oidc_provider_metadata_url:
+        type: str
+        required: false
+        description: OIDC discovery URL; defaults to Pocket ID's well-known endpoint.
+      freshrss_oidc_client_id:
+        type: str
+        required: true
+        description: OAuth2 client ID issued by Pocket ID for FreshRSS.
+      freshrss_oidc_scopes:
+        type: str
+        required: false
+        description: Space-separated OIDC scopes (default "openid email profile").
+      freshrss_oidc_remote_user_claim:
+        type: str
+        required: false
+        description: Claim mapped to the FreshRSS username (default preferred_username).
+      freshrss_oidc_x_forwarded_headers:
+        type: str
+        required: false
+        description: Forwarded headers FreshRSS trusts to build the OIDC redirect URL.

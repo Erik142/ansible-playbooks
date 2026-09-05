@@ -1,0 +1,66 @@
+---
+# Default variables for the `freshrss` role.
+
+# FreshRSS image, pinned to a specific release for reproducibility.
+freshrss_image: docker.io/freshrss/freshrss:1.29.1
+
+# Named Podman volume for persistent data — holds the SQLite DB and config.php
+# (/var/www/FreshRSS/data). Back this up. Podman creates it automatically.
+freshrss_volume: freshrss
+
+# Host directory holding the rendered, root-only (0600) environment file that
+# carries FreshRSS's secrets (OIDC client secret, crypto key, admin password).
+freshrss_data_dir: /opt/podman/freshrss
+
+# Public https:// URL FreshRSS is served on. REQUIRED — must match the DNS
+# record and the caddy_sites host. Set it in inventory group_vars.
+# freshrss_app_url: "https://rss.wahlberger.dev"
+
+# FreshRSS admin username. REQUIRED, and it MUST match the username of the
+# Pocket ID account exactly (case-sensitive, lowercase — Pocket ID forces
+# lowercase). FreshRSS does NOT auto-create users from OIDC, so the entrypoint
+# pre-creates this user; if it doesn't match the OIDC `preferred_username`
+# claim you get a 403 with no admin access. Set it in group_vars.
+# freshrss_admin_user: "your-pocket-id-username"
+
+# Optional email stamped on the admin account.
+freshrss_admin_email: ""
+
+# UI language and timezone passed to the install/runtime.
+freshrss_language: en
+freshrss_timezone: Europe/Stockholm
+
+# Built-in cron that refreshes feeds — the minutes field of the container's
+# crontab entry. Auto-refresh is DISABLED in the image unless this is set, so it
+# defaults to twice an hour here ("13,43" is the FreshRSS-recommended value: off
+# the top of the hour to avoid hammering servers in sync with everyone else).
+# Set to "" to disable, "*/20" for every 20 min, etc. This is the upper bound on
+# how often FreshRSS *checks*; per-feed minimum intervals (set in the UI) decide
+# which feeds actually get pulled on each run.
+freshrss_cron_min: "13,43"
+
+# CIDR(s) FreshRSS (Apache mod_remoteip) trusts as the reverse proxy. Caddy
+# reaches FreshRSS over the internal caddy.network bridge; these cover Podman's
+# default bridge ranges. Adjust if your caddy.network subnet differs.
+freshrss_trusted_proxy: "10.88.0.0/16 10.89.0.0/16"
+
+# --- OpenID Connect (Pocket ID) --------------------------------------------
+# Discovery document URL. Defaults to Pocket ID's well-known endpoint, derived
+# from pocket_id_app_url (set in the same group_vars), so the two stay in sync.
+freshrss_oidc_provider_metadata_url: "{{ pocket_id_app_url }}/.well-known/openid-configuration"
+
+# OAuth2 client identifier issued by Pocket ID when you register the FreshRSS
+# client. Not secret (a UUID), but REQUIRED — set it in group_vars.
+# freshrss_oidc_client_id: "uuid-from-pocket-id"
+
+# Scopes requested from Pocket ID. `profile` carries preferred_username/name,
+# `email` the address — both used by FreshRSS.
+freshrss_oidc_scopes: "openid email profile"
+
+# Which claim becomes the FreshRSS username. Pocket ID exposes the login name
+# as `preferred_username`; it must equal freshrss_admin_user.
+freshrss_oidc_remote_user_claim: preferred_username
+
+# Forwarded headers FreshRSS trusts to reconstruct the public scheme/host when
+# building the OIDC redirect URL behind Caddy.
+freshrss_oidc_x_forwarded_headers: "X-Forwarded-Proto X-Forwarded-Host"

@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  role_name: pocket_id
+  author: Erik Wahlberger
+  description: Run Pocket ID (OIDC provider with passkeys) as a Podman Quadlet behind a reverse proxy.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+  galaxy_tags:
+    - oidc
+    - sso
+    - podman
+
+dependencies: []

@@ -1,0 +1,28 @@
+---
+- name: Install Podman and Quadlet support
+  ansible.builtin.apt:
+    name: "{{ podman_packages }}"
+    state: present
+
+- name: Create the persistent container data directory
+  ansible.builtin.file:
+    path: "{{ podman_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Ensure the Quadlet unit directory exists
+  ansible.builtin.file:
+    path: "{{ podman_quadlet_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Enable and start the Podman API socket
+  ansible.builtin.systemd:
+    name: podman.socket
+    enabled: true
+    state: started
+  when: podman_enable_socket | bool

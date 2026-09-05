@@ -1,0 +1,7 @@
+[Unit]
+Description=Caddy reverse-proxy network
+
+[Network]
+Driver=bridge
+DNS=1.1.1.1
+DNS=8.8.8.8

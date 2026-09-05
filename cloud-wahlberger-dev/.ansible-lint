@@ -1,0 +1,10 @@
+---
+# Hold this playbook to ansible-lint's strictest "production" tier so it stays a
+# clean reference. https://ansible.readthedocs.io/projects/lint/profiles/
+#
+# Check it with:  ansible-lint
+profile: production
+
+exclude_paths:
+  - .ansible_cache/
+  - .ansible/

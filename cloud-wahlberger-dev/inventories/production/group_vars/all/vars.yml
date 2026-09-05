@@ -1,0 +1,85 @@
+---
+# Variables applied to every host in the production inventory.
+#
+# group_vars/all/ is a *directory* (not a single file) on purpose: it lets a
+# plaintext `vars.yml` sit next to an encrypted `vault.yml`, so secrets and
+# non-secrets live side by side without mixing.
+
+# --- Connection -------------------------------------------------------------
+# SSH login user. Privilege escalation (become) is turned on in site.yml.
+ansible_user: erikwahlberger
+
+# --- Hardening (geerlingguy.security) ---------------------------------------
+# These mirror the role's secure defaults, set explicitly so the security
+# posture is auditable in one place. SSH stays on port 22: key-only auth plus
+# fail2ban is the real control, and CIS does not require moving it. If you do
+# change security_ssh_port, update firewall_allowed_tcp_ports to match.
+security_ssh_port: 22
+security_ssh_permit_root_login: "no"
+security_ssh_password_authentication: "no"
+security_fail2ban_enabled: true
+security_autoupdate_enabled: true
+# Passwordless sudo for Semaphore UI's unattended playbook runs (see
+# pi-de-int-wahlberger-dev). geerlingguy.security applies this list directly.
+security_sudoers_passwordless:
+  - erikwahlberger
+
+# --- SSH access (ssh_authorized_keys role) ----------------------------------
+# Your personal key (manual access) plus Semaphore UI's dedicated automation
+# key (pi-de-int-wahlberger-dev), kept separate on purpose — see
+# roles/ssh_authorized_keys/README.md. Neither is secret (public keys), so
+# both live here in plaintext, not Vault. The SAME two keys are authorized on
+# cloud-wahlberger-dev, the NAS, and the Pi.
+ssh_authorized_keys_list:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJSKdeHoK+WkyBI69OSZqn0sVqZPPDRs082S/IVoOeSu erikwahlberger@personal"
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMixf1vPbDUankXYuMO0bJFXjQ+Cmh3QsrwC6TzGPkda semaphore-automation@pi.de.int.wahlberger.dev"
+
+# --- Reverse proxy (caddy role) --------------------------------------------
+caddy_acme_email: "ewahlberger@gmail.com"
+caddy_sites:
+  - host: id.wahlberger.dev
+    upstream: "pocket-id:1411"
+  - host: rss.wahlberger.dev
+    upstream: "freshrss:80"
+
+# --- Pocket ID (pocket_id role) --------------------------------------------
+# Must match the caddy_sites host above and the public DNS record.
+pocket_id_app_url: "https://id.wahlberger.dev"
+
+# --- FreshRSS (freshrss role) ----------------------------------------------
+# Must match the caddy_sites host above and the public DNS record.
+freshrss_app_url: "https://rss.wahlberger.dev"
+# REQUIRED: your Pocket ID username, lowercase. FreshRSS will not auto-create
+# OIDC users, and this must equal the OIDC `preferred_username` claim exactly,
+# or login 403s. Left empty so the role fails fast until you set it.
+freshrss_admin_user: "erikwahlberger"
+# OAuth2 client ID issued by Pocket ID when you register the FreshRSS client.
+# Not secret (a UUID), so it lives here in plaintext. REQUIRED.
+freshrss_oidc_client_id: "bfe9129b-8c6e-45b5-b67d-3534299fe264"
+# Feed-refresh cadence: every 10 minutes, offset 3 past the hour (not on the
+# round 00,10,20… that every other reader hits). Overrides the role default.
+freshrss_cron_min: "3,13,23,33,43,53"
+
+# --- Secrets (Ansible Vault) ------------------------------------------------
+# Never put secrets in plaintext. They live in an encrypted sibling file
+# `vault.yml` in this directory, each with a `vault_` prefix, surfaced here
+# under a friendly name. `| default('')` keeps roles failing with a clear
+# assert (rather than a bare "undefined variable") when the Vault is absent.
+#
+# Scaffold and the exact contents are in `vault.yml.example`. Create the real,
+# encrypted file with:
+#
+#     ansible-vault create inventories/production/group_vars/all/vault.yml
+#
+# and run plays with `--ask-vault-pass` (or --vault-password-file .vault_pass).
+# See README.md -> "Secrets with Ansible Vault" for the full workflow.
+
+# Pocket ID data-encryption key. MUST be the existing value when migrating an
+# already-running instance (see roles/pocket_id/README.md).
+pocket_id_encryption_key: "{{ vault_pocket_id_encryption_key | default('') }}"
+
+# FreshRSS: OIDC client secret (from Pocket ID), an internal crypto key, and a
+# break-glass admin password (for recovery if OIDC ever breaks).
+freshrss_oidc_client_secret: "{{ vault_freshrss_oidc_client_secret | default('') }}"
+freshrss_oidc_crypto_key: "{{ vault_freshrss_oidc_crypto_key | default('') }}"
+freshrss_admin_password: "{{ vault_freshrss_admin_password | default('') }}"

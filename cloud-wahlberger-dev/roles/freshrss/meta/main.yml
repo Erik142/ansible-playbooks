@@ -1,0 +1,19 @@
+---
+galaxy_info:
+  role_name: freshrss
+  author: Erik Wahlberger
+  description: Run FreshRSS (RSS aggregator) as a Podman Quadlet behind a reverse proxy, with Pocket ID OIDC login.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+  galaxy_tags:
+    - rss
+    - oidc
+    - sso
+    - podman
+
+dependencies: []

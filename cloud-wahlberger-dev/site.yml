@@ -1,0 +1,32 @@
+---
+# Top-level playbook. Convention: `site.yml` applies the *entire* configuration
+# to every host. As the stack grows, split concerns into per-tier playbooks and
+# pull them together here with `import_playbook:`.
+#
+# Run with:  ansible-playbook site.yml
+# Limit to one role:  ansible-playbook site.yml --tags podman
+- name: Configure the cloud.wahlberger.dev host
+  hosts: cloud
+  become: true
+  gather_facts: true
+  roles:
+    - role: common
+      tags: [common]
+    # Personal + Semaphore automation SSH keys, authorized before hardening.
+    - role: ssh_authorized_keys
+      tags: [ssh_authorized_keys]
+    # Harden the host before anything else listens on the network.
+    - role: geerlingguy.security
+      tags: [security]
+    - role: firewall
+      tags: [firewall]
+    - role: podman
+      tags: [podman]
+    # Reverse proxy (creates the shared network), then the Pocket ID service.
+    - role: caddy
+      tags: [caddy]
+    - role: pocket_id
+      tags: [pocket_id]
+    # FreshRSS (RSS aggregator), authenticating against Pocket ID via OIDC.
+    - role: freshrss
+      tags: [freshrss]

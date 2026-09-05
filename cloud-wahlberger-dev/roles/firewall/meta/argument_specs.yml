@@ -1,0 +1,26 @@
+---
+argument_specs:
+  main:
+    short_description: Configure a default-deny host firewall with ufw.
+    options:
+      firewall_allowed_tcp_ports:
+        type: list
+        elements: int
+        required: false
+        description: Inbound TCP ports to allow.
+      firewall_default_incoming:
+        type: str
+        required: false
+        description: Default policy for inbound traffic (allow/deny/reject).
+      firewall_default_outgoing:
+        type: str
+        required: false
+        description: Default policy for outbound traffic (allow/deny/reject).
+      firewall_forward_policy:
+        type: str
+        required: false
+        description: DEFAULT_FORWARD_POLICY in /etc/default/ufw (ACCEPT/DROP).
+      firewall_logging:
+        type: str
+        required: false
+        description: "ufw logging level: off, low, medium, high, or full."

@@ -1,0 +1,54 @@
+---
+# Renders a root-only environment file holding FreshRSS's config + secrets, then
+# deploys the Quadlet unit via the generic `container` role. All secrets come
+# from Ansible Vault, surfaced under friendly names in group_vars (see
+# vault.yml.example): the OIDC client secret + crypto key and a break-glass admin
+# password. FreshRSS does not auto-create OIDC users, so the entrypoint
+# pre-creates an admin whose name must equal the OIDC username claim.
+
+# Fail fast with one actionable message if the operator has not yet supplied the
+# values that only they can provide (see roles/freshrss/README.md). The secrets
+# are surfaced with `| default('')`, so an unset Vault makes them empty here
+# rather than raising a bare "undefined variable".
+- name: Validate FreshRSS inputs are present
+  ansible.builtin.assert:
+    that:
+      - freshrss_admin_user | length > 0
+      - freshrss_oidc_client_id | length > 0
+      - freshrss_oidc_client_secret | length > 0
+      - freshrss_oidc_crypto_key | length > 0
+      - freshrss_admin_password | length > 0
+    fail_msg: >-
+      FreshRSS is not fully configured yet. Set freshrss_admin_user (your
+      lowercase Pocket ID username) and freshrss_oidc_client_id in group_vars,
+      and provide the Vault secrets vault_freshrss_oidc_client_secret,
+      vault_freshrss_oidc_crypto_key and vault_freshrss_admin_password
+      (run with --ask-vault-pass). See roles/freshrss/README.md.
+    quiet: true
+
+- name: Ensure the FreshRSS host data directory exists
+  ansible.builtin.file:
+    path: "{{ freshrss_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+# 0600 so the OIDC client secret / crypto key / admin password are not exposed
+# in the world-readable Quadlet unit. A change here restarts the container via
+# the container role's handler (flushed inside the include below).
+- name: Render the FreshRSS environment file
+  ansible.builtin.template:
+    src: freshrss.env.j2
+    dest: "{{ freshrss_data_dir }}/freshrss.env"
+    owner: root
+    group: root
+    mode: '0600'
+  notify: Restart freshrss
+
+- name: Deploy the FreshRSS container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: freshrss
+    container_quadlet_src: freshrss.container.j2

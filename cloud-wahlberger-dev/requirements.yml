@@ -1,0 +1,27 @@
+---
+# Galaxy content this playbook depends on. Install before the first run:
+#
+#   ansible-galaxy collection install -r requirements.yml
+#   ansible-galaxy role install -r requirements.yml
+#
+# Versions are pinned with a floor (">=") so installs are reproducible but can
+# still pick up patch/minor fixes. Bump deliberately.
+collections:
+  # Timezone module used by the `common` role (and many other handy modules).
+  - name: community.general
+    version: ">=8.0.0"
+
+  # profile_tasks callback wired up in ansible.cfg, plus POSIX modules.
+  - name: ansible.posix
+    version: ">=1.5.0"
+
+  # Not used yet, but the canonical collection for the Podman service roles
+  # you'll add later (podman_image, podman_network, podman_login, ...).
+  - name: containers.podman
+    version: ">=1.16.0"
+
+roles:
+  # SSH hardening + fail2ban + unattended-upgrades on Debian. Tuned via the
+  # security_* vars in inventories/production/group_vars/all/vars.yml.
+  - name: geerlingguy.security
+    version: "3.0.2"

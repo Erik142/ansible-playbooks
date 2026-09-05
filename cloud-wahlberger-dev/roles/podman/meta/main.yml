@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: podman
+  author: Erik Wahlberger
+  description: Installs Podman and Quadlet support and prepares the container data directory.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+  galaxy_tags:
+    - podman
+    - containers
+
+dependencies: []

@@ -1,0 +1,19 @@
+---
+galaxy_info:
+  role_name: common
+  author: Erik Wahlberger
+  description: Baseline OS setup (apt upgrades, common packages, timezone) for Debian hosts.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+  galaxy_tags:
+    - base
+    - debian
+
+# Production-profile rule `meta-no-dependencies`: do not chain roles here.
+# Order them explicitly in the playbook (site.yml) instead.
+dependencies: []

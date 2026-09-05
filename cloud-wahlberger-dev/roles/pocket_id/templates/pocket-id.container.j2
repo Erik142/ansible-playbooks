@@ -1,0 +1,21 @@
+[Unit]
+Description=Pocket ID OIDC provider
+After=network-online.target caddy-network.service
+Wants=network-online.target
+Requires=caddy-network.service
+
+[Container]
+ContainerName=pocket-id
+Image={{ pocket_id_image }}
+Network=caddy.network
+Volume={{ pocket_id_data_dir }}/encryption.key:/etc/pocket-id/encryption.key:z,ro
+Volume={{ pocket_id_volume }}:/app/data:Z
+Environment=APP_URL={{ pocket_id_app_url }}
+Environment=TRUST_PROXY={{ pocket_id_trust_proxy | string | lower }}
+Environment=ENCRYPTION_KEY_FILE=/etc/pocket-id/encryption.key
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

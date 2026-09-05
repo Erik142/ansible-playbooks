@@ -1,0 +1,21 @@
+---
+# Default variables for the `pocket_id` role.
+
+# Pocket ID image, pinned to a specific release for reproducibility.
+pocket_id_image: ghcr.io/pocket-id/pocket-id:v2.8.0
+
+# Named Podman volume for persistent data — holds the SQLite DB AND the
+# encryption key (/app/data). Back this up. Podman creates it automatically.
+pocket_id_volume: pocket-id
+
+# Trust X-Forwarded-* headers from the reverse proxy in front of Pocket ID.
+pocket_id_trust_proxy: true
+
+# pocket_id_app_url is REQUIRED (the public https:// URL) and has no default;
+# set it in inventory group_vars so argument validation catches a missing value.
+pocket_id_data_dir: /opt/podman/pocket-id
+
+# pocket_id_encryption_key is REQUIRED and has no default. It encrypts Pocket
+# ID's data and MUST stay constant, so it is kept in Ansible Vault and surfaced
+# in group_vars (vault_pocket_id_encryption_key). 64 hex chars (openssl rand
+# -hex 32). Never commit it in plaintext.

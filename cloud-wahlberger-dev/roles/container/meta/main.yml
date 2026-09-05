@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  role_name: container
+  author: Erik Wahlberger
+  description: Deploy a Podman Quadlet (.container) unit and restart its service on change.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+  galaxy_tags:
+    - podman
+    - quadlet
+    - containers
+
+dependencies: []

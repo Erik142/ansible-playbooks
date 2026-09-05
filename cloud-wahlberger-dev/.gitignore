@@ -1,0 +1,13 @@
+# Ansible runtime artifacts
+*.retry
+.ansible_cache/
+.ansible/
+
+# Vault password files — never commit these
+.vault_pass
+.vault_password
+vault_pass.txt
+
+# Locally-generated / pasted secrets (encryption keys, OIDC client secrets,
+# break-glass passwords). These belong on your machine + the host, not in Git.
+secret_files/

@@ -1,0 +1,27 @@
+---
+argument_specs:
+  main:
+    short_description: Run Pocket ID as a Podman Quadlet behind a reverse proxy.
+    options:
+      pocket_id_image:
+        type: str
+        required: false
+        description: Pocket ID container image (pin a version).
+      pocket_id_volume:
+        type: str
+        required: false
+        description: Named Podman volume mounted at /app/data (DB + encryption key).
+      pocket_id_app_url:
+        type: str
+        required: true
+        description: Public https URL Pocket ID is served on (must match DNS and the Caddy site).
+      pocket_id_trust_proxy:
+        type: bool
+        required: false
+        description: Trust X-Forwarded-* headers from the reverse proxy.
+      pocket_id_encryption_key:
+        type: str
+        required: true
+        description: >-
+          Key that encrypts Pocket ID data (from Vault). Must stay constant;
+          changing it makes existing encrypted data unrecoverable.

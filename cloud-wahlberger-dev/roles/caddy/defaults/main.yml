@@ -1,0 +1,23 @@
+---
+# Default variables for the `caddy` role.
+
+# Official Caddy image (do NOT swap for a third-party build). Pinned to the v2 line.
+caddy_image: docker.io/library/caddy:2
+
+# Host directory holding the rendered Caddyfile and Caddy's persistent state.
+# Issued certificates live in <dir>/data — back that up.
+caddy_data_dir: /opt/podman/caddy
+
+# Host ports Caddy publishes. The container always uses 80/443 internally.
+caddy_http_port: 80
+caddy_https_port: 443
+
+# Email for Let's Encrypt registration (expiry notices). Empty = no account email.
+caddy_acme_email: ""
+
+# Sites Caddy serves. Each item is a dict:
+#   host:     public hostname (must resolve to this VM for HTTP-01)
+#   upstream: container_name:port to reverse_proxy to
+#   extra:    (optional) raw Caddy directives inserted into the site block
+# Set the real list in inventory group_vars.
+caddy_sites: []

@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  role_name: firewall
+  author: Erik Wahlberger
+  description: Host firewall via ufw (nftables backend) with a default-deny inbound policy.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+  galaxy_tags:
+    - firewall
+    - ufw
+    - security
+
+dependencies: []

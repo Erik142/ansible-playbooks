@@ -1,0 +1,37 @@
+---
+- name: Create the Caddy directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ caddy_data_dir }}"
+    - "{{ caddy_data_dir }}/data"
+    - "{{ caddy_data_dir }}/config"
+
+- name: Deploy the Caddy network Quadlet
+  ansible.builtin.copy:
+    src: caddy.network
+    dest: /etc/containers/systemd/caddy.network
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart caddy
+
+- name: Render the Caddyfile
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: "{{ caddy_data_dir }}/Caddyfile"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart caddy
+
+- name: Deploy the Caddy container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: caddy
+    container_quadlet_src: caddy.container.j2

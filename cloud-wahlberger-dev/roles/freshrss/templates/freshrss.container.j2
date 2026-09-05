@@ -1,0 +1,21 @@
+[Unit]
+Description=FreshRSS feed aggregator
+After=network-online.target caddy-network.service
+Wants=network-online.target
+Requires=caddy-network.service
+
+[Container]
+ContainerName=freshrss
+Image={{ freshrss_image }}
+Network=caddy.network
+# Persistent data (SQLite DB + config.php). Podman creates the named volume.
+Volume={{ freshrss_volume }}:/var/www/FreshRSS/data:Z
+# All env (config + secrets) comes from this root-only 0600 file, so secrets
+# never land in the world-readable unit file. Rendered by the freshrss role.
+EnvironmentFile={{ freshrss_data_dir }}/freshrss.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

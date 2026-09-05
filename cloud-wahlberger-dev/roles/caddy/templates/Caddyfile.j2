@@ -1,0 +1,14 @@
+{# Rendered by Ansible from the caddy_sites variable — do not edit on the host. #}
+{% if caddy_acme_email | length > 0 %}
+{
+    email {{ caddy_acme_email }}
+}
+{% endif %}
+{% for site in caddy_sites %}
+{{ site.host }} {
+    reverse_proxy {{ site.upstream }}
+{% if site.extra | default("", true) | length > 0 %}
+    {{ site.extra }}
+{% endif %}
+}
+{% endfor %}
