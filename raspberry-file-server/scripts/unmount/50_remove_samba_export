@@ -1,6 +1,0 @@
-#!/bin/bash
-USBNAME=`basename $UM_MOUNTPOINT`
-rm -f /etc/samba/auto/$USBNAME.conf
- 
-systemctl restart smbd
-systemctl restart nmbd

@@ -1,2 +1,0 @@
-[pi]
-10.10.10.54 ansible_connection=ssh ansible_user=ubuntu
