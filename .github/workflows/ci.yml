@@ -1,0 +1,86 @@
+---
+# CI for pull requests: validates every playbook directory (anything with an
+# ansible.cfg) without touching real infrastructure — GitHub-hosted runners
+# can't reach the LAN-only hosts anyway (see pi-de-int-wahlberger-dev's
+# semaphore role for why runs happen there instead). Playbooks opt into
+# yamllint/ansible-lint by having a .yamllint/.ansible-lint file; syntax-check
+# and the vault-encryption check always run.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      dirs: ${{ steps.find.outputs.dirs }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: find
+        run: |
+          dirs=$(find . -maxdepth 1 -mindepth 1 -type d \
+            -exec test -e '{}/ansible.cfg' \; -print \
+            | sed 's|^\./||' | sort | jq -R -s -c 'split("\n")[:-1]')
+          echo "dirs=$dirs" >> "$GITHUB_OUTPUT"
+
+  validate:
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJson(needs.discover.outputs.dirs) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ansible-core pinned <2.17 to match the pyenv venv every playbook here
+      # is developed against (see each playbook's CLAUDE.md) — some tasks use
+      # module names/behaviors tied to that version.
+      - name: Install Ansible tooling
+        run: pip install "ansible-core>=2.16,<2.17" ansible-lint yamllint
+
+      - name: Install collection/role requirements
+        if: hashFiles(format('{0}/requirements.yml', matrix.dir)) != ''
+        working-directory: ${{ matrix.dir }}
+        run: |
+          ansible-galaxy collection install -r requirements.yml
+          ansible-galaxy role install -r requirements.yml
+
+      - name: yamllint
+        if: hashFiles(format('{0}/.yamllint', matrix.dir)) != ''
+        working-directory: ${{ matrix.dir }}
+        run: yamllint .
+
+      - name: ansible-lint
+        if: hashFiles(format('{0}/.ansible-lint', matrix.dir)) != ''
+        working-directory: ${{ matrix.dir }}
+        run: ansible-lint
+
+      - name: Syntax check
+        working-directory: ${{ matrix.dir }}
+        run: |
+          entrypoint=site.yml
+          [ -f site.yml ] || entrypoint=main.yml
+          ansible-playbook "$entrypoint" --syntax-check
+
+  vault-encrypted:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure every vault.yml is Ansible-Vault encrypted
+        run: |
+          status=0
+          while IFS= read -r -d '' f; do
+            if ! head -c 15 "$f" | grep -q '^\$ANSIBLE_VAULT'; then
+              echo "::error file=$f::not Ansible-Vault encrypted (plaintext secrets committed?)"
+              status=1
+            fi
+          done < <(find . -type f -name 'vault.yml' -print0)
+          exit "$status"
