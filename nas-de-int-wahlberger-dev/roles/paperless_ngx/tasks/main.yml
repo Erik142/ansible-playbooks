@@ -1,0 +1,120 @@
+---
+- name: Validate Paperless OIDC inputs are present
+  ansible.builtin.assert:
+    that:
+      - paperless_ngx_db_password | length > 0
+      - paperless_ngx_oidc_client_id | length > 0
+      - paperless_ngx_oidc_client_secret | length > 0
+    fail_msg: >-
+      Paperless is not fully configured. Set paperless_ngx_oidc_client_id in
+      group_vars and provide the Vault secrets vault_paperless_ngx_db_password and
+      vault_paperless_ngx_oidc_client_secret (run with --ask-vault-pass). See
+      roles/paperless_ngx/README.md.
+    quiet: true
+
+# world-writable (0777): the paperless-ngx app itself remaps to
+# paperless_ngx_uid/gid via an entrypoint that runs as root first, so 0750
+# would have worked for it alone — but this loop also covers directories
+# nothing remaps. Kept uniform (and matching rpi-karlsruhe's proven-working
+# 0777) rather than special-casing one iteration of the loop.
+- name: Create the Paperless data/media/export directories
+  ansible.builtin.file:
+    path: "{{ paperless_ngx_data_dir }}/{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0777"
+  loop:
+    - data
+    - media
+    - export
+
+# world-writable (0777): the official postgres image drops to a non-root
+# "postgres" user with no UID/GID remap option (unlike paperless-ngx above),
+# so a stricter root-only mode here fails with "Permission denied" on the
+# container's first write. Matches rpi-karlsruhe's proven-working mode.
+#
+# Postgres 18+ expects /var/lib/postgresql mounted here; the cluster lives in
+# a version subdir (e.g. pgdata/18/docker). See paperless-db.container.j2.
+- name: Create the Paperless Postgres data directory
+  ansible.builtin.file:
+    path: "{{ paperless_ngx_db_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0777"
+
+# world-writable (0777): same reasoning as the Postgres directory above — the
+# official redis image also runs as a non-root user with no remap option.
+- name: Create the Paperless Redis data directory
+  ansible.builtin.file:
+    path: "{{ paperless_ngx_redis_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0777"
+
+# Guest-writable scan-to-folder inbox, inside the Samba share so anyone on the
+# LAN can drop documents for Paperless to consume and OCR.
+- name: Create the Paperless inbox directory inside the Samba share
+  ansible.builtin.file:
+    path: "{{ paperless_ngx_inbox_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0777"
+
+- name: Create the Paperless-ngx Podman network
+  containers.podman.podman_network:
+    name: paperless-ngx
+
+# Each container's env file (if any) is rendered IMMEDIATELY before that same
+# container's include_role: container call, not batched upfront. The
+# container role's `flush_handlers` is global — it fires every handler
+# notified anywhere in the play so far, not just ones from its own include.
+# Rendering paperless-db.env and paperless-ngx.env early (before any
+# container was deployed) let their "Restart X" handlers get flushed during
+# paperless-redis's include, before those services' Quadlet units even
+# existed on disk yet, so a daemon-reload had nothing to find.
+- name: Deploy the Paperless Redis container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: paperless-redis
+    container_quadlet_src: paperless-redis.container.j2
+
+# Secrets (DB password), rendered root-only so it never appears in the
+# world-readable Quadlet unit. A change here restarts paperless-db below.
+- name: Render the Paperless DB environment file
+  ansible.builtin.template:
+    src: paperless-db.env.j2
+    dest: "{{ paperless_ngx_db_data_dir_root }}/paperless-db.env"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart paperless-db
+
+- name: Deploy the Paperless DB container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: paperless-db
+    container_quadlet_src: paperless-db.container.j2
+
+# Secrets + OIDC config, rendered root-only for the same reason as above. A
+# change here restarts paperless-ngx below.
+- name: Render the Paperless-ngx environment file
+  ansible.builtin.template:
+    src: paperless-ngx.env.j2
+    dest: "{{ paperless_ngx_data_dir }}/paperless-ngx.env"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart paperless-ngx
+
+- name: Deploy the Paperless-ngx container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: paperless-ngx
+    container_quadlet_src: paperless-ngx.container.j2

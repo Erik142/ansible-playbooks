@@ -1,0 +1,20 @@
+---
+# Default variables for the `security` role.
+
+# SSH hardening. Port stays 22: key-only auth plus fail2ban is the real
+# control, matching the cloud-wahlberger-dev reference design's reasoning.
+security_ssh_permit_root_login: "no"
+security_ssh_password_authentication: "no"
+
+# fail2ban bans IPs after repeated failed SSH logins.
+security_fail2ban_enabled: true
+security_fail2ban_bantime: 3600
+security_fail2ban_maxretry: 5
+
+# Weekly automatic `zypper patch` via a systemd timer.
+security_autoupdate_enabled: true
+security_autoupdate_on_calendar: "Sun *-*-* 03:00:00"
+
+# Usernames granted passwordless sudo (each gets its own /etc/sudoers.d/
+# drop-in). Empty by default — opt in per host in group_vars.
+security_sudoers_passwordless: []

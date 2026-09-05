@@ -1,0 +1,45 @@
+---
+- name: Validate Homepage inputs are present
+  ansible.builtin.assert:
+    that:
+      - homepage_url | length > 0
+    fail_msg: >-
+      homepage_url is not set. Set it in group_vars. See
+      roles/homepage/README.md.
+    quiet: true
+
+- name: Create the Homepage config directory
+  ansible.builtin.file:
+    path: "{{ homepage_data_dir }}/config"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# No secrets here — plain links + ping-based status only, no API keys, no
+# Podman socket exposed to the dashboard. A change to either file restarts
+# the container below.
+- name: Render the Homepage settings
+  ansible.builtin.template:
+    src: settings.yaml.j2
+    dest: "{{ homepage_data_dir }}/config/settings.yaml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart homepage
+
+- name: Render the Homepage services list
+  ansible.builtin.template:
+    src: services.yaml.j2
+    dest: "{{ homepage_data_dir }}/config/services.yaml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart homepage
+
+- name: Deploy the Homepage container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: homepage
+    container_quadlet_src: homepage.container.j2

@@ -1,0 +1,29 @@
+---
+argument_specs:
+  main:
+    short_description: Homepage dashboard behind Caddy, linking services across playbooks.
+    options:
+      homepage_image:
+        type: str
+        required: false
+        description: Homepage container image.
+      homepage_data_dir:
+        type: path
+        required: false
+        description: Host directory for Homepage's rendered config.
+      homepage_title:
+        type: str
+        required: false
+        description: Dashboard page title.
+      homepage_url:
+        type: str
+        required: true
+        description: Public https:// URL Homepage is served on.
+      homepage_pocket_id_url:
+        type: str
+        required: false
+        description: Pocket ID URL linked from the dashboard (cloud-wahlberger-dev).
+      homepage_freshrss_url:
+        type: str
+        required: false
+        description: FreshRSS URL linked from the dashboard (cloud-wahlberger-dev).

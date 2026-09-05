@@ -1,0 +1,42 @@
+---
+- name: Install firewalld
+  community.general.zypper:
+    name: firewalld
+    state: present
+
+- name: Enable and start firewalld
+  ansible.builtin.systemd:
+    name: firewalld
+    enabled: true
+    state: started
+
+# Allow the service ports BEFORE anything else, so this can never lock out SSH.
+- name: Allow inbound services
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    zone: "{{ firewall_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ firewall_allowed_services }}"
+
+- name: Allow inbound ports without a predefined firewalld service
+  ansible.posix.firewalld:
+    port: "{{ item }}"
+    zone: "{{ firewall_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ firewall_allowed_ports }}"
+
+# Rootful Podman publishes container ports (e.g. Caddy's 80/443) via DNAT.
+# Masquerading on this zone is required for that forwarded/NATed traffic to be
+# routed correctly — the equivalent of ufw's DEFAULT_FORWARD_POLICY=ACCEPT in
+# the cloud-wahlberger-dev reference design.
+- name: Enable masquerading so Podman published ports keep working
+  ansible.posix.firewalld:
+    masquerade: true
+    zone: "{{ firewall_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled

@@ -1,0 +1,49 @@
+---
+argument_specs:
+  main:
+    short_description: Mealie recipe manager behind Caddy, with Pocket ID OIDC login.
+    options:
+      mealie_image:
+        type: str
+        required: false
+        description: Mealie container image.
+      mealie_data_dir:
+        type: path
+        required: false
+        description: Host directory for Mealie's persistent data and env file.
+      mealie_timezone:
+        type: str
+        required: false
+        description: IANA timezone passed to the container.
+      mealie_url:
+        type: str
+        required: true
+        description: Public https:// URL Mealie is served on.
+      mealie_oidc_provider_name:
+        type: str
+        required: false
+        description: Label shown on the Mealie login button.
+      mealie_oidc_client_id:
+        type: str
+        required: true
+        description: OAuth2 client ID issued by Pocket ID.
+      mealie_oidc_signup_enabled:
+        type: bool
+        required: false
+        description: Auto-provision a Mealie account on first OIDC login.
+      mealie_oidc_auto_redirect:
+        type: bool
+        required: false
+        description: Skip Mealie's login page and redirect straight to Pocket ID.
+      mealie_oidc_user_claim:
+        type: str
+        required: false
+        description: Claim matched against existing Mealie user emails.
+      mealie_oidc_admin_group:
+        type: str
+        required: false
+        description: Pocket ID group whose members become Mealie admins.
+      mealie_oidc_user_group:
+        type: str
+        required: false
+        description: Pocket ID group required to sign in, if set.

@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: security
+  author: Erik Wahlberger
+  description: SSH hardening, fail2ban, and automatic patching for openSUSE Tumbleweed hosts.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - security
+    - opensuse
+
+dependencies: []

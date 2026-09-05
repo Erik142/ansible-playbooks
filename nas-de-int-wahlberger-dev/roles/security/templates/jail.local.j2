@@ -1,0 +1,6 @@
+{# Rendered by the security role to /etc/fail2ban/jail.local. #}
+[sshd]
+enabled = true
+backend = systemd
+bantime = {{ security_fail2ban_bantime }}
+maxretry = {{ security_fail2ban_maxretry }}

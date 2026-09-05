@@ -1,0 +1,40 @@
+---
+argument_specs:
+  main:
+    short_description: Native Samba file server with guest-only access.
+    description:
+      - Installs Samba as a native openSUSE service (not a container), renders
+        a guest-only smb.conf, and enables smb/nmb.
+    options:
+      samba_mount_path:
+        type: path
+        required: false
+        description: The mounted disk holding Samba data.
+      samba_data_dir:
+        type: path
+        required: false
+        description: Fixed subdirectory under samba_mount_path holding all Samba data.
+      samba_share_name:
+        type: str
+        required: false
+        description: Name of the SMB share, and of its subdirectory under samba_data_dir.
+      samba_share_path:
+        type: path
+        required: false
+        description: Full path to the share directory (a subdirectory of samba_data_dir).
+      samba_share_comment:
+        type: str
+        required: false
+        description: Share comment shown to clients.
+      samba_server_string:
+        type: str
+        required: false
+        description: Samba server string (shown to clients).
+      samba_guest_account:
+        type: str
+        required: false
+        description: Unix account guest connections are mapped to.
+      samba_selinux_type:
+        type: str
+        required: false
+        description: SELinux type label applied to samba_data_dir when SELinux is enabled.

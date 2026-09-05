@@ -1,0 +1,11 @@
+---
+# daemon_reload: true for the same reason as mealie/paperless_ngx's own
+# handlers — this can run before the container role's own restart handler on
+# a first-ever deploy (Ansible runs flushed handlers in definition order, not
+# notification order). See roles/mealie/handlers/main.yml for the full
+# explanation.
+- name: Restart homepage
+  ansible.builtin.systemd:
+    name: homepage.service
+    state: restarted
+    daemon_reload: true

@@ -1,0 +1,123 @@
+---
+# Variables applied to every host in the production inventory.
+#
+# group_vars/all/ is a *directory* (not a single file) on purpose: it lets a
+# plaintext `vars.yml` sit next to an encrypted `vault.yml`, so secrets and
+# non-secrets live side by side without mixing.
+
+# --- Connection -------------------------------------------------------------
+# SSH login user. Privilege escalation (become) is turned on in site.yml.
+ansible_user: erikwahlberger
+
+# --- Hardening (security role) -----------------------------------------------
+# These mirror the role's secure defaults, set explicitly so the security
+# posture is auditable in one place.
+security_ssh_permit_root_login: "no"
+security_ssh_password_authentication: "no"
+security_fail2ban_enabled: true
+security_autoupdate_enabled: true
+# Passwordless sudo for Semaphore UI's unattended playbook runs (see
+# pi-de-int-wahlberger-dev).
+security_sudoers_passwordless:
+  - erikwahlberger
+
+# --- SSH access (ssh_authorized_keys role) ----------------------------------
+# Your personal key (manual access) plus Semaphore UI's dedicated automation
+# key (pi-de-int-wahlberger-dev), kept separate on purpose — see
+# roles/ssh_authorized_keys/README.md. Neither is secret (public keys), so
+# both live here in plaintext, not Vault. The SAME two keys are authorized on
+# cloud-wahlberger-dev, the NAS, and the Pi.
+ssh_authorized_keys_list:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJSKdeHoK+WkyBI69OSZqn0sVqZPPDRs082S/IVoOeSu erikwahlberger@personal"
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMixf1vPbDUankXYuMO0bJFXjQ+Cmh3QsrwC6TzGPkda semaphore-automation@pi.de.int.wahlberger.dev"
+
+# --- Reverse proxy (caddy role) ----------------------------------------------
+# DNS-01 via Cloudflare (not HTTP-01): this host has no public inbound port,
+# so certificates are issued via a Cloudflare DNS API token instead. See
+# roles/caddy/README.md.
+caddy_acme_email: "ewahlberger@gmail.com"
+caddy_sites:
+  - host: recipes.de.int.wahlberger.dev
+    upstream: "mealie:9000"
+  - host: docs.de.int.wahlberger.dev
+    upstream: "paperless-ngx:8000"
+  - host: www.de.int.wahlberger.dev
+    upstream: "homepage:3000"
+
+# --- Identity provider (Pocket ID) -------------------------------------------
+# Public issuer URL of the Pocket ID instance (served by cloud-wahlberger-dev)
+# that mealie and paperless-ngx authenticate against. The OIDC discovery
+# document is derived from it as "{{ pocket_id_app_url }}/.well-known/openid-configuration".
+pocket_id_app_url: "https://id.wahlberger.dev"
+
+# --- Paperless-ngx ------------------------------------------------------------
+# This replaces the rpi-karlsruhe paperless-ngx instance at the SAME hostname —
+# reuse the OIDC client already registered in Pocket ID for
+# https://docs.de.int.wahlberger.dev/accounts/oidc/pocketid/login/callback/
+# (same client_id, same vault_paperless_ngx_oidc_client_secret value) rather than
+# registering a new app.
+paperless_ngx_url: "https://docs.de.int.wahlberger.dev"
+paperless_ngx_oidc_provider_id: "pocketid"
+paperless_ngx_oidc_provider_name: "Pocket ID"
+paperless_ngx_oidc_client_id: "d1cd5641-7d8f-4ec2-bb53-8cb5bf558f2f"
+# Account creation from OIDC. BOTH true = fully automatic provisioning.
+paperless_ngx_oidc_auto_signup: true
+paperless_ngx_oidc_allow_signups: true
+# Username/password form is disabled — Pocket ID is the ONLY way in.
+paperless_ngx_disable_local_login: true
+# Login page redirects straight to Pocket ID instead of showing the local form.
+paperless_ngx_oidc_redirect_login: true
+
+# --- Mealie -------------------------------------------------------------------
+# Same continuity note as paperless-ngx above: reuses the existing Pocket ID
+# OIDC client for https://recipes.de.int.wahlberger.dev/login.
+mealie_url: "https://recipes.de.int.wahlberger.dev"
+mealie_oidc_provider_name: "Pocket ID"
+mealie_oidc_client_id: "93041358-e45e-4e44-b838-3c758cfe4681"
+# Account creation from OIDC. false = map to existing users only.
+mealie_oidc_signup_enabled: false
+# Skip Mealie's own login page and go straight to Pocket ID.
+mealie_oidc_auto_redirect: true
+mealie_oidc_user_claim: "email"
+mealie_oidc_admin_group: ""
+mealie_oidc_user_group: ""
+
+# --- Homepage (dashboard) ------------------------------------------------------
+# Links cloud-wahlberger-dev's and this NAS's services. rpi-karlsruhe is
+# intentionally excluded — it's legacy, being retired.
+homepage_url: "https://www.de.int.wahlberger.dev"
+
+# --- Samba --------------------------------------------------------------------
+# Matches the existing backup layout (server_backup/samba/Delat/) and the
+# share name rpi-karlsruhe already used — restore the backup into
+# samba_share_path (/mnt/data/samba/Delat) so the directory name lines up.
+samba_share_name: "Delat"
+
+# --- Secrets (Ansible Vault) ---------------------------------------------------
+# Never put secrets in plaintext. They live in an encrypted sibling file
+# `vault.yml` in this directory, each with a `vault_` prefix, surfaced here
+# under a friendly name. `| default('')` keeps roles failing with a clear
+# assert (rather than a bare "undefined variable") when the Vault is absent.
+#
+# Scaffold and the exact contents are in `vault.yml.example`. Create the real,
+# encrypted file with:
+#
+#     ansible-vault create inventories/production/group_vars/all/vault.yml
+#
+# and run plays with `--ask-vault-pass` (or --vault-password-file .vault_pass).
+# See README.md -> "Secrets with Ansible Vault" for the full workflow.
+
+# PostgreSQL password shared by the paperless-db and paperless-ngx containers.
+# Migrating from rpi-karlsruhe? Reuse its EXISTING value or the restored DB
+# dump won't authenticate.
+paperless_ngx_db_password: "{{ vault_paperless_ngx_db_password | default('') }}"
+
+# OIDC client secrets from Pocket ID. Migrating from rpi-karlsruhe? Reuse the
+# EXISTING values — they belong to the client_ids above, not to this host.
+paperless_ngx_oidc_client_secret: "{{ vault_paperless_ngx_oidc_client_secret | default('') }}"
+mealie_oidc_client_secret: "{{ vault_mealie_oidc_client_secret | default('') }}"
+
+# Cloudflare DNS API token for Caddy's DNS-01 challenge (Zone:DNS:Edit on
+# wahlberger.dev). Same token rpi-karlsruhe's Traefik already uses for the
+# same zone — reused rather than minted fresh.
+cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token | default('') }}"

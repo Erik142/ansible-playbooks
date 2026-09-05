@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: firewall
+  author: Erik Wahlberger
+  description: firewalld host firewall for openSUSE Tumbleweed, default-deny inbound.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - firewall
+    - opensuse
+
+dependencies: []

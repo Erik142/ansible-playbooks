@@ -1,0 +1,124 @@
+---
+- name: Install Samba
+  community.general.zypper:
+    name: samba
+    state: present
+
+# The playbook does not mount/format this filesystem — it's expected to
+# already be mounted (see "Data layout" in the top-level README). Failing fast
+# here beats silently writing the share onto the root filesystem. Note this
+# checks samba_mount_path itself, NOT samba_share_path — the shared directory
+# is a plain subdirectory *within* the mount, not the mountpoint itself.
+- name: Verify the Samba data directory is on a mounted filesystem
+  ansible.builtin.assert:
+    that:
+      - ansible_mounts | selectattr('mount', 'equalto', samba_mount_path) | list | length > 0
+    fail_msg: >-
+      {{ samba_mount_path }} is not a mountpoint. Mount the intended storage
+      device there before running this playbook.
+    quiet: true
+
+# world-writable (0777): the share is guest-only with no matching Unix
+# account, so "other" permission bits are what actually govern guest access.
+- name: Create the Samba share directory
+  ansible.builtin.file:
+    path: "{{ samba_share_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0777"
+
+# Recent openSUSE Tumbleweed snapshots default to SELinux (targeted policy)
+# instead of AppArmor. Its policy only knows about Samba's usual default
+# paths — an unlabeled custom path here makes smbd fail with
+# "canonicalize_connect_path failed", even though POSIX permissions (0777
+# above) are wide open; SELinux denies before Samba ever reaches its own
+# permission checks. Installed unconditionally (harmless if SELinux is
+# disabled) rather than gated on ansible_facts.selinux.status: that fact is
+# gathered once at the very start of the play, before these very tools are
+# installed, and would misreport "disabled" on a fresh host that just lacks
+# the Python bindings yet.
+- name: Install SELinux management tools
+  community.general.zypper:
+    name:
+      - policycoreutils-python-utils
+      - python3-selinux
+    state: present
+
+- name: Re-gather the SELinux fact now that its Python bindings are installed
+  ansible.builtin.setup:
+    filter: ansible_selinux
+
+# Belt-and-braces alongside the explicit labeling below: Podman's own SELinux
+# separation keeps relabeling paperless_ngx_inbox_dir (a subdirectory of this
+# share also bind-mounted into the paperless-ngx container) to
+# container_file_t, fighting the samba_share_t label this role wants there.
+# Rather than chase Podman's exact relabeling behavior, tell smbd to ignore
+# per-file SELinux types on exported shares entirely — this share is already
+# guest-only and world-writable (0777), so "security via file labels" isn't
+# doing anything for us here anyway.
+- name: Allow Samba to export files regardless of their SELinux type
+  ansible.posix.seboolean:
+    name: samba_export_all_rw
+    state: true
+    persistent: true
+  when: ansible_facts.selinux.status == "enabled"
+
+# SELinux requires *search* permission on every directory component of a
+# path, not just the final one — smbd needs to traverse samba_mount_path
+# itself to ever reach samba_data_dir below it. A custom-mounted filesystem's
+# root starts as unlabeled_t until something explicitly labels it (it holds
+# nothing but Samba data in this deployment, so reusing samba_selinux_type
+# here is fine; a mount shared with other unrelated services would want a
+# more neutral type like mnt_t on the root instead). Deliberately NOT
+# recursive (no `(/.*)?` suffix, no -R) — samba_data_dir below gets its own,
+# separately-managed label next, and this must not overwrite it.
+- name: Set the SELinux file context for the Samba mountpoint
+  community.general.sefcontext:
+    target: "{{ samba_mount_path }}"
+    setype: "{{ samba_selinux_type }}"
+    state: present
+  when: ansible_facts.selinux.status == "enabled"
+
+- name: Apply the SELinux file context to the mountpoint
+  ansible.builtin.command: "restorecon -v {{ samba_mount_path }}"
+  register: samba_mount_restorecon
+  changed_when: samba_mount_restorecon.stdout != ''
+  when: ansible_facts.selinux.status == "enabled"
+
+- name: Set the SELinux file context for the Samba data directory
+  community.general.sefcontext:
+    target: "{{ samba_data_dir }}(/.*)?"
+    setype: "{{ samba_selinux_type }}"
+    state: present
+  when: ansible_facts.selinux.status == "enabled"
+
+# No dedicated Ansible module applies a context to already-existing files
+# (that's what `restorecon` is for) — this is the one deliberate exception to
+# this repo's "built-in modules only" convention. Idempotent via
+# changed_when: restorecon -v only prints a line per file it actually
+# relabels, so empty output means nothing needed changing.
+- name: Apply the SELinux file context to existing files
+  ansible.builtin.command: "restorecon -Rv {{ samba_data_dir }}"
+  register: samba_selinux_restorecon
+  changed_when: samba_selinux_restorecon.stdout != ''
+  when: ansible_facts.selinux.status == "enabled"
+
+- name: Render the Samba configuration
+  ansible.builtin.template:
+    src: smb.conf.j2
+    dest: /etc/samba/smb.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: "testparm -s %s"
+  notify: Restart samba
+
+- name: Enable and start the Samba services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - smb
+    - nmb

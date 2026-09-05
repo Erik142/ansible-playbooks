@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: mealie
+  author: Erik Wahlberger
+  description: Mealie recipe manager, running as a Podman Quadlet behind Caddy with Pocket ID OIDC login.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - mealie
+    - podman
+
+dependencies: []

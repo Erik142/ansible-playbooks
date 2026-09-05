@@ -1,0 +1,47 @@
+---
+# Default variables for the `paperless_ngx` role.
+
+paperless_ngx_image: ghcr.io/paperless-ngx/paperless-ngx:2.20.15
+paperless_ngx_redis_image: docker.io/library/redis:8
+paperless_ngx_db_image: docker.io/library/postgres:18
+
+paperless_ngx_data_dir: /mnt/containers/paperless-ngx
+paperless_ngx_db_data_dir_root: /mnt/containers/paperless-db
+paperless_ngx_db_data_dir: "{{ paperless_ngx_db_data_dir_root }}/pgdata"
+paperless_ngx_redis_data_dir: /mnt/containers/paperless-redis/data
+
+# Scan-to-folder inbox, inside the Samba share (samba_share_path comes from
+# the samba role's defaults — the samba role must run before this one).
+paperless_ngx_inbox_dir: "{{ samba_share_path }}/paperless-inbox"
+
+# UID/GID that files written by the container are owned as on the host.
+paperless_ngx_uid: 1000
+paperless_ngx_gid: 1000
+
+paperless_ngx_ocr_languages: deu
+
+# REQUIRED: public https:// URL Paperless is served on (set in group_vars).
+# Must match the caddy_sites host entry and the OIDC callback URL registered
+# in Pocket ID.
+paperless_ngx_url: ""
+
+# allauth provider slug. It appears in the OIDC callback URL you register in
+# Pocket ID: "{{ paperless_ngx_url }}/accounts/oidc/{{ paperless_ngx_oidc_provider_id }}/login/callback/"
+paperless_ngx_oidc_provider_id: "pocketid"
+# Label shown on the Paperless login button.
+paperless_ngx_oidc_provider_name: "Pocket ID"
+# OAuth2 client ID issued by Pocket ID when you register the Paperless app.
+# Not secret (a UUID), so it lives in group_vars in plaintext. REQUIRED.
+paperless_ngx_oidc_client_id: ""
+# Account creation from OIDC. BOTH true = fully automatic provisioning: any
+# Pocket ID user who is not yet linked gets a new Paperless account created
+# silently from their token claims on first login. Set both false to lock this
+# down to map-to-existing-users-only.
+paperless_ngx_oidc_auto_signup: true
+paperless_ngx_oidc_allow_signups: true
+# Username/password form is disabled — Pocket ID is the ONLY way in. There is
+# no local admin fallback while this is true; set it back to false and re-run,
+# or use `manage.py` in the container, to recover.
+paperless_ngx_disable_local_login: true
+# Login page redirects straight to Pocket ID instead of showing the local form.
+paperless_ngx_oidc_redirect_login: true

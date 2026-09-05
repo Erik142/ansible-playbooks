@@ -1,0 +1,26 @@
+[Unit]
+Description=PostgreSQL (Paperless-ngx database)
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=paperless-db
+Image={{ paperless_ngx_db_image }}
+Network=paperless-ngx
+# Postgres 18+ images changed the data layout: mount /var/lib/postgresql (not
+# .../data) and the cluster lands in a major-version subdir (e.g. 18/docker).
+# See docker-library/postgres#1259. A major upgrade (e.g. 18 -> 19) is NOT a
+# tag bump: dump from the old version and restore into the new one (or run
+# pg_upgrade with both binaries present). The data dir is version-specific.
+Volume={{ paperless_ngx_db_data_dir }}:/var/lib/postgresql:Z
+Environment=POSTGRES_DB=paperless
+Environment=POSTGRES_USER=paperless
+# POSTGRES_PASSWORD rendered to a root-only 0600 file by this role from
+# Ansible Vault (must match PAPERLESS_DBPASS in paperless-ngx.env).
+EnvironmentFile={{ paperless_ngx_db_data_dir_root }}/paperless-db.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

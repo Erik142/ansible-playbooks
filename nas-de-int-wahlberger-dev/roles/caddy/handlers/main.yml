@@ -1,0 +1,8 @@
+---
+# Restarts Caddy when the Caddyfile or the network unit changes. (The container
+# helper independently restarts it when caddy.container itself changes.)
+- name: Restart caddy
+  ansible.builtin.systemd:
+    name: caddy.service
+    state: restarted
+    daemon_reload: true

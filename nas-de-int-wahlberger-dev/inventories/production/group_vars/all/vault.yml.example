@@ -1,0 +1,29 @@
+# EXAMPLE Vault contents — copy the structure, NOT the placeholder values.
+#
+# This file is a committed, plaintext template. The REAL file is the encrypted
+# sibling `vault.yml` (same directory). Create it with:
+#
+#     ansible-vault create inventories/production/group_vars/all/vault.yml
+#
+# then paste real values in. Every key is referenced from vars.yml under a
+# friendly (non-vault_) name.
+
+# PostgreSQL password shared by paperless-db and paperless-ngx.
+# Migrating from rpi-karlsruhe? Copy the EXISTING value from its vault.yml —
+# a new value here won't authenticate against the restored database dump.
+#     openssl rand -hex 24
+vault_paperless_ngx_db_password: "REPLACE-with-a-generated-password"
+
+# Paperless-ngx OIDC client secret, issued by Pocket ID when you registered the
+# app (the client_id lives in vars.yml). Migrating? Reuse the EXISTING secret —
+# it belongs to the Pocket ID client registration, not to this host.
+vault_paperless_ngx_oidc_client_secret: "REPLACE-with-pocket-id-client-secret"
+
+# Mealie OIDC client secret, issued by Pocket ID. Same migration note as above.
+vault_mealie_oidc_client_secret: "REPLACE-with-pocket-id-client-secret"
+
+# Cloudflare DNS API token for Caddy's DNS-01 challenge — scoped to
+# Zone:DNS:Edit on the wahlberger.dev zone, nothing broader. Migrating from
+# rpi-karlsruhe? Its Traefik role already uses a token for the same zone —
+# reuse it instead of minting a new one.
+vault_cloudflare_dns_api_token: "REPLACE-with-a-cloudflare-api-token"

@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: podman
+  author: Erik Wahlberger
+  description: Install Podman and Quadlet support on openSUSE Tumbleweed.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - podman
+    - containers
+    - opensuse
+
+dependencies: []

@@ -1,0 +1,26 @@
+---
+# Default variables for the `samba` role.
+
+# The actual mounted disk holding Samba data (see the top-level README's
+# "Data layout" section) — this exact path must already be a mountpoint.
+samba_mount_path: /mnt/data
+
+# Fixed "samba" subdirectory under the mount that holds all Samba data.
+samba_data_dir: "{{ samba_mount_path }}/samba"
+
+# Name of the SMB share (\\nas\<name>) and of its subdirectory under
+# samba_data_dir. Referenced by the paperless_ngx role too, for its
+# consume/inbox directory (a subdirectory of samba_share_path).
+samba_share_name: share
+samba_share_path: "{{ samba_data_dir }}/{{ samba_share_name }}"
+
+samba_share_comment: "NAS file share (guest access)"
+samba_server_string: "nas.de.int.wahlberger.dev"
+
+# Unix account smbd maps anonymous/guest connections to.
+samba_guest_account: nobody
+
+# SELinux type label applied to samba_data_dir on hosts where SELinux is
+# enabled (recent openSUSE Tumbleweed snapshots default to it). No-op on
+# hosts without SELinux.
+samba_selinux_type: samba_share_t

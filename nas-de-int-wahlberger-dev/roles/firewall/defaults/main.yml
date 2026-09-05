@@ -1,0 +1,17 @@
+---
+# Default variables for the `firewall` role.
+
+# firewalld zone to configure. openSUSE Tumbleweed defaults to "public".
+firewall_zone: public
+
+# Predefined firewalld services to allow inbound: SSH, the Samba file server
+# (137-138/udp, 139+445/tcp), and HTTP/HTTPS (Caddy).
+firewall_allowed_services:
+  - ssh
+  - samba
+  - http
+  - https
+
+# Ports with no predefined firewalld service. Empty by default — add entries
+# here (as "port/proto" strings) for anything that needs one.
+firewall_allowed_ports: []

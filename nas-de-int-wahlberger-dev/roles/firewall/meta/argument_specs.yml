@@ -1,0 +1,23 @@
+---
+argument_specs:
+  main:
+    short_description: Host firewall via firewalld, default-deny inbound.
+    description:
+      - Installs and enables firewalld, allows the given services and ports in
+        the target zone, and enables masquerading so Podman's published
+        container ports keep working.
+    options:
+      firewall_zone:
+        type: str
+        required: false
+        description: firewalld zone to configure.
+      firewall_allowed_services:
+        type: list
+        elements: str
+        required: false
+        description: Predefined firewalld services to allow inbound.
+      firewall_allowed_ports:
+        type: list
+        elements: str
+        required: false
+        description: "Ports (as port/proto strings, e.g. '9993/udp') to allow inbound."

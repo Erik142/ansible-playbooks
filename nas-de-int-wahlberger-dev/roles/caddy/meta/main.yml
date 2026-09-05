@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: caddy
+  author: Erik Wahlberger
+  description: Caddy reverse proxy with automatic HTTPS, running as a Podman Quadlet.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - caddy
+    - reverseproxy
+    - podman
+
+dependencies: []

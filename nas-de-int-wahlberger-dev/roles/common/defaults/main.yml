@@ -1,0 +1,19 @@
+---
+# Default variables for the `common` role.
+# Every variable is prefixed with the role name (best practice: avoids
+# collisions) and can be overridden from inventory group_vars/host_vars.
+
+# Baseline packages installed on every host.
+common_packages:
+  - ca-certificates
+  - curl
+  - gpg2
+  - htop
+  - vim
+
+# System timezone as an IANA name.
+common_timezone: Europe/Berlin
+
+# Run a full `zypper update` (Tumbleweed is a rolling release; this is the
+# equivalent of Debian's `apt upgrade: full`).
+common_upgrade: true

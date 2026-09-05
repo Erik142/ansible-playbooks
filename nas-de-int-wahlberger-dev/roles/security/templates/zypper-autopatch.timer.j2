@@ -1,0 +1,10 @@
+{# Rendered by the security role to /etc/systemd/system/zypper-autopatch.timer. #}
+[Unit]
+Description=Weekly zypper patch timer
+
+[Timer]
+OnCalendar={{ security_autoupdate_on_calendar }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

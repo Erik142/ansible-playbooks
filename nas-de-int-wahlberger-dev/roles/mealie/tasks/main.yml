@@ -1,0 +1,42 @@
+---
+- name: Validate Mealie OIDC inputs are present
+  ansible.builtin.assert:
+    that:
+      - mealie_oidc_client_id | length > 0
+      - mealie_oidc_client_secret | length > 0
+    fail_msg: >-
+      Mealie OIDC is not fully configured. Set mealie_oidc_client_id in
+      group_vars and provide the Vault secret vault_mealie_oidc_client_secret
+      (run with --ask-vault-pass). See roles/mealie/README.md.
+    quiet: true
+
+# world-writable (0777): the mealie image runs its process as root by
+# default (no non-root user, no UID/GID remap), so 0750 root:root would work
+# for it alone — kept 0777 for consistency with the other Podman data
+# directories that DO need it (paperless-ngx's postgres/redis backends run
+# as non-root with no remap option), matching rpi-karlsruhe's proven pattern.
+- name: Create the Mealie data directory
+  ansible.builtin.file:
+    path: "{{ mealie_data_dir }}/data"
+    state: directory
+    owner: root
+    group: root
+    mode: "0777"
+
+# OIDC config + client secret, rendered root-only so the secret never appears
+# in the world-readable Quadlet unit. A change restarts the container below.
+- name: Render the Mealie environment file
+  ansible.builtin.template:
+    src: mealie.env.j2
+    dest: "{{ mealie_data_dir }}/mealie.env"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart mealie
+
+- name: Deploy the Mealie container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: mealie
+    container_quadlet_src: mealie.container.j2

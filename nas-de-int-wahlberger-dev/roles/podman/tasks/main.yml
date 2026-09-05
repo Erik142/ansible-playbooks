@@ -1,0 +1,40 @@
+---
+- name: Install Podman and Quadlet support
+  community.general.zypper:
+    name: "{{ podman_packages }}"
+    state: present
+
+# The playbook does not mount/format this filesystem — it's expected to
+# already be mounted (see "Data layout" in the top-level README). Failing fast
+# here beats silently writing container data onto the root filesystem.
+- name: Verify the container data directory is on a mounted filesystem
+  ansible.builtin.assert:
+    that:
+      - ansible_mounts | selectattr('mount', 'equalto', podman_data_dir) | list | length > 0
+    fail_msg: >-
+      {{ podman_data_dir }} is not a mountpoint. Mount the intended storage
+      device there before running this playbook.
+    quiet: true
+
+- name: Create the persistent container data directory
+  ansible.builtin.file:
+    path: "{{ podman_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Ensure the Quadlet unit directory exists
+  ansible.builtin.file:
+    path: "{{ podman_quadlet_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Enable and start the Podman API socket
+  ansible.builtin.systemd:
+    name: podman.socket
+    enabled: true
+    state: started
+  when: podman_enable_socket | bool

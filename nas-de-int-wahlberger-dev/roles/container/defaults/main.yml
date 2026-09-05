@@ -1,0 +1,10 @@
+---
+# Default variables for the `container` role.
+#
+# `container_name` and `container_quadlet_src` (the `.container` template's
+# filename, looked up in the calling role's templates/ dir) are REQUIRED and
+# intentionally have no default here: leaving them undefined lets
+# meta/argument_specs.yml catch a missing value instead of doing nothing.
+
+# Directory on the target where systemd reads Quadlet unit files from.
+container_quadlet_dir: /etc/containers/systemd

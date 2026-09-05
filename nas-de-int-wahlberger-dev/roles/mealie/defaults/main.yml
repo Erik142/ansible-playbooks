@@ -1,0 +1,31 @@
+---
+# Default variables for the `mealie` role.
+
+mealie_image: ghcr.io/mealie-recipes/mealie:latest
+mealie_data_dir: /mnt/containers/mealie
+mealie_timezone: Europe/Berlin
+
+# REQUIRED: public https:// URL Mealie is served on (set in group_vars). Must
+# match the caddy_sites host entry and Mealie's own OIDC redirect URI
+# ("{{ mealie_url }}/login") registered in Pocket ID.
+mealie_url: ""
+
+# Label shown on the Mealie login button.
+mealie_oidc_provider_name: "Pocket ID"
+# OAuth2 client ID issued by Pocket ID when you register the Mealie app.
+# Not secret (a UUID), so it lives in group_vars in plaintext. REQUIRED.
+mealie_oidc_client_id: ""
+# Account creation from OIDC. false = "map to existing users only": Mealie
+# links a login to the existing account whose email equals the Pocket ID
+# `email` claim (mealie_oidc_user_claim), and rejects logins with no match.
+mealie_oidc_signup_enabled: false
+# Skip Mealie's own login page and go straight to Pocket ID. NOTE: Mealie
+# always keeps a break-glass local login at "{{ mealie_url }}/login?direct=1" —
+# it has no switch to fully disable password auth.
+mealie_oidc_auto_redirect: true
+# Claim Mealie matches against existing user emails.
+mealie_oidc_user_claim: "email"
+# Optional Pocket ID group names that gate access / admin rights. Leave empty
+# to let any Pocket ID user in (subject to the signup setting above).
+mealie_oidc_admin_group: ""
+mealie_oidc_user_group: ""

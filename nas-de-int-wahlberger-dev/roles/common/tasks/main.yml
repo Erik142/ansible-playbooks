@@ -1,0 +1,16 @@
+---
+- name: Refresh repositories and upgrade all packages
+  community.general.zypper:
+    name: "*"
+    state: latest
+    update_cache: true
+  when: common_upgrade | bool
+
+- name: Install baseline packages
+  community.general.zypper:
+    name: "{{ common_packages }}"
+    state: present
+
+- name: Set the system timezone
+  community.general.timezone:
+    name: "{{ common_timezone }}"

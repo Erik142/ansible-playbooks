@@ -1,0 +1,81 @@
+---
+- name: Validate the Cloudflare DNS API token is present
+  ansible.builtin.assert:
+    that:
+      - cloudflare_dns_api_token | length > 0
+    fail_msg: >-
+      cloudflare_dns_api_token is empty. Provide the Vault secret
+      vault_cloudflare_dns_api_token (run with --ask-vault-pass). See
+      roles/caddy/README.md.
+    quiet: true
+
+- name: Create the Caddy directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ caddy_data_dir }}"
+    - "{{ caddy_data_dir }}/data"
+    - "{{ caddy_data_dir }}/config"
+    - "{{ caddy_build_dir }}"
+
+- name: Copy the Caddy Containerfile
+  ansible.builtin.copy:
+    src: Containerfile
+    dest: "{{ caddy_build_dir }}/Containerfile"
+    owner: root
+    group: root
+    mode: "0644"
+  register: caddy_containerfile
+
+# Builds a Caddy image with the Cloudflare DNS module baked in (see
+# files/Containerfile) — the official image can't do DNS-01. `force` only
+# triggers a real rebuild when the Containerfile changed; otherwise this is a
+# no-op once the image already exists.
+- name: Build the Caddy image with the Cloudflare DNS module
+  containers.podman.podman_image:
+    name: "{{ caddy_image }}"
+    path: "{{ caddy_build_dir }}"
+    state: build
+    force: "{{ caddy_containerfile.changed }}"
+  notify: Restart caddy
+
+- name: Deploy the Caddy network Quadlet
+  ansible.builtin.copy:
+    src: caddy.network
+    dest: /etc/containers/systemd/caddy.network
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart caddy
+
+# Cloudflare token, rendered root-only so it never appears in the
+# world-readable Quadlet unit or Caddyfile. Referenced from the Caddyfile as
+# {env.CLOUDFLARE_API_TOKEN}.
+- name: Render the Caddy environment file
+  ansible.builtin.template:
+    src: caddy.env.j2
+    dest: "{{ caddy_data_dir }}/caddy.env"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart caddy
+
+- name: Render the Caddyfile
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: "{{ caddy_data_dir }}/Caddyfile"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart caddy
+
+- name: Deploy the Caddy container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: caddy
+    container_quadlet_src: caddy.container.j2

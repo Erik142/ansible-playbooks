@@ -1,0 +1,21 @@
+---
+# `container_quadlet_src` is just the template's filename. We resolve it against
+# the *calling* role's templates/ dir via ansible_parent_role_paths[0] (the role
+# that included us, e.g. `mealie`). We can't let the service role pass a
+# `{{ role_path }}`-based path: include_role vars are templated lazily, at the
+# moment this task reads them, so `role_path` would resolve to *this* role
+# (`container`) and look for the template under roles/container/templates/.
+- name: Deploy the Quadlet unit for {{ container_name }}
+  ansible.builtin.template:
+    src: "{{ ansible_parent_role_paths[0] }}/templates/{{ container_quadlet_src }}"
+    dest: "{{ container_quadlet_dir }}/{{ container_name }}.container"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart the container service
+
+# Run the restart now (inside this include) instead of at the end of the play,
+# so the handler sees the correct container_name and services come up in the
+# order they are included.
+- name: Apply pending container restarts
+  ansible.builtin.meta: flush_handlers

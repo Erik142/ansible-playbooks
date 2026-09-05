@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: homepage
+  author: Erik Wahlberger
+  description: Homepage (gethomepage.dev) dashboard, running as a Podman Quadlet behind Caddy, linking cloud-wahlberger-dev and this NAS's services.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - homepage
+    - dashboard
+    - podman
+
+dependencies: []

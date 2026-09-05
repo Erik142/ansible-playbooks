@@ -1,0 +1,81 @@
+---
+argument_specs:
+  main:
+    short_description: Paperless-ngx (Redis + PostgreSQL + app) behind Caddy, with Pocket ID OIDC login.
+    options:
+      paperless_ngx_image:
+        type: str
+        required: false
+        description: Paperless-ngx container image.
+      paperless_ngx_redis_image:
+        type: str
+        required: false
+        description: Redis container image.
+      paperless_ngx_db_image:
+        type: str
+        required: false
+        description: PostgreSQL container image.
+      paperless_ngx_data_dir:
+        type: path
+        required: false
+        description: Host directory for Paperless-ngx data/media/export and its env file.
+      paperless_ngx_db_data_dir_root:
+        type: path
+        required: false
+        description: Host directory for the Postgres container's env file.
+      paperless_ngx_db_data_dir:
+        type: path
+        required: false
+        description: Host directory mounted as the Postgres data volume.
+      paperless_ngx_redis_data_dir:
+        type: path
+        required: false
+        description: Host directory mounted as the Redis data volume.
+      paperless_ngx_inbox_dir:
+        type: path
+        required: false
+        description: Scan-to-folder consume directory, inside the Samba share.
+      paperless_ngx_uid:
+        type: int
+        required: false
+        description: UID files written by the container are owned as on the host.
+      paperless_ngx_gid:
+        type: int
+        required: false
+        description: GID files written by the container are owned as on the host.
+      paperless_ngx_ocr_languages:
+        type: str
+        required: false
+        description: OCR language code(s) passed to Tesseract.
+      paperless_ngx_url:
+        type: str
+        required: true
+        description: Public https:// URL Paperless is served on.
+      paperless_ngx_oidc_provider_id:
+        type: str
+        required: false
+        description: allauth provider slug, part of the OIDC callback URL.
+      paperless_ngx_oidc_provider_name:
+        type: str
+        required: false
+        description: Label shown on the Paperless login button.
+      paperless_ngx_oidc_client_id:
+        type: str
+        required: true
+        description: OAuth2 client ID issued by Pocket ID.
+      paperless_ngx_oidc_auto_signup:
+        type: bool
+        required: false
+        description: Auto-provision a Paperless account on first OIDC login.
+      paperless_ngx_oidc_allow_signups:
+        type: bool
+        required: false
+        description: Whether OIDC social signup is permitted at all.
+      paperless_ngx_disable_local_login:
+        type: bool
+        required: false
+        description: Disable the username/password login form entirely.
+      paperless_ngx_oidc_redirect_login:
+        type: bool
+        required: false
+        description: Redirect the login page straight to Pocket ID.

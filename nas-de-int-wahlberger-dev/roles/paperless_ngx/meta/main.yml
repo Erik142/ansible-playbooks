@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: paperless_ngx
+  author: Erik Wahlberger
+  description: Paperless-ngx document management (Redis + PostgreSQL + app), running as Podman Quadlets behind Caddy with Pocket ID OIDC login.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - paperlessngx
+    - podman
+
+dependencies: []

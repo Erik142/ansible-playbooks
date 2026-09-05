@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: samba
+  author: Erik Wahlberger
+  description: Native Samba file server on openSUSE Tumbleweed with guest-only access.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - samba
+    - fileserver
+    - opensuse
+
+dependencies: []

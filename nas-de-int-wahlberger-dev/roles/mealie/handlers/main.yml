@@ -1,0 +1,14 @@
+---
+# daemon_reload: true matters here — on a first-ever run this handler can run
+# BEFORE the container role's own restart handler (Ansible runs flushed
+# handlers in definition order, not notification order, and this role's
+# handler is statically defined while container's is only registered when its
+# dynamic include_role actually executes). Without a reload, systemd doesn't
+# know mealie.service exists yet (Podman Quadlet units are generated on
+# daemon-reload), so the restart fails with "Could not find the requested
+# service". Making this handler self-sufficient avoids depending on ordering.
+- name: Restart mealie
+  ansible.builtin.systemd:
+    name: mealie.service
+    state: restarted
+    daemon_reload: true

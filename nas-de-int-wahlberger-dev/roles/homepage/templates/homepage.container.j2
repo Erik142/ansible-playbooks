@@ -1,0 +1,20 @@
+[Unit]
+Description=Homepage dashboard
+After=network-online.target caddy-network.service
+Wants=network-online.target
+Requires=caddy-network.service
+
+[Container]
+ContainerName=homepage
+Image={{ homepage_image }}
+Network=caddy.network
+Volume={{ homepage_data_dir }}/config:/app/config:Z
+# Homepage (Next.js) refuses requests for hosts not in this list — REQUIRED
+# behind a reverse proxy with a custom domain, not optional hardening.
+Environment=HOMEPAGE_ALLOWED_HOSTS={{ homepage_url | regex_replace('^https?://', '') }}
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

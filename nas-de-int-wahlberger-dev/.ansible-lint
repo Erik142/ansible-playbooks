@@ -1,0 +1,9 @@
+---
+# Hold this playbook to ansible-lint's strictest "production" tier, matching
+# the cloud-wahlberger-dev reference design.
+# https://ansible.readthedocs.io/projects/lint/profiles/
+profile: production
+
+exclude_paths:
+  - .ansible_cache/
+  - .ansible/

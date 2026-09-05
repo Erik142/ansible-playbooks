@@ -1,0 +1,42 @@
+---
+argument_specs:
+  main:
+    short_description: SSH hardening, fail2ban, and automatic patching.
+    description:
+      - Disables SSH root login and password authentication, installs and
+        configures fail2ban for sshd, and schedules a weekly `zypper patch` via
+        a systemd timer.
+    options:
+      security_ssh_permit_root_login:
+        type: str
+        required: false
+        description: sshd_config PermitRootLogin value.
+      security_ssh_password_authentication:
+        type: str
+        required: false
+        description: sshd_config PasswordAuthentication value.
+      security_fail2ban_enabled:
+        type: bool
+        required: false
+        description: Whether to install and enable fail2ban for sshd.
+      security_fail2ban_bantime:
+        type: int
+        required: false
+        description: Seconds an IP stays banned after too many failed logins.
+      security_fail2ban_maxretry:
+        type: int
+        required: false
+        description: Failed login attempts allowed before a ban.
+      security_autoupdate_enabled:
+        type: bool
+        required: false
+        description: Whether to schedule automatic zypper patching.
+      security_autoupdate_on_calendar:
+        type: str
+        required: false
+        description: systemd OnCalendar expression for the patch timer.
+      security_sudoers_passwordless:
+        type: list
+        elements: str
+        required: false
+        description: Usernames granted passwordless sudo via /etc/sudoers.d drop-ins.

@@ -1,0 +1,23 @@
+[Unit]
+Description=Mealie recipe manager
+After=network-online.target caddy-network.service
+Wants=network-online.target
+Requires=caddy-network.service
+
+[Container]
+ContainerName=mealie
+Image={{ mealie_image }}
+Network=caddy.network
+Volume={{ mealie_data_dir }}/data:/app/data:Z
+Environment=ALLOW_SIGNUP=false
+Environment=BASE_URL={{ mealie_url }}
+Environment=TZ={{ mealie_timezone }}
+# OIDC config + client secret rendered to a root-only 0600 file by the mealie
+# role from Ansible Vault.
+EnvironmentFile={{ mealie_data_dir }}/mealie.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

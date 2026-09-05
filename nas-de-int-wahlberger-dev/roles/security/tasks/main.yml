@@ -1,0 +1,119 @@
+---
+# geerlingguy.security (used by cloud-wahlberger-dev) does not target
+# openSUSE, so this role hand-rolls the same three controls: SSH hardening,
+# fail2ban, and automatic patching.
+
+# This openSUSE image ships an empty /etc/ssh/sshd_config.d/ but no base
+# /etc/ssh/sshd_config at all — sshd runs on compiled-in defaults until one
+# exists. `create: true` creates it if missing (preserving it untouched if a
+# future package update ships a real one); owner/mode match a from-scratch file.
+- name: Harden the SSH daemon configuration
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0600"
+    validate: "sshd -t -f %s"
+  loop:
+    - regexp: "^#?PermitRootLogin"
+      line: "PermitRootLogin {{ security_ssh_permit_root_login }}"
+    - regexp: "^#?PasswordAuthentication"
+      line: "PasswordAuthentication {{ security_ssh_password_authentication }}"
+  notify: Restart sshd
+
+# Appended AFTER the hardening lines above (OpenSSH uses the first value it
+# encounters per keyword), so a future drop-in in sshd_config.d/ can never
+# override PermitRootLogin/PasswordAuthentication set above. `create: true`
+# here too: in --check mode the task above only simulates creating the file,
+# it never actually writes it, so this task must be able to create it as well.
+- name: Ensure sshd_config includes the drop-in directory
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^Include /etc/ssh/sshd_config\\.d/\\*\\.conf$"
+    line: "Include /etc/ssh/sshd_config.d/*.conf"
+    create: true
+    owner: root
+    group: root
+    mode: "0600"
+    validate: "sshd -t -f %s"
+  notify: Restart sshd
+
+- name: Install fail2ban
+  community.general.zypper:
+    name: fail2ban
+    state: present
+  when: security_fail2ban_enabled | bool
+
+- name: Render the fail2ban jail for sshd
+  ansible.builtin.template:
+    src: jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: "0644"
+  when: security_fail2ban_enabled | bool
+  notify: Restart fail2ban
+
+- name: Enable and start fail2ban
+  ansible.builtin.systemd:
+    name: fail2ban
+    enabled: true
+    state: started
+  when: security_fail2ban_enabled | bool
+
+# openSUSE has no unattended-upgrades equivalent package; a small systemd timer
+# running `zypper patch` on a schedule covers the same need without adding a
+# dependency. Auto-reboot is intentionally NOT wired up — reboot after kernel
+# updates on your own schedule, same policy as cloud-wahlberger-dev.
+- name: Deploy the automatic-patching systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/zypper-autopatch.service
+    content: |
+      [Unit]
+      Description=Apply pending zypper patches automatically
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/bin/zypper --non-interactive patch --auto-agree-with-licenses
+    owner: root
+    group: root
+    mode: "0644"
+  when: security_autoupdate_enabled | bool
+  notify: Reload systemd
+
+- name: Deploy the automatic-patching systemd timer
+  ansible.builtin.template:
+    src: zypper-autopatch.timer.j2
+    dest: /etc/systemd/system/zypper-autopatch.timer
+    owner: root
+    group: root
+    mode: "0644"
+  when: security_autoupdate_enabled | bool
+  notify: Reload systemd
+
+- name: Apply pending handlers before enabling the timer
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start the automatic-patching timer
+  ansible.builtin.systemd:
+    name: zypper-autopatch.timer
+    enabled: true
+    state: started
+  when: security_autoupdate_enabled | bool
+
+# Needed for Semaphore UI's unattended playbook runs (pi-de-int-wahlberger-dev)
+# — it can't type a sudo password interactively. A separate 0440 drop-in per
+# user, matching geerlingguy.security's security_sudoers_passwordless
+# variable name (used by cloud-wahlberger-dev) for consistency.
+- name: Grant configured users passwordless sudo
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/90-{{ item }}-nopasswd"
+    content: "{{ item }} ALL=(ALL) NOPASSWD: ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+  loop: "{{ security_sudoers_passwordless }}"

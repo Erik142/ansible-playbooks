@@ -1,0 +1,41 @@
+[Unit]
+Description=Paperless-ngx document management
+After=network-online.target caddy-network.service paperless-db.service paperless-redis.service
+Wants=network-online.target paperless-db.service paperless-redis.service
+Requires=caddy-network.service
+
+[Container]
+ContainerName=paperless-ngx
+Image={{ paperless_ngx_image }}
+Network=paperless-ngx
+Network=caddy.network
+Volume={{ paperless_ngx_data_dir }}/data:/usr/src/paperless/data:Z
+Volume={{ paperless_ngx_data_dir }}/media:/usr/src/paperless/media:Z
+Volume={{ paperless_ngx_data_dir }}/export:/usr/src/paperless/export:Z
+# No :Z here (unlike the volumes above): this path lives inside the Samba
+# share and must stay labeled samba_share_t so smbd can also reach it — :Z
+# would make Podman relabel it container_file_t on every container start,
+# regardless of SecurityLabelDisable below (that only affects how THIS
+# container's own process is confined, not whether Podman relabels the host
+# file at mount time). See roles/paperless_ngx/README.md -> SELinux.
+Volume={{ paperless_ngx_inbox_dir }}:/usr/src/paperless/consume
+# Runs this container unconfined so its (still container_t-confined by
+# default) process can read/write the samba_share_t-labeled inbox above —
+# there's no stock policy rule allowing a confined container to access
+# Samba's file type. The other volumes stay container_file_t-labeled and
+# work fine unconfined too; only this one strictly needs it.
+SecurityLabelDisable=true
+Environment=UID={{ paperless_ngx_uid }}
+Environment=GID={{ paperless_ngx_gid }}
+Environment=PAPERLESS_REDIS=redis://paperless-redis:6379
+Environment=PAPERLESS_DBHOST=paperless-db
+Environment=PAPERLESS_OCR_LANGUAGES={{ paperless_ngx_ocr_languages }}
+# Secrets + OIDC config (PAPERLESS_DBPASS, PAPERLESS_URL, PAPERLESS_*OIDC*)
+# rendered to a root-only 0600 file by this role from Ansible Vault.
+EnvironmentFile={{ paperless_ngx_data_dir }}/paperless-ngx.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,36 @@
+---
+# Rendered by the homepage role. Do NOT edit on the host. rpi-karlsruhe is
+# intentionally excluded (legacy, being retired) — see the top-level README.
+- Cloud (Hetzner):
+    - Pocket ID:
+        href: "{{ homepage_pocket_id_url }}"
+        description: Passkey OIDC identity provider
+        ping: "{{ homepage_pocket_id_url }}"
+    - FreshRSS:
+        href: "{{ homepage_freshrss_url }}"
+        description: RSS feed aggregator
+        ping: "{{ homepage_freshrss_url }}"
+
+- NAS (nas.de.int.wahlberger.dev):
+    - Mealie:
+        href: "{{ mealie_url }}"
+        description: Recipe manager
+        # Not {{ mealie_url }}: that public hostname resolves (via public DNS)
+        # to this same NAS's own LAN IP, and Homepage pinging its own host's
+        # external address to reach a sibling container is a classic NAT
+        # hairpin that Podman's default bridge networking doesn't handle —
+        # fails even though the exact same URL works fine from an actual
+        # external client. Homepage and mealie share caddy.network, so the
+        # container name resolves directly via Podman's network-scoped DNS.
+        ping: "http://mealie:9000"
+    - Paperless-ngx:
+        href: "{{ paperless_ngx_url }}"
+        description: Document management
+        # See the mealie ping comment above — same hairpin, same fix.
+        ping: "http://paperless-ngx:8000"
+
+- NAS (truenas.boras.int.wahlberger.dev):
+    - TrueNAS:
+        href: "{{ homepage_truenas_url }}"
+        description: TrueNAS instance in Sweden
+        ping: "{{ homepage_truenas_url }}"

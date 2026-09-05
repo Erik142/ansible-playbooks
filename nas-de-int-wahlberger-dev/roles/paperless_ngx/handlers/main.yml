@@ -1,0 +1,21 @@
+---
+# daemon_reload: true matters here — on a first-ever run these handlers can
+# run BEFORE the container role's own restart handler for the matching
+# service (Ansible runs flushed handlers in definition order, not
+# notification order, and this role's handlers are statically defined while
+# container's is only registered when its dynamic include_role actually
+# executes). Without a reload, systemd doesn't know the unit exists yet
+# (Podman Quadlet units are generated on daemon-reload), so the restart fails
+# with "Could not find the requested service". Making these handlers
+# self-sufficient avoids depending on ordering. See also roles/mealie's.
+- name: Restart paperless-db
+  ansible.builtin.systemd:
+    name: paperless-db.service
+    state: restarted
+    daemon_reload: true
+
+- name: Restart paperless-ngx
+  ansible.builtin.systemd:
+    name: paperless-ngx.service
+    state: restarted
+    daemon_reload: true

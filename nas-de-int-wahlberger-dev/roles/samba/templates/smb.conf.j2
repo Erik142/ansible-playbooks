@@ -1,0 +1,37 @@
+{# Rendered by the samba role to /etc/samba/smb.conf. Do NOT edit on the host. #}
+[global]
+    server string = {{ samba_server_string }}
+    workgroup = WORKGROUP
+    security = user
+    # No Samba user accounts exist on this host — every connection is
+    # unauthenticated and mapped straight to the guest account below.
+    map to guest = Bad User
+    guest account = {{ samba_guest_account }}
+    server min protocol = SMB2
+
+    # No printing services on this host.
+    load printers = no
+    printing = bsd
+    printcap name = /dev/null
+    disable spoolss = yes
+
+    # macOS clients (this share's primary use case): negotiate Apple's SMB2+
+    # protocol extensions. Without vfs_fruit, macOS falls back to a much
+    # chattier per-file metadata protocol and often creates "._filename"
+    # AppleDouble sidecar files for resource forks — on a large flat
+    # directory this makes Finder spin for a very long time enumerating it,
+    # even though the server itself is barely working. Recommended by the
+    # Samba project specifically for macOS clients, not a workaround.
+    fruit:aapl = yes
+
+[{{ samba_share_name }}]
+    path = {{ samba_share_path }}
+    comment = {{ samba_share_comment }}
+    guest ok = yes
+    guest only = yes
+    browseable = yes
+    writable = yes
+    read only = no
+    create mask = 0664
+    directory mask = 0775
+    vfs objects = catia fruit streams_xattr

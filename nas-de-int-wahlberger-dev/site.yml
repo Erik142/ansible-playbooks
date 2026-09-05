@@ -1,0 +1,38 @@
+---
+# Top-level playbook. Convention: `site.yml` applies the *entire* configuration
+# to every host. As the stack grows, split concerns into per-tier playbooks and
+# pull them together here with `import_playbook:`.
+#
+# Run with:  ansible-playbook site.yml
+# Limit to one role:  ansible-playbook site.yml --tags samba
+- name: Configure the nas.de.int.wahlberger.dev host
+  hosts: nas
+  become: true
+  gather_facts: true
+  roles:
+    - role: common
+      tags: [common]
+    # Personal + Semaphore automation SSH keys, authorized before hardening.
+    - role: ssh_authorized_keys
+      tags: [ssh_authorized_keys]
+    # Harden the host before anything else listens on the network.
+    - role: security
+      tags: [security]
+    - role: firewall
+      tags: [firewall]
+    - role: podman
+      tags: [podman]
+    # Reverse proxy (creates the shared network) for mealie/paperless-ngx.
+    - role: caddy
+      tags: [caddy]
+    # Native Samba file server (not a container) with guest access.
+    - role: samba
+      tags: [samba]
+    - role: mealie
+      tags: [mealie]
+    # After samba: its inbox directory lives inside the Samba share.
+    - role: paperless_ngx
+      tags: [paperless_ngx]
+    # Dashboard linking this NAS's and cloud-wahlberger-dev's services.
+    - role: homepage
+      tags: [homepage]

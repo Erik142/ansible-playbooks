@@ -1,0 +1,16 @@
+[Unit]
+Description=Redis (Paperless-ngx cache/queue)
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=paperless-redis
+Image={{ paperless_ngx_redis_image }}
+Network=paperless-ngx
+Volume={{ paperless_ngx_redis_data_dir }}:/data:Z
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
