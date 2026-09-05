@@ -8,9 +8,15 @@ Requires=caddy-network.service
 ContainerName=semaphore
 Image={{ semaphore_image }}
 Network=caddy.network
-Volume={{ semaphore_data_dir }}/config:/etc/semaphore:Z
-# DB path, admin bootstrap, encryption keys, and OIDC config all come from
-# this root-only file, rendered by the semaphore role from Ansible Vault.
+# Mounted as a single file, not a directory: config.json.j2 IS Semaphore's
+# real config (secrets included) — nothing here is auto-generated. See
+# tasks/main.yml for why env vars alone don't work for this.
+Volume={{ semaphore_data_dir }}/config.json:/etc/semaphore/config.json:Z
+# The actual database path config.json declares — must be persisted here
+# too, or every restart silently starts from an empty database.
+Volume={{ semaphore_data_dir }}/data:/var/lib/semaphore:Z
+# OIDC config comes from this root-only file, rendered by the semaphore role
+# from Ansible Vault.
 EnvironmentFile={{ semaphore_data_dir }}/semaphore.env
 
 [Service]

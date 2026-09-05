@@ -18,18 +18,42 @@
 # world-writable (0777): matches this repo's established pattern for Podman
 # data directories where the exact in-container UID isn't pinned down — see
 # nas-de-int-wahlberger-dev's mealie/paperless_ngx roles for the history of
-# why this is the safer default over guessing at a tighter mode.
-- name: Create the Semaphore config directory
+# why this is the safer default over guessing at a tighter mode. (config.json
+# itself, rendered below, needs the same treatment for the same reason.)
+- name: Create the Semaphore data directory
   ansible.builtin.file:
-    path: "{{ semaphore_data_dir }}/config"
+    path: "{{ semaphore_data_dir }}/data"
     state: directory
     owner: root
     group: root
     mode: "0777"
 
-# All config + secrets (DB path, admin bootstrap, encryption keys, OIDC
-# client secret) go through this single root-only env file — none of it lands
-# in the world-readable Quadlet unit. A change here restarts the container.
+# Deliberately NOT SEMAPHORE_DB_DIALECT/SEMAPHORE_DB/SEMAPHORE_ACCESS_KEY_ENCRYPTION/
+# SEMAPHORE_COOKIE_* env vars: this image's `server` command auto-generates
+# its own config.json (with its own random secrets and its default sqlite
+# path, ignoring those env vars) on first boot and never revisits it once the
+# file exists. Rendering the real config.json ourselves is the only reliable
+# way to control these values.
+#
+# mode "0644", not root-only: the semaphore process inside the container runs
+# as a non-root "semaphore" user (confirmed — the image's own auto-generated
+# config.json was owned by that user, not root), so a root:root 0600 file is
+# unreadable to it. Learned this the hard way: `semaphore users add` failed
+# with the misleading "Cannot Find configuration!" — actually a permission
+# denied reading the file, not a missing one. A change here restarts the
+# container below.
+- name: Render the Semaphore configuration
+  ansible.builtin.template:
+    src: config.json.j2
+    dest: "{{ semaphore_data_dir }}/config.json"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart semaphore
+
+# OIDC is the one setting this image DOES read fresh from the environment on
+# every boot (confirmed: Pocket ID login works). Everything else moved to
+# config.json.j2 above.
 - name: Render the Semaphore environment file
   ansible.builtin.template:
     src: semaphore.env.j2
@@ -45,3 +69,64 @@
   vars:
     container_name: semaphore
     container_quadlet_src: semaphore.container.j2
+
+# SEMAPHORE_ADMIN* env vars don't create an admin account under this image's
+# `server` command (see the env template's comment) — create it explicitly
+# and idempotently via Semaphore's own CLI instead. No dedicated Ansible
+# module for this, so `ansible.builtin.command` is used deliberately, same
+# exception already made elsewhere in this repo (e.g. the NAS's
+# `restorecon` calls) for operations with no module equivalent.
+#
+# Every `semaphore` CLI invocation — not just `server` — runs its own
+# migration check against the database first. On a container that just
+# (re)started, that races the main server process's own migrations: two
+# processes independently trying to ALTER the same table concurrently, one
+# of which then fails with a "duplicate column" SQL error. Retrying rides
+# out that transient window rather than assuming the container is instantly
+# fully ready the moment `systemctl restart` returns.
+- name: Check whether the Semaphore admin user already exists
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - semaphore
+      - semaphore
+      - users
+      - get
+      - --config
+      - /etc/semaphore/config.json
+      - --login
+      - "{{ semaphore_admin_username }}"
+  register: semaphore_admin_check
+  changed_when: false
+  failed_when: false
+  retries: 10
+  delay: 2
+  until: "'SQL logic error' not in semaphore_admin_check.stderr"
+
+- name: Create the Semaphore admin user
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - semaphore
+      - semaphore
+      - users
+      - add
+      - --config
+      - /etc/semaphore/config.json
+      - --login
+      - "{{ semaphore_admin_username }}"
+      - --name
+      - "{{ semaphore_admin_name }}"
+      - --email
+      - "{{ semaphore_admin_email }}"
+      - --password
+      - "{{ semaphore_admin_password }}"
+      - --admin
+  when: semaphore_admin_check.rc != 0
+  register: semaphore_admin_create
+  changed_when: true
+  retries: 10
+  delay: 2
+  until: "semaphore_admin_create.rc == 0 or 'SQL logic error' not in semaphore_admin_create.stderr"

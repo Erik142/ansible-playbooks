@@ -27,9 +27,46 @@ are **not** as seamless as Mealie/Paperless-ngx's Pocket ID integration:
    a project role.
 2. **No way to fully disable local login.** Unlike Paperless's
    `PAPERLESS_DISABLE_REGULAR_LOGIN`, Semaphore has no "OIDC-only" switch. The
-   `SEMAPHORE_ADMIN*` variables below create a real local account — kept
-   deliberately as a break-glass fallback into the one system that holds SSH
-   keys to your entire infrastructure, not an oversight to lock down later.
+   admin account below is a real local account — kept deliberately as a
+   break-glass fallback into the one system that holds SSH keys to your
+   entire infrastructure, not an oversight to lock down later.
+
+## Why config.json is templated directly, not set via env vars
+
+Semaphore's Docker documentation describes `SEMAPHORE_DB_DIALECT`,
+`SEMAPHORE_DB`, `SEMAPHORE_ADMIN*`, `SEMAPHORE_ACCESS_KEY_ENCRYPTION`, and
+`SEMAPHORE_COOKIE_*` as env-var-configurable — but empirically, this image's
+`server` command (what its default entrypoint runs) does **not** apply them:
+on first boot it auto-generates its own `/etc/semaphore/config.json` with its
+own random secrets and its own default sqlite path
+(`/var/lib/semaphore/database.sqlite`, **not** on any bind-mounted volume),
+then never re-reads those env vars again once that file exists — including
+never creating an admin user from `SEMAPHORE_ADMIN*`. OIDC is the one setting
+this image *does* read fresh from the environment on every boot (confirmed:
+Pocket ID login works), so it stays in `semaphore.env.j2`.
+
+The fix: `config.json.j2` renders the real config directly (mounted as a
+single file, not a directory — Semaphore never gets the chance to
+auto-generate its own), `/var/lib/semaphore` is bind-mounted so the database
+persists across restarts, and the admin account is created explicitly via
+`semaphore users add` (idempotent — checked with `semaphore users get`
+first) rather than relying on env vars that don't do what the docs describe
+for this image.
+
+`config.json` is rendered mode `0644`, not root-only — the `semaphore`
+process inside the container runs as a non-root user (confirmed: the
+image's own auto-generated config.json was owned by a `semaphore` user, not
+root), so a root:root `0600` file is unreadable to it. Found this the hard
+way: `semaphore users add --config /etc/semaphore/config.json` failed with
+the misleading `Cannot Find configuration!` — actually a permission denied
+reading the file, not a missing one.
+
+**Rotating `semaphore_admin_password` later won't update an existing
+account** — the idempotency check only looks for the user's *existence*, not
+whether its password matches the current Vault value. To actually change it,
+either delete the user first (`semaphore users delete --config
+/etc/semaphore/config.json --login <login>`) and re-run, or run `semaphore
+users change-by-login` by hand.
 
 ## Register the OIDC client in Pocket ID
 
