@@ -46,6 +46,18 @@ jobs:
       - name: Install Ansible tooling
         run: pip install "ansible-core>=2.16,<2.17" ansible-lint yamllint
 
+      # Every playbook's ansible.cfg defaults vault_password_file to
+      # .vault_pass.sh, which shells out to the 1Password CLI (op) for local
+      # runs — not present here, nor should it be: CI never touches real
+      # secrets. A non-executable dummy file (wrong password, not a script)
+      # overrides that default for every step below, restoring the original
+      # behavior of a graceful "can't decrypt" warning instead of a hard
+      # failure from the vault-password script itself exiting non-zero.
+      - name: Provide a dummy vault password (CI never decrypts real secrets)
+        run: |
+          echo "ci-cannot-decrypt-this-is-expected" > "$RUNNER_TEMP/dummy-vault-pass"
+          echo "ANSIBLE_VAULT_PASSWORD_FILE=$RUNNER_TEMP/dummy-vault-pass" >> "$GITHUB_ENV"
+
       - name: Install collection/role requirements
         if: hashFiles(format('{0}/requirements.yml', matrix.dir)) != ''
         working-directory: ${{ matrix.dir }}
