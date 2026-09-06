@@ -1,7 +1,7 @@
 ---
 # Default variables for the `uptime_kuma` role.
 
-uptime_kuma_image: louislam/uptime-kuma:2.5.3
+uptime_kuma_image: docker.io/louislam/uptime-kuma:2.5.3
 
 # Named Podman volume for persistent data (SQLite DB, uploaded icons) —
 # Podman creates it automatically. Back this up.
