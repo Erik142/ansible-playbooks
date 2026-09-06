@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: cloudflare_dns
+  author: Erik Wahlberger
+  description: Ensures Cloudflare DNS records exist for this host and its Caddy sites.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - dns
+    - cloudflare
+
+dependencies: []
