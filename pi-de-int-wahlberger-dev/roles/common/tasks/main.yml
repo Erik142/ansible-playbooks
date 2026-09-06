@@ -17,3 +17,24 @@
 - name: Set the system timezone
   community.general.timezone:
     name: "{{ common_timezone }}"
+
+# inventory_hostname is already this host's real FQDN (matches ansible.cfg's
+# inventory file) — no new variable needed. Fixes cases like a VM's hostname
+# having been left at whatever the provisioning process set it to (seen
+# firsthand on cloud-wahlberger-dev: a notify_failure email tagged a log
+# line "cloud-podman", not "cloud.wahlberger.dev").
+- name: Set the system hostname to the host's FQDN
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+
+# A static fallback for resolving this host's own hostname, so `sudo`
+# doesn't print "unable to resolve host" if DNS is ever briefly unavailable
+# — not a replacement for the real public DNS record (cloudflare_dns role)
+# this host already has.
+- name: Ensure /etc/hosts resolves this host's own hostname locally
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1\s'
+    line: "127.0.1.1\t{{ inventory_hostname }}\t{{ inventory_hostname.split('.')[0] }}"
+    create: true
+    mode: "0644"
