@@ -1,4 +1,9 @@
 ---
+collections:
+  # seboolean module, used by the prereq role.
+  - name: ansible.posix
+    version: ">=1.5.0"
+
 roles:
   - name: bind9
     src: https://github.com/Erik142/ansible-role-bind9.git
