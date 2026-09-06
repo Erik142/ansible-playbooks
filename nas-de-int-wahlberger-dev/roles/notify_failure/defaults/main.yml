@@ -4,8 +4,11 @@
 # REQUIRED: set vault_notify_failure_resend_api_key in Ansible Vault.
 notify_failure_resend_api_key: ""
 
-# Must be an address on a domain verified in Resend, or sending fails.
-notify_failure_from_address: "alerts@no-reply.wahlberger.dev"
+# Display name + address: the address must be on a domain verified in
+# Resend, or sending fails. Kept consistent with Uptime Kuma's own SMTP
+# notification sender name (configured manually in its UI) so alerts from
+# any source in the homelab look like they come from the same place.
+notify_failure_from_address: "Homelab Alerts <alerts@no-reply.wahlberger.dev>"
 
 notify_failure_to_address: "ewahlberger@gmail.com"
 

@@ -1,0 +1,6 @@
+// Rendered by the reboot_notify role. Do NOT edit on the host — re-run
+// Ansible. A separate file from needrestart's own 99needrestart (which this
+// role must not overwrite) — this one only maintains
+// /var/run/reboot-required, needrestart's own hook does its usual
+// stale-service-restart checks.
+DPkg::Post-Invoke {"/usr/local/bin/check-reboot-required.sh || true";};

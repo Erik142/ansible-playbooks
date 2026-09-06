@@ -25,9 +25,12 @@ This role deploys five things:
    handles any number of monitored services. Applies the crash-loop dedup
    below.
 3. `notify-failure-immediate@.service` — the same script, but with
-   `NOTIFY_CRASH_THRESHOLD` forced to `1` via a unit-level `Environment=`
-   (which wins over the same key from `EnvironmentFile=` below it — see the
-   comment in the template). For units with **no `Restart=`** at all — a
+   `NOTIFY_CRASH_THRESHOLD` forced to `1` via a unit-level `Environment=`.
+   That key is deliberately absent from `notify-failure.env` (below) —
+   `EnvironmentFile=` always wins over a same-named `Environment=` on this
+   systemd, confirmed empirically, so a unit-level override only works when
+   the shared file doesn't also define the key. For units with **no
+   `Restart=`** at all — a
    `Type=oneshot` job like `restic-backup.service`, or a native service like
    Samba's `smb`/`nmb` with no auto-restart configured — there's no
    repeating flap to deduplicate in the first place, and for a job that only

@@ -17,6 +17,11 @@ security_ssh_permit_root_login: "no"
 security_ssh_password_authentication: "no"
 security_fail2ban_enabled: true
 security_autoupdate_enabled: true
+# Reboot automatically for updates that need it (kernel, libc, …) — the
+# reboot_notify role emails a heads-up right before it happens, gated on
+# /var/run/reboot-required so it only fires for a genuine update-triggered
+# reboot. Default reboot time (security_autoupdate_reboot_time) is 03:00.
+security_autoupdate_reboot: "true"
 # Passwordless sudo for Semaphore UI's own unattended playbook runs against
 # THIS host (as well as cloud-wahlberger-dev and the NAS) — it can't type a
 # sudo password interactively.

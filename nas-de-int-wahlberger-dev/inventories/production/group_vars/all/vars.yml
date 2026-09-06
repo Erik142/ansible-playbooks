@@ -16,6 +16,11 @@ security_ssh_permit_root_login: "no"
 security_ssh_password_authentication: "no"
 security_fail2ban_enabled: true
 security_autoupdate_enabled: true
+# Reboot automatically (via rebootmgr) for updates that need it (kernel,
+# glibc, …) — the reboot_notify role emails a heads-up right before it
+# happens, gated on `zypper needs-rebooting` so it only fires for a genuine
+# update-triggered reboot. See roles/security/README.md.
+security_autoupdate_reboot: true
 # Passwordless sudo for Semaphore UI's unattended playbook runs (see
 # pi-de-int-wahlberger-dev).
 security_sudoers_passwordless:

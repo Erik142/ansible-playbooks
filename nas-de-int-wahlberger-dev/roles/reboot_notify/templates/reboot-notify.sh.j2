@@ -1,0 +1,47 @@
+#!/bin/sh
+# Rendered by the reboot_notify role. Do NOT edit on the host — re-run
+# Ansible. Runs on every shutdown/reboot (see reboot-notify.service), but
+# only actually emails when zypper itself says a reboot is genuinely
+# needed — i.e. this specific reboot is (at least in part) rebootmgr's own
+# automatic one for a pending kernel/library update (see roles/security's
+# request-reboot-if-needed.sh), not an ordinary manual one.
+set -eu
+
+if OUTPUT="$(zypper needs-rebooting 2>&1)"; then
+  RC=0
+else
+  RC=$?
+fi
+
+# 102 = ZYPPER_EXIT_INF_REBOOT_NEEDED. Anything else (0 = not needed, or a
+# real zypper error) means there's nothing accurate to email about.
+[ "$RC" -eq 102 ] || exit 0
+
+# shellcheck disable=SC1091
+. /etc/notify-failure/notify-failure.env
+TEMPLATE=/etc/reboot-notify/email-template.html
+HOST="$(hostname -f)"
+NOW="$(date '+%Y-%m-%d %H:%M:%S %Z')"
+
+BODY="$(jq -n \
+  --arg from "$NOTIFY_FROM" \
+  --arg to "$NOTIFY_TO" \
+  --arg host "$HOST" \
+  --arg time "$NOW" \
+  --arg packages "$OUTPUT" \
+  --rawfile tmpl "$TEMPLATE" \
+  '{
+    from: $from,
+    to: [$to],
+    subject: ("[" + $host + "] Rebooting for a software update"),
+    text: ($host + " is rebooting at " + $time + " because of a pending software update.\n\n" + $packages),
+    html: ($tmpl
+      | gsub("@@HOST@@"; $host)
+      | gsub("@@TIME@@"; $time)
+      | gsub("@@PACKAGES@@"; $packages))
+  }' 2>&1)" || { echo "jq failed building the reboot notice body: $BODY" >&2; exit 0; }
+
+curl -fsS --max-time 15 https://api.resend.com/emails \
+  -H "Authorization: Bearer ${RESEND_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d "$BODY" || echo "Sending the reboot notice failed (reboot proceeds regardless)" >&2

@@ -1,0 +1,22 @@
+[Unit]
+Description=Email a heads-up when this host reboots for a pending update
+DefaultDependencies=no
+# Ordering this After= network-online.target means it's stopped BEFORE
+# network-online.target on the way down (systemd stops units in the reverse
+# of their start order) — the email still has a network to send over.
+# Before= is what actually puts this in the shutdown transaction at all.
+After=network-online.target
+Wants=network-online.target
+Before=shutdown.target reboot.target halt.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/bin/true
+ExecStop=/usr/local/bin/reboot-notify.sh
+# Caps how long a failed/hanging send can delay the actual reboot — the
+# host going down on schedule matters more than the email landing.
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

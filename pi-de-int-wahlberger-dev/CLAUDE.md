@@ -38,6 +38,7 @@ automation host that runs `ansible-playbook` against this host,
 | `disk_space` | Periodic disk usage check (systemd timer), emailing via `notify_failure` on a new threshold crossing. |
 | `ssh_authorized_keys` | Authorizes your personal SSH key plus Semaphore's dedicated automation key (both also authorized on cloud-wahlberger-dev and the NAS) |
 | `geerlingguy.security` (external) | SSH hardening, fail2ban, unattended-upgrades. Also grants `erikwahlberger` passwordless sudo (`security_sudoers_passwordless`) — Semaphore can't type an interactive sudo password |
+| `reboot_notify` | Emails a heads-up (reusing `notify_failure`'s Resend credentials; its own notification class, not a failure alert) right before an unattended-upgrades-triggered reboot. Installs `needrestart` to maintain `/var/run/reboot-required`, which Debian has no other source for. |
 | `firewall` | ufw host firewall, default-deny inbound, allows 22/80/443 |
 | `storage` | Mounts the external USB drive (stable `/dev/disk/by-id/...` path, `nofail` in fstab) at `/mnt/data`; does NOT format it — `storage_fstype` must be set to what's already on it |
 | `podman` | Podman + Quadlet support, `/mnt/data/containers` data dir (inside the `storage` mount), `podman.socket` |

@@ -4,4 +4,6 @@ Description=Send a failure notification email for %i
 [Service]
 Type=oneshot
 EnvironmentFile=/etc/notify-failure/notify-failure.env
+# Not in the shared file above — see the comment there for why.
+Environment=NOTIFY_CRASH_THRESHOLD={{ notify_failure_crash_threshold }}
 ExecStart=/usr/local/bin/notify-failure.sh %i

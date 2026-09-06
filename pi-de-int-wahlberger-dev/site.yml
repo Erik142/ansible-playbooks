@@ -25,6 +25,11 @@
     # Harden the host before anything else listens on the network.
     - role: geerlingguy.security
       tags: [security]
+    # After notify_failure (reuses its Resend credentials) and security
+    # (enables security_autoupdate_reboot, the reboot this role emails
+    # about).
+    - role: reboot_notify
+      tags: [reboot_notify]
     - role: firewall
       tags: [firewall]
     # Mounts the external USB drive before podman needs somewhere under it

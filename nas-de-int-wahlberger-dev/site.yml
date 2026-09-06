@@ -26,6 +26,11 @@
     # Harden the host before anything else listens on the network.
     - role: security
       tags: [security]
+    # After notify_failure (reuses its Resend credentials) and security
+    # (enables security_autoupdate_reboot, the reboot this role emails
+    # about).
+    - role: reboot_notify
+      tags: [reboot_notify]
     - role: firewall
       tags: [firewall]
     # Before podman/samba: both assert their data directories are already

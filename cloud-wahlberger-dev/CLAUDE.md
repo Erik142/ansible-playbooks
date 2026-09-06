@@ -41,6 +41,7 @@ playbooks in this repo — prefer copying its patterns over the older `rpi-*` on
 | `disk_space` | Periodic disk usage check (systemd timer), emailing via `notify_failure` on a new threshold crossing. |
 | `ssh_authorized_keys` | Authorizes your personal SSH key plus Semaphore's dedicated automation key (both also authorized on the NAS and the Pi) |
 | `geerlingguy.security` (external) | SSH hardening, fail2ban, unattended-upgrades. Tuned via `security_*` in group_vars; installed from Galaxy. |
+| `reboot_notify` | Emails a heads-up (reusing `notify_failure`'s Resend credentials; its own notification class, not a failure alert) right before an unattended-upgrades-triggered reboot. Installs `needrestart` to maintain `/var/run/reboot-required`, which Debian has no other source for. |
 | `firewall` | ufw host firewall, default-deny inbound, allows 22/80/443. |
 | `podman` | Podman + Quadlet support, `/opt/podman` data dir, `podman.socket` |
 | `cloudflare_dns` | Brings this host's already-existing Cloudflare records under Ansible management |

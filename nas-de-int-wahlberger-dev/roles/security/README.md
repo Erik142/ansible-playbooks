@@ -15,6 +15,10 @@ target openSUSE.
 | `security_fail2ban_maxretry` | `5` | Failed attempts before a ban. |
 | `security_autoupdate_enabled` | `true` | Schedule weekly `zypper patch`. |
 | `security_autoupdate_on_calendar` | `Sun *-*-* 03:00:00` | systemd `OnCalendar` for the patch timer. |
+| `security_autoupdate_reboot` | `false` | Reboot automatically (via rebootmgr) when zypper says one is needed. Same variable name as cloud/pi's geerlingguy.security equivalent, different mechanism. |
+| `security_autoupdate_reboot_window_start` | `"03:00"` | rebootmgr's maintenance window start. |
+| `security_autoupdate_reboot_window_duration` | `"1h"` | rebootmgr's maintenance window length. |
+| `security_autoupdate_reboot_strategy` | `"best-effort"` | rebootmgr strategy — see below. |
 | `security_sudoers_passwordless` | `[]` | Usernames granted passwordless sudo (needed for Semaphore UI's unattended runs — see `pi-de-int-wahlberger-dev`). |
 
 ## Don't lock yourself out
@@ -35,7 +39,33 @@ password auth out from under this role.
 
 ## Automatic patching
 
-Unlike Debian's `unattended-upgrades`, `zypper patch` does **not** auto-reboot
-even after a kernel update — check `zypper ps -s` periodically and reboot on
-your own schedule. Inspect the timer with `systemctl status zypper-autopatch.timer`
-and past runs with `journalctl -u zypper-autopatch.service`.
+`zypper-autopatch.service`/`.timer` runs `zypper patch` weekly. Inspect the
+timer with `systemctl status zypper-autopatch.timer` and past runs with
+`journalctl -u zypper-autopatch.service`.
+
+## Automatic reboot (rebootmgr)
+
+Unlike Debian's `unattended-upgrades`, `zypper patch` never reboots on its
+own — this role wires up [rebootmgr](https://github.com/SUSE/rebootmgr)
+(SUSE's own purpose-built tool for this, unlike Debian which has nothing
+equivalent — see `roles/reboot_notify/README.md`) to do it, when
+`security_autoupdate_reboot: true`:
+
+1. `zypper-autopatch.service` gets an `ExecStartPost=` running
+   `request-reboot-if-needed.sh` after every successful patch run.
+2. That script checks `zypper needs-rebooting` (exit code 102 = a reboot is
+   genuinely suggested — kernel, glibc, etc.) and, only then, calls
+   `rebootmgrctl reboot` to *request* one.
+3. `rebootmgrd` (its own long-running service, configured via
+   `/etc/rebootmgr.conf`) decides *when* to actually carry it out, per
+   `security_autoupdate_reboot_strategy`. The default, `best-effort`,
+   reboots at the first reasonable opportunity once requested — it doesn't
+   re-gate on the configured window on top, since the weekly patch timer
+   already only requests a reboot once, right after Sunday 03:00 patching.
+   Switch to `maint-window` if you want reboots strictly confined to
+   `security_autoupdate_reboot_window_start`/`_window_duration` instead.
+
+Emailing a heads-up before this actually happens is a separate role, not
+this one — see `roles/reboot_notify/README.md`.
+
+Inspect on the host: `sudo rebootmgrctl status`, `zypper needs-rebooting`.

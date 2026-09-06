@@ -1,0 +1,6 @@
+---
+# Default variables for the `reboot_notify` role.
+#
+# No variables of its own: it entirely reuses notify_failure's Resend
+# credentials and from/to addresses (/etc/notify-failure/notify-failure.env)
+# rather than duplicating them. See README.md.

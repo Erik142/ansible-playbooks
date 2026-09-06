@@ -1,0 +1,10 @@
+{# Rendered by the security role to /etc/systemd/system/zypper-autopatch.service. #}
+[Unit]
+Description=Apply pending zypper patches automatically
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/zypper --non-interactive patch --auto-agree-with-licenses
+{% if security_autoupdate_reboot %}
+ExecStartPost=/usr/local/bin/request-reboot-if-needed.sh
+{% endif %}

@@ -35,6 +35,22 @@ argument_specs:
         type: str
         required: false
         description: systemd OnCalendar expression for the patch timer.
+      security_autoupdate_reboot:
+        type: bool
+        required: false
+        description: Reboot automatically (via rebootmgr) when zypper says one is needed after patching.
+      security_autoupdate_reboot_window_start:
+        type: str
+        required: false
+        description: rebootmgr window-start (HH:MM).
+      security_autoupdate_reboot_window_duration:
+        type: str
+        required: false
+        description: rebootmgr window-duration (e.g. "1h").
+      security_autoupdate_reboot_strategy:
+        type: str
+        required: false
+        description: rebootmgr strategy (best-effort/maint-window/instantly/off/on).
       security_sudoers_passwordless:
         type: list
         elements: str

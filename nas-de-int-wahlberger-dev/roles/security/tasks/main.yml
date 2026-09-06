@@ -66,18 +66,43 @@
 
 # openSUSE has no unattended-upgrades equivalent package; a small systemd timer
 # running `zypper patch` on a schedule covers the same need without adding a
-# dependency. Auto-reboot is intentionally NOT wired up — reboot after kernel
-# updates on your own schedule, same policy as cloud-wahlberger-dev.
-- name: Deploy the automatic-patching systemd service
-  ansible.builtin.copy:
-    dest: /etc/systemd/system/zypper-autopatch.service
-    content: |
-      [Unit]
-      Description=Apply pending zypper patches automatically
+# dependency.
+- name: Install rebootmgr
+  community.general.zypper:
+    name: rebootmgr
+    state: present
+  when: (security_autoupdate_enabled | bool) and (security_autoupdate_reboot | bool)
 
-      [Service]
-      Type=oneshot
-      ExecStart=/usr/bin/zypper --non-interactive patch --auto-agree-with-licenses
+- name: Deploy the rebootmgr configuration
+  ansible.builtin.template:
+    src: rebootmgr.conf.j2
+    dest: /etc/rebootmgr.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: (security_autoupdate_enabled | bool) and (security_autoupdate_reboot | bool)
+  notify: Reload systemd
+
+- name: Enable and start rebootmgr
+  ansible.builtin.systemd:
+    name: rebootmgr
+    enabled: true
+    state: started
+  when: (security_autoupdate_enabled | bool) and (security_autoupdate_reboot | bool)
+
+- name: Deploy the reboot-request script
+  ansible.builtin.template:
+    src: request-reboot-if-needed.sh.j2
+    dest: /usr/local/bin/request-reboot-if-needed.sh
+    owner: root
+    group: root
+    mode: "0700"
+  when: (security_autoupdate_enabled | bool) and (security_autoupdate_reboot | bool)
+
+- name: Deploy the automatic-patching systemd service
+  ansible.builtin.template:
+    src: zypper-autopatch.service.j2
+    dest: /etc/systemd/system/zypper-autopatch.service
     owner: root
     group: root
     mode: "0644"

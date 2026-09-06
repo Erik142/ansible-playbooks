@@ -1,0 +1,39 @@
+---
+- name: Create the reboot_notify config directory
+  ansible.builtin.file:
+    path: /etc/reboot-notify
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy the reboot notice email template
+  ansible.builtin.copy:
+    src: email-template.html
+    dest: /etc/reboot-notify/email-template.html
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy the reboot notice script
+  ansible.builtin.template:
+    src: reboot-notify.sh.j2
+    dest: /usr/local/bin/reboot-notify.sh
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Deploy the reboot-notify systemd shutdown hook
+  ansible.builtin.template:
+    src: reboot-notify.service.j2
+    dest: /etc/systemd/system/reboot-notify.service
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enable and start the reboot-notify service
+  ansible.builtin.systemd:
+    name: reboot-notify.service
+    enabled: true
+    state: started
+    daemon_reload: true

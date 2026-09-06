@@ -1,0 +1,22 @@
+#!/bin/sh
+# Rendered by the reboot_notify role. Do NOT edit on the host — re-run
+# Ansible. Debian doesn't ship Ubuntu's update-notifier-common, so nothing
+# else creates /var/run/reboot-required — this is what does, via
+# needrestart's own kernel-version detection. Runs after every apt/dpkg
+# transaction (see check-reboot-required.hook.j2), including
+# unattended-upgrades' own nightly one, so the flag is already in place by
+# the time it checks for it.
+set -eu
+
+OUTPUT="$(needrestart -b -r a 2>/dev/null || true)"
+# KSTA: 1 = running kernel matches installed, 2 = ABI-only bump, 3 = a
+# genuinely different kernel version is installed — the only case that
+# actually needs a reboot.
+KSTA="$(printf '%s\n' "$OUTPUT" | sed -n 's/^NEEDRESTART-KSTA: //p')"
+[ "${KSTA:-0}" -ge 3 ] || exit 0
+
+KCUR="$(printf '%s\n' "$OUTPUT" | sed -n 's/^NEEDRESTART-KCUR: //p')"
+KEXP="$(printf '%s\n' "$OUTPUT" | sed -n 's/^NEEDRESTART-KEXP: //p')"
+printf 'Kernel: running %s, installed %s\n' "${KCUR:-?}" "${KEXP:-?}" \
+  > /var/run/reboot-required.pkgs
+touch /var/run/reboot-required

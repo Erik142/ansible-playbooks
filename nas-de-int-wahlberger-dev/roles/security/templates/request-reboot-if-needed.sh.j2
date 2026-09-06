@@ -1,0 +1,20 @@
+#!/bin/sh
+# Rendered by the security role. Do NOT edit on the host — re-run Ansible.
+# Runs as zypper-autopatch.service's ExecStartPost=, after `zypper patch`
+# succeeds. Requests a reboot via rebootmgr only when zypper itself says one
+# is actually needed (kernel, glibc, …) — rebootmgrd then carries it out
+# per its own configured strategy/window (/etc/rebootmgr.conf), not
+# immediately. Always exits 0: a failed reboot request here shouldn't mark
+# the patch job itself as failed — patching already succeeded by this point.
+set -u
+
+zypper needs-rebooting >/dev/null 2>&1
+RC=$?
+
+# 102 = ZYPPER_EXIT_INF_REBOOT_NEEDED. Anything else (0 = not needed, or a
+# real zypper error) should not request a reboot.
+if [ "$RC" -eq 102 ]; then
+  rebootmgrctl reboot || echo "rebootmgrctl reboot failed" >&2
+fi
+
+exit 0

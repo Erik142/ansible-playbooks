@@ -1,0 +1,68 @@
+---
+# Debian doesn't ship Ubuntu's update-notifier-common (confirmed: not even
+# in the apt cache on this host), so nothing creates
+# /var/run/reboot-required by default — without it, neither this role's own
+# check nor geerlingguy.security's security_autoupdate_reboot actually has a
+# signal to act on. needrestart's own kernel-version detection is what
+# creates it here instead — see check-reboot-required.sh.j2.
+- name: Install needrestart
+  ansible.builtin.apt:
+    name: needrestart
+    state: present
+
+- name: Deploy the reboot-required check script
+  ansible.builtin.template:
+    src: check-reboot-required.sh.j2
+    dest: /usr/local/bin/check-reboot-required.sh
+    owner: root
+    group: root
+    mode: "0700"
+
+# A separate file from needrestart's own /etc/apt/apt.conf.d/99needrestart —
+# must not overwrite that package-owned conffile.
+- name: Deploy the apt post-invoke hook that maintains /var/run/reboot-required
+  ansible.builtin.template:
+    src: reboot-required.hook.j2
+    dest: /etc/apt/apt.conf.d/99-reboot-required
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create the reboot_notify config directory
+  ansible.builtin.file:
+    path: /etc/reboot-notify
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy the reboot notice email template
+  ansible.builtin.copy:
+    src: email-template.html
+    dest: /etc/reboot-notify/email-template.html
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy the reboot notice script
+  ansible.builtin.template:
+    src: reboot-notify.sh.j2
+    dest: /usr/local/bin/reboot-notify.sh
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Deploy the reboot-notify systemd shutdown hook
+  ansible.builtin.template:
+    src: reboot-notify.service.j2
+    dest: /etc/systemd/system/reboot-notify.service
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enable and start the reboot-notify service
+  ansible.builtin.systemd:
+    name: reboot-notify.service
+    enabled: true
+    state: started
+    daemon_reload: true

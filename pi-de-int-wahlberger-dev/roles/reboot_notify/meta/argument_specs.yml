@@ -1,0 +1,13 @@
+---
+argument_specs:
+  main:
+    short_description: Email a heads-up before an unattended-upgrades-triggered reboot.
+    description:
+      - Installs needrestart (which maintains /var/run/reboot-required —
+        Debian has no update-notifier-common) and a systemd shutdown hook
+        that emails, reusing notify_failure's Resend credentials, only when
+        that file exists — i.e. this reboot is actually because of a
+        pending kernel update, not an ordinary manual one. Its own
+        notification class, not a failure alert. No variables of its own;
+        see README.md.
+    options: {}

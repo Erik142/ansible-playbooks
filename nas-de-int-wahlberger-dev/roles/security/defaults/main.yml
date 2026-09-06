@@ -15,6 +15,19 @@ security_fail2ban_maxretry: 5
 security_autoupdate_enabled: true
 security_autoupdate_on_calendar: "Sun *-*-* 03:00:00"
 
+# Reboot automatically (via rebootmgr) when zypper says one is actually
+# needed (kernel, glibc, …) after the weekly patch run above — same
+# variable name as cloud-wahlberger-dev/pi-de-int-wahlberger-dev's
+# geerlingguy.security-driven equivalent, different mechanism underneath
+# (openSUSE has no unattended-upgrades). See README.md.
+security_autoupdate_reboot: false
+# rebootmgr's maintenance window: strategy "best-effort" reboots at the
+# first opportunity once requested (no separate re-gating on the window —
+# see README.md), so these mostly just need to be *set*, not tuned.
+security_autoupdate_reboot_window_start: "03:00"
+security_autoupdate_reboot_window_duration: "1h"
+security_autoupdate_reboot_strategy: "best-effort"
+
 # Usernames granted passwordless sudo (each gets its own /etc/sudoers.d/
 # drop-in). Empty by default — opt in per host in group_vars.
 security_sudoers_passwordless: []
