@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  role_name: restic_server
+  author: Erik Wahlberger
+  description: Restic REST server backup target, running as a Podman Quadlet.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+  galaxy_tags:
+    - backup
+    - restic
+    - podman
+
+dependencies: []

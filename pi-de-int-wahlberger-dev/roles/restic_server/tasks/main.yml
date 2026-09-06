@@ -1,0 +1,57 @@
+---
+- name: Validate restic_server inputs are present
+  ansible.builtin.assert:
+    that:
+      - restic_server_htpasswd_password | length > 0
+    fail_msg: >-
+      restic_server_htpasswd_password is empty. Set
+      vault_restic_server_htpasswd_password in Ansible Vault — it must match
+      nas-de-int-wahlberger-dev's vault_restic_backup_rest_server_password
+      exactly. See roles/restic_server/README.md.
+    quiet: true
+
+# community.general.htpasswd needs passlib on the managed host to compute
+# the bcrypt hash.
+- name: Install passlib for the htpasswd module
+  ansible.builtin.apt:
+    name: python3-passlib
+    state: present
+
+- name: Create the restic_server data directory
+  ansible.builtin.file:
+    path: "{{ restic_server_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0777"
+
+# mode "0777": same reasoning as elsewhere in this repo (see the semaphore
+# role) — the exact non-root UID rest-server runs as inside the container
+# isn't pinned down, so this is the safer default over guessing at a
+# tighter mode.
+- name: Create the htpasswd entry for backup clients
+  community.general.htpasswd:
+    path: "{{ restic_server_data_dir }}/.htpasswd"
+    name: "{{ restic_server_htpasswd_username }}"
+    password: "{{ restic_server_htpasswd_password }}"
+    hash_scheme: bcrypt
+    mode: "0777"
+
+# This server has no reason to ever be reachable from the public internet,
+# unlike Caddy's 80/443 — scoped to the home LAN/ZeroTier range instead of
+# firewall_allowed_tcp_ports' allow-from-anywhere entries.
+- name: Allow the REST server port from the home LAN/ZeroTier range only
+  community.general.ufw:
+    rule: allow
+    direction: in
+    from_ip: "{{ restic_server_allowed_src }}"
+    to_port: "{{ restic_server_port | string }}"
+    proto: tcp
+    comment: "restic REST server (backup target)"
+
+- name: Deploy the Restic REST server container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: restic-server
+    container_quadlet_src: restic-server.container.j2

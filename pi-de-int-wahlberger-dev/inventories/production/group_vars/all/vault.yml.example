@@ -30,3 +30,8 @@ vault_semaphore_cookie_encryption: "REPLACE-32-random-bytes-base64"
 # Semaphore's OIDC client secret, issued by Pocket ID when you register the
 # app (the client_id lives in vars.yml).
 vault_semaphore_oidc_client_secret: "REPLACE-with-pocket-id-client-secret"
+
+# restic REST server auth password. SHARED SECRET: must be the exact same
+# value as nas-de-int-wahlberger-dev's vault_restic_backup_rest_server_password.
+#     LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo
+vault_restic_server_htpasswd_password: "REPLACE-with-a-32-char-alnum-password"

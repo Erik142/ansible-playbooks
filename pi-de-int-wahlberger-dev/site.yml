@@ -33,3 +33,6 @@
       tags: [caddy]
     - role: semaphore
       tags: [semaphore]
+    # Backup target nas-de-int-wahlberger-dev pushes nightly backups to.
+    - role: restic_server
+      tags: [restic_server]

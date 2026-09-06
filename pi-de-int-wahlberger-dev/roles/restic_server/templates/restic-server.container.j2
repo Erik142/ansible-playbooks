@@ -1,0 +1,24 @@
+[Unit]
+Description=Restic REST server (backup target)
+After=network-online.target caddy-network.service
+Wants=network-online.target
+Requires=caddy-network.service
+
+[Container]
+ContainerName=restic-server
+Image={{ restic_server_image }}
+# Shares caddy.network with the other services on this host for simplicity —
+# never reverse-proxied through Caddy itself (see README.md), reached
+# directly on its published port instead.
+Network=caddy.network
+PublishPort={{ restic_server_port }}:8000
+# .htpasswd lives at the root of this directory, where rest-server looks for
+# it by default.
+Volume={{ restic_server_data_dir }}:/data:Z
+Environment=OPTIONS={% if restic_server_private_repos %}--private-repos{% endif %}
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

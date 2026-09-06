@@ -1,0 +1,34 @@
+---
+# Default variables for the `restic_server` role.
+
+restic_server_image: docker.io/restic/rest-server:0.14.0
+
+# Sibling to podman_data_dir on the same external drive (see the `storage`
+# role) — deliberately NOT under podman_data_dir itself, so it's obvious this
+# holds backup repositories, not this host's own container state. Given the
+# full space budget on this drive: everything else on it is either this
+# host's own container data or backup repositories, nothing more.
+restic_server_data_dir: "{{ storage_mount_path }}/restic-repos"
+
+restic_server_port: 8000
+
+# One user per backup source. --private-repos (below) confines each user to
+# a same-named subdirectory of restic_server_data_dir, so adding a second
+# backup client later (another host, or eventually a Hetzner Storage Box
+# acting as a client of its own) is just another htpasswd entry, not a
+# reconfiguration.
+restic_server_htpasswd_username: nas
+# REQUIRED: set vault_restic_server_htpasswd_password in Ansible Vault. This
+# is a shared secret with nas-de-int-wahlberger-dev's
+# vault_restic_backup_rest_server_password — both MUST hold the same value.
+restic_server_htpasswd_password: ""
+
+# Confines each htpasswd user to their own subdirectory under
+# restic_server_data_dir instead of one shared namespace.
+restic_server_private_repos: true
+
+# This server is reachable only from the home LAN/ZeroTier range (the same
+# trust boundary rpi-boras's bind9 config already uses for internal
+# traffic) — never the public internet, unlike Caddy's 80/443. See
+# roles/restic_server/README.md.
+restic_server_allowed_src: "10.10.0.0/16"

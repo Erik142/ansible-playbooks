@@ -1,0 +1,33 @@
+---
+argument_specs:
+  main:
+    short_description: Restic REST server backup target.
+    options:
+      restic_server_image:
+        type: str
+        required: false
+        description: Pinned restic/rest-server image tag.
+      restic_server_data_dir:
+        type: path
+        required: false
+        description: Host directory holding backup repositories and the htpasswd file.
+      restic_server_port:
+        type: int
+        required: false
+        description: Host port the REST server listens on.
+      restic_server_htpasswd_username:
+        type: str
+        required: false
+        description: Username backup clients authenticate as.
+      restic_server_htpasswd_password:
+        type: str
+        required: true
+        description: Password backup clients authenticate with.
+      restic_server_private_repos:
+        type: bool
+        required: false
+        description: Confine each htpasswd user to their own repository subdirectory.
+      restic_server_allowed_src:
+        type: str
+        required: false
+        description: CIDR range allowed to reach the REST server port in ufw.
