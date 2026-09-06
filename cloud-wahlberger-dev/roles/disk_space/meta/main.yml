@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: disk_space
+  author: Erik Wahlberger
+  description: Periodic disk space check, emailing via notify_failure on a new threshold crossing.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - "all"
+  galaxy_tags:
+    - monitoring
+    - disk
+
+dependencies: []

@@ -50,7 +50,8 @@ This role only deploys the *mechanism*. It does not add `OnFailure=` to any
 service itself — that's a one-line addition in the monitored service's own
 role/template. Currently wired up for every container Quadlet across all
 three playbooks (deduped) plus `nas-de-int-wahlberger-dev`'s
-`restic-backup.service` and `smb`/`nmb` (immediate).
+`restic-backup.service` and `smb`/`nmb`, and all three playbooks'
+`disk-space-check.service` (immediate).
 
 ## What the email includes
 

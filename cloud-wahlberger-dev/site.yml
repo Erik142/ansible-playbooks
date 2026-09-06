@@ -16,6 +16,10 @@
     # deploys.
     - role: notify_failure
       tags: [notify_failure]
+    # Periodic disk usage check, emailing via notify_failure — the only
+    # thing in this stack that watches disk space at all.
+    - role: disk_space
+      tags: [disk_space]
     # Personal + Semaphore automation SSH keys, authorized before hardening.
     - role: ssh_authorized_keys
       tags: [ssh_authorized_keys]

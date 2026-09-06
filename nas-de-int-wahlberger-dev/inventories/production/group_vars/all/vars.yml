@@ -31,6 +31,14 @@ ssh_authorized_keys_list:
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJSKdeHoK+WkyBI69OSZqn0sVqZPPDRs082S/IVoOeSu erikwahlberger@personal"
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMixf1vPbDUankXYuMO0bJFXjQ+Cmh3QsrwC6TzGPkda semaphore-automation@pi.de.int.wahlberger.dev"
 
+# --- Disk space check (disk_space role) --------------------------------------
+# This host's two separately mounted disks (see the top-level README's "Data
+# & secrets"), plus the root filesystem the role already defaults to.
+disk_space_paths:
+  - /
+  - /mnt/data
+  - /mnt/containers
+
 # --- Reverse proxy (caddy role) ----------------------------------------------
 # DNS-01 via Cloudflare (not HTTP-01): this host has no public inbound port,
 # so certificates are issued via a Cloudflare DNS API token instead. See

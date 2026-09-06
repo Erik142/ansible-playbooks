@@ -40,6 +40,7 @@ contrast (Debian, `apt`, `ufw`, `geerlingguy.security`, hyphenated role names).
 |------|---------|
 | `common` | zypper update, baseline packages, timezone |
 | `notify_failure` | Emails via Resend when a monitored systemd unit's OnFailure= fires. Wired to `restic_backup`'s service |
+| `disk_space` | Periodic disk usage check (systemd timer), emailing via `notify_failure` on a new threshold crossing. |
 | `security` | SSH hardening, fail2ban, weekly `zypper patch` timer (hand-rolled; no openSUSE geerlingguy.security) |
 | `firewall` | firewalld, default-deny inbound, allows ssh/samba/http/https |
 | `podman` | Podman + Quadlet support, `/mnt/containers` data dir (a separately mounted disk), `podman.socket` |

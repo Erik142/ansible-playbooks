@@ -1,0 +1,22 @@
+---
+argument_specs:
+  main:
+    short_description: Periodic disk space check via notify_failure.
+    options:
+      disk_space_paths:
+        type: list
+        elements: str
+        required: false
+        description: Mountpoints to monitor.
+      disk_space_threshold_percent:
+        type: int
+        required: false
+        description: Usage percentage (df's "Capacity" column) that triggers an alert.
+      disk_space_check_interval:
+        type: str
+        required: false
+        description: systemd time span between checks (OnUnitActiveSec=).
+      disk_space_check_boot_delay:
+        type: str
+        required: false
+        description: systemd time span after boot before the first check (OnBootSec=).

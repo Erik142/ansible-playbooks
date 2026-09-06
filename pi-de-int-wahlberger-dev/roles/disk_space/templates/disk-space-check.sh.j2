@@ -1,0 +1,37 @@
+#!/bin/sh
+# Rendered by the disk_space role. Do NOT edit on the host — re-run Ansible.
+set -eu
+
+THRESHOLD={{ disk_space_threshold_percent }}
+STATE_DIR=/run/disk-space-check
+mkdir -p "$STATE_DIR"
+
+# Edge-triggered, not level-triggered: only exit non-zero the FIRST time a
+# path crosses the threshold, not on every run while it stays over. State
+# lives under /run (tmpfs) — a reboot legitimately means "re-check fresh".
+# This is what lets the service use notify_failure's "immediate" variant
+# (see disk-space-check.service.j2) without emailing on every 15-minute
+# check for as long as the disk stays full.
+FAILED=0
+
+for MOUNT in {{ disk_space_paths | map('quote') | join(' ') }}; do
+  USE_PERCENT="$(df -P "$MOUNT" | awk 'NR==2 { gsub("%", "", $5); print $5 }')"
+  STATE_FILE="$STATE_DIR/$(printf '%s' "$MOUNT" | tr '/' '_')"
+  PREV="ok"
+  [ -f "$STATE_FILE" ] && PREV="$(cat "$STATE_FILE")"
+
+  if [ "$USE_PERCENT" -ge "$THRESHOLD" ]; then
+    if [ "$PREV" = "critical" ]; then
+      echo "disk-space-check: $MOUNT at ${USE_PERCENT}% (>= ${THRESHOLD}%) — already alerted, skipping"
+    else
+      echo "disk-space-check: $MOUNT at ${USE_PERCENT}% (>= ${THRESHOLD}%) — new alert"
+      FAILED=1
+    fi
+    echo critical > "$STATE_FILE"
+  else
+    echo "disk-space-check: $MOUNT at ${USE_PERCENT}% (< ${THRESHOLD}%) — OK"
+    echo ok > "$STATE_FILE"
+  fi
+done
+
+[ "$FAILED" -eq 0 ]

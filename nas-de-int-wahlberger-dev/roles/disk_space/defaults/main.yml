@@ -1,0 +1,16 @@
+---
+# Default variables for the `disk_space` role.
+
+# Mountpoints to monitor. Defaults to just the root filesystem — override
+# per host for extra mounted disks.
+disk_space_paths:
+  - /
+
+# Emails once a path's usage (df's "Capacity" column) crosses this
+# percentage — not on every check while it stays over, see the state
+# tracking in templates/disk-space-check.sh.j2.
+disk_space_threshold_percent: 85
+
+# How often to check, and how long after boot before the first check.
+disk_space_check_interval: 15min
+disk_space_check_boot_delay: 5min
