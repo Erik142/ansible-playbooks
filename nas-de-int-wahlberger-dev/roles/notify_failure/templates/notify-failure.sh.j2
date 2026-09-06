@@ -1,6 +1,7 @@
 #!/bin/sh
 # Rendered by the notify_failure role. Do NOT edit on the host — re-run
-# Ansible. RESEND_API_KEY/NOTIFY_FROM/NOTIFY_TO/NOTIFY_LOG_LINES come from
+# Ansible. RESEND_API_KEY/NOTIFY_FROM/NOTIFY_TO/NOTIFY_LOG_LINES/
+# NOTIFY_CRASH_THRESHOLD/NOTIFY_CRASH_WINDOW_SECONDS come from
 # notify-failure@.service's EnvironmentFile, not this script.
 #
 # Usage: notify-failure.sh <failed-unit-name>
@@ -10,6 +11,36 @@ UNIT="${1:?usage: notify-failure.sh <unit-name>}"
 HOST="$(hostname -f)"
 NOW="$(date '+%Y-%m-%d %H:%M:%S %Z')"
 TEMPLATE=/etc/notify-failure/email-template.html
+
+# --- Crash-loop dedup: only email once a unit has failed
+# NOTIFY_CRASH_THRESHOLD times within NOTIFY_CRASH_WINDOW_SECONDS, not on
+# every single restart (OnFailure= fires on each one — a self-healing
+# blip should never reach an inbox). State lives under /run (tmpfs): a
+# fresh boot legitimately means "start counting again", and re-creating the
+# directory here (rather than via Ansible) is required precisely because
+# /run doesn't survive a reboot for Ansible to have pre-created it into.
+STATE_DIR=/run/notify-failure
+mkdir -p "$STATE_DIR"
+STATE_FILE="$STATE_DIR/$UNIT"
+
+NOW_EPOCH="$(date +%s)"
+COUNT=0
+LAST_EPOCH=0
+[ -f "$STATE_FILE" ] && read -r COUNT LAST_EPOCH < "$STATE_FILE" || true
+
+# Streak went quiet for longer than the window — this failure starts a new
+# one, not a continuation of whatever happened before.
+if [ $((NOW_EPOCH - LAST_EPOCH)) -gt "${NOTIFY_CRASH_WINDOW_SECONDS}" ]; then
+  COUNT=0
+fi
+COUNT=$((COUNT + 1))
+printf '%s %s\n' "$COUNT" "$NOW_EPOCH" > "$STATE_FILE"
+
+if [ "$COUNT" -ne "${NOTIFY_CRASH_THRESHOLD}" ]; then
+  echo "notify-failure: $UNIT failure #$COUNT in the current streak (threshold ${NOTIFY_CRASH_THRESHOLD}) — not emailing"
+  exit 0
+fi
+STREAK="${NOTIFY_CRASH_THRESHOLD} failures in $((NOTIFY_CRASH_WINDOW_SECONDS / 60)) min"
 
 # Scope the log query to the failed unit's own invocation, not its whole
 # history — an id systemd assigns fresh to each start of the unit. Falls
@@ -39,16 +70,18 @@ BODY="$(jq -n \
   --arg logs "$LOGS" \
   --arg logs_html "$LOGS_HTML" \
   --arg log_caption "Last ${NOTIFY_LOG_LINES} log lines:" \
+  --arg streak "$STREAK" \
   --rawfile tmpl "$TEMPLATE" \
   '{
     from: $from,
     to: [$to],
-    subject: ("[" + $host + "] " + $unit + " failed"),
-    text: ($unit + " failed on " + $host + " at " + $time + ".\n\n" + $log_caption + "\n" + $logs + "\n\nFull history: journalctl -u " + $unit + " -e"),
+    subject: ("[" + $host + "] " + $unit + " failing repeatedly (" + $streak + ")"),
+    text: ($unit + " has now failed " + $streak + " on " + $host + ", as of " + $time + ".\n\n" + $log_caption + "\n" + $logs + "\n\nFull history: journalctl -u " + $unit + " -e"),
     html: ($tmpl
       | gsub("@@UNIT@@"; $unit)
       | gsub("@@HOST@@"; $host)
       | gsub("@@TIME@@"; $time)
+      | gsub("@@STREAK@@"; $streak)
       | gsub("@@LOG_CAPTION@@"; $log_caption)
       | gsub("@@LOGS@@"; $logs_html))
   }' 2>&1)" || { echo "jq failed building the request body: $BODY" >&2; exit 1; }
