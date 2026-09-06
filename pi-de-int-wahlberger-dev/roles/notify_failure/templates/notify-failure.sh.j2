@@ -1,0 +1,16 @@
+#!/bin/sh
+# Rendered by the notify_failure role. Do NOT edit on the host — re-run
+# Ansible. RESEND_API_KEY/NOTIFY_FROM/NOTIFY_TO come from
+# notify-failure@.service's EnvironmentFile, not this script.
+#
+# Usage: notify-failure.sh <failed-unit-name>
+set -eu
+
+UNIT="${1:?usage: notify-failure.sh <unit-name>}"
+HOST="$(hostname -f)"
+
+curl -fsS https://api.resend.com/emails \
+  -H "Authorization: Bearer ${RESEND_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d "$(printf '{"from":"%s","to":["%s"],"subject":"[%s] %s failed","text":"%s failed on %s.\n\nCheck: journalctl -u %s -e"}' \
+    "$NOTIFY_FROM" "$NOTIFY_TO" "$HOST" "$UNIT" "$UNIT" "$HOST" "$UNIT")"

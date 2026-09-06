@@ -104,3 +104,7 @@ semaphore_oidc_client_secret: "{{ vault_semaphore_oidc_client_secret | default('
 # Shared with nas-de-int-wahlberger-dev's vault_restic_backup_rest_server_password
 # — both MUST hold the same value. See roles/restic_server/README.md.
 restic_server_htpasswd_password: "{{ vault_restic_server_htpasswd_password | default('') }}"
+
+# Resend API key for failure notification emails (notify_failure role). Same
+# account/key as cloud-wahlberger-dev and nas-de-int-wahlberger-dev.
+notify_failure_resend_api_key: "{{ vault_notify_failure_resend_api_key | default('') }}"
