@@ -1,10 +1,13 @@
 # notify_failure
 
 Sends a failure notification email via [Resend](https://resend.com/) when a
-systemd unit's `OnFailure=` hook fires. This only covers services that
-crash on a host that's still up and running — it can't tell you a host went
-dark entirely (crashed, lost power, lost network), since nothing running on
-a dead host can report its own death. That's a separate, external watcher
+systemd unit's `OnFailure=` hook fires — but only once that unit has failed
+`notify_failure_crash_threshold` times within
+`notify_failure_crash_window_seconds` (default: 5 times within 10 minutes),
+not on every individual restart. This only covers services that crash on a
+host that's still up and running — it can't tell you a host went dark
+entirely (crashed, lost power, lost network), since nothing running on a
+dead host can report its own death. That's a separate, external watcher
 (planned: Uptime Kuma on `cloud-wahlberger-dev`), not this role.
 
 ## How it works
@@ -52,6 +55,28 @@ template — not after, which would mangle the highlight `<span>` tags the
 escape pass would otherwise treat as literal text — see the comment in
 `notify-failure.sh.j2`.
 
+## Crash-loop dedup: one email per incident, not one per restart
+
+`OnFailure=` fires on *every* failed start, including each cycle of a unit
+that's set to `Restart=always` and keeps auto-restarting — there's no
+built-in systemd knob for "only tell me after N in a row." So the counting
+lives in the script itself: a per-unit counter and timestamp under
+`/run/notify-failure/` (tmpfs — a fresh boot legitimately means "start
+counting again", and the directory has to be created by the script at
+runtime rather than by Ansible, precisely because `/run` doesn't survive a
+reboot for Ansible to have pre-created it into).
+
+Each invocation increments that unit's count if the last failure was within
+`notify_failure_crash_window_seconds`, or resets it to 1 if the streak had
+gone quiet longer than that. An email is sent **only** on the exact
+`notify_failure_crash_threshold`-th failure of a streak — nothing for the
+1st through 4th (a self-healing blip should never reach an inbox), and
+nothing for the 6th, 7th, 8th... of an ongoing incident either, so a unit
+stuck permanently crash-looping still only ever sends one email, not an
+endless stream. A fresh incident later (after a genuine quiet period) gets
+its own fresh count and its own single alert once it, too, crosses the
+threshold.
+
 ## Role variables
 
 See `defaults/main.yml`. `notify_failure_resend_api_key` is required — set
@@ -62,18 +87,33 @@ Resend account, or sending silently fails.
 ## Testing it without waiting for a real failure
 
 The script expects `RESEND_API_KEY`/`NOTIFY_FROM`/`NOTIFY_TO`/
-`NOTIFY_LOG_LINES` as environment variables (normally supplied by
-`notify-failure@.service`'s `EnvironmentFile`) — source them first when
-running it by hand:
+`NOTIFY_LOG_LINES`/`NOTIFY_CRASH_THRESHOLD`/`NOTIFY_CRASH_WINDOW_SECONDS` as
+environment variables (normally supplied by `notify-failure@.service`'s
+`EnvironmentFile`) — source them first when running it by hand:
 
 ```sh
 sudo -i
 set -a; . /etc/notify-failure/notify-failure.env; set +a
-/usr/local/bin/notify-failure.sh sshd.service
 ```
 
-`sshd.service` (or any currently-running unit) works fine here even though
-it hasn't actually failed — the script only reads that unit's *current*
-invocation's logs, it doesn't check whether it's actually in a failed
-state. Confirms the API key, from-address, template substitution, and
-network path all work, independent of a real failure.
+`sshd.service` (or any currently-running unit) works fine as the target
+even though it hasn't actually failed — the script only reads that unit's
+*current* invocation's logs, it doesn't check whether it's actually in a
+failed state.
+
+To see an email immediately, without the crash-loop dedup getting in the
+way, override the threshold for just this one call:
+
+```sh
+NOTIFY_CRASH_THRESHOLD=1 /usr/local/bin/notify-failure.sh sshd.service
+```
+
+To actually exercise the dedup logic end-to-end instead — confirms the
+1st-through-4th calls stay silent and only the 5th sends:
+
+```sh
+for i in 1 2 3 4 5; do /usr/local/bin/notify-failure.sh sshd.service; done
+```
+
+Either way, delete the state file first if you've already run either test
+recently and want a clean streak: `rm -f /run/notify-failure/sshd.service`.

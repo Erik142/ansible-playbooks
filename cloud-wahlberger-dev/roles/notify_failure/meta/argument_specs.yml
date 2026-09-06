@@ -19,3 +19,11 @@ argument_specs:
         type: int
         required: false
         description: Tail length of the journalctl excerpt embedded in the email.
+      notify_failure_crash_threshold:
+        type: int
+        required: false
+        description: Consecutive failures within the window required before an email is sent.
+      notify_failure_crash_window_seconds:
+        type: int
+        required: false
+        description: Time window (seconds) a run of consecutive failures must stay within to count as one streak.
