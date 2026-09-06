@@ -74,14 +74,17 @@ nas-de-int-wahlberger-dev/
 
 ```sh
 # Dry run — show what would change, with diffs.
-ansible-playbook site.yml --check --diff --ask-vault-pass
+/Users/erikwahlberger/.pyenv/versions/ansible-bind9-venv/bin/ansible-playbook site.yml --check --diff
 
 # Apply everything.
-ansible-playbook site.yml --ask-vault-pass
+/Users/erikwahlberger/.pyenv/versions/ansible-bind9-venv/bin/ansible-playbook site.yml
 
 # Only one role.
-ansible-playbook site.yml --tags samba --ask-vault-pass
+/Users/erikwahlberger/.pyenv/versions/ansible-bind9-venv/bin/ansible-playbook site.yml --tags samba
 ```
+
+The vault password is fetched automatically from 1Password (see `.vault_pass.sh`
+and "Secrets with Ansible Vault" below) — no `--ask-vault-pass` needed.
 
 `ansible.cfg` sets `inventories/production/hosts.yml` as the default
 inventory, so `-i` is optional.
@@ -154,8 +157,10 @@ ansible-vault edit   inventories/production/group_vars/all/vault.yml
 Inside `vault.yml`, name everything with a `vault_` prefix — see
 `vault.yml.example` for the exact keys this playbook needs (Paperless's DB
 password, both apps' OIDC client secrets, and the Cloudflare DNS API token).
-Surface each under a friendly name in `vars.yml` (already done). Run with the
-vault password:
+Surface each under a friendly name in `vars.yml` (already done). By default
+the vault password is fetched from 1Password automatically — see
+`.vault_pass.sh` (requires the `op` CLI signed in and the desktop app
+unlocked). Without 1Password, fall back to:
 
 ```sh
 ansible-playbook site.yml --ask-vault-pass
