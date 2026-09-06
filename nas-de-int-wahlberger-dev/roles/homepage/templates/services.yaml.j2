@@ -10,6 +10,10 @@
         href: "{{ homepage_freshrss_url }}"
         description: RSS feed aggregator
         ping: "{{ homepage_freshrss_url }}"
+    - Uptime Kuma:
+        href: "{{ homepage_uptime_kuma_url }}"
+        description: Uptime monitoring
+        ping: "{{ homepage_uptime_kuma_url }}"
 
 - NAS (nas.de.int.wahlberger.dev):
     - Mealie:
@@ -28,6 +32,12 @@
         description: Document management
         # See the mealie ping comment above — same hairpin, same fix.
         ping: "http://paperless-ngx:8000"
+
+- Pi (pi.de.int.wahlberger.dev):
+    - Semaphore UI:
+        href: "{{ homepage_semaphore_url }}"
+        description: Ansible automation runner
+        ping: "{{ homepage_semaphore_url }}"
 
 - NAS (truenas.boras.int.wahlberger.dev):
     - TrueNAS:

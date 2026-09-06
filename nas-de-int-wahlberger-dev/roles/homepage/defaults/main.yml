@@ -18,6 +18,10 @@ homepage_url: ""
 # rather than duplicating the URL under a new name.
 homepage_pocket_id_url: "{{ pocket_id_app_url }}"
 homepage_freshrss_url: "https://rss.wahlberger.dev"
+homepage_uptime_kuma_url: "https://status.wahlberger.dev"
+
+# Cross-playbook link to pi-de-int-wahlberger-dev's Semaphore UI.
+homepage_semaphore_url: "https://semaphore.de.int.wahlberger.dev"
 
 # TrueNAS instance in Sweden (a separate physical host, not managed by any
 # playbook in this repo), reachable over ZeroTier.

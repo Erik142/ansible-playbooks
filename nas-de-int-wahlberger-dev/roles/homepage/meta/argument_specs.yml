@@ -27,3 +27,15 @@ argument_specs:
         type: str
         required: false
         description: FreshRSS URL linked from the dashboard (cloud-wahlberger-dev).
+      homepage_uptime_kuma_url:
+        type: str
+        required: false
+        description: Uptime Kuma URL linked from the dashboard (cloud-wahlberger-dev).
+      homepage_semaphore_url:
+        type: str
+        required: false
+        description: Semaphore UI URL linked from the dashboard (pi-de-int-wahlberger-dev).
+      homepage_truenas_url:
+        type: str
+        required: false
+        description: TrueNAS URL linked from the dashboard (a separate host in Sweden, not managed by this repo).

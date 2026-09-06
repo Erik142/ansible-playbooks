@@ -3,9 +3,9 @@
 [Homepage](https://gethomepage.dev/) dashboard, deployed as a Podman Quadlet
 on the shared `caddy.network` and reverse-proxied by the `caddy` role. A
 single landing page linking services from **cloud-wahlberger-dev**, this NAS,
-and the **TrueNAS** instance in Sweden (a separate physical host, not managed
-by any playbook in this repo) — `rpi-karlsruhe` is intentionally excluded
-(legacy, being retired).
+**pi-de-int-wahlberger-dev**, and the **TrueNAS** instance in Sweden (a
+separate physical host, not managed by any playbook in this repo) —
+`rpi-karlsruhe` is intentionally excluded (legacy, being retired).
 
 Deliberately simple: static grouped links with lightweight `ping`-based
 status indicators, no API keys, no Podman socket exposed to the container —
@@ -23,6 +23,8 @@ key per app and is out of scope for a first version.
 | `homepage_url` | `""` (**required**) | Public https:// URL Homepage is served on. |
 | `homepage_pocket_id_url` | `{{ pocket_id_app_url }}` | Pocket ID link (cloud-wahlberger-dev). |
 | `homepage_freshrss_url` | `https://rss.wahlberger.dev` | FreshRSS link (cloud-wahlberger-dev). |
+| `homepage_uptime_kuma_url` | `https://status.wahlberger.dev` | Uptime Kuma link (cloud-wahlberger-dev). |
+| `homepage_semaphore_url` | `https://semaphore.de.int.wahlberger.dev` | Semaphore UI link (pi-de-int-wahlberger-dev). |
 | `homepage_truenas_url` | `https://truenas.boras.int.wahlberger.dev` | TrueNAS link (separate physical host in Sweden). |
 
 ## Adding/removing a service
