@@ -83,14 +83,17 @@ pi-de-int-wahlberger-dev/
 
 ```sh
 # Dry run — show what would change, with diffs.
-ansible-playbook site.yml --check --diff --ask-vault-pass
+/Users/erikwahlberger/.pyenv/versions/ansible-bind9-venv/bin/ansible-playbook site.yml --check --diff
 
 # Apply everything.
-ansible-playbook site.yml --ask-vault-pass
+/Users/erikwahlberger/.pyenv/versions/ansible-bind9-venv/bin/ansible-playbook site.yml
 
 # Only one role.
-ansible-playbook site.yml --tags semaphore --ask-vault-pass
+/Users/erikwahlberger/.pyenv/versions/ansible-bind9-venv/bin/ansible-playbook site.yml --tags semaphore
 ```
+
+The vault password is fetched automatically from 1Password (see `.vault_pass.sh`
+and "Secrets with Ansible Vault" below) — no `--ask-vault-pass` needed.
 
 `ansible.cfg` sets `inventories/production/hosts.yml` as the default
 inventory, so `-i` is optional.
@@ -176,7 +179,9 @@ Inside `vault.yml`, name everything with a `vault_` prefix — see
 `vault.yml.example` for the exact keys this playbook needs (the Cloudflare
 DNS token, Semaphore's admin password, its database encryption key and
 cookie keys, and its OIDC client secret). Surface each under a friendly name
-in `vars.yml` (already done). Run with the vault password:
+in `vars.yml` (already done). By default the vault password is fetched from
+1Password automatically — see `.vault_pass.sh` (requires the `op` CLI signed
+in and the desktop app unlocked). Without 1Password, fall back to:
 
 ```sh
 ansible-playbook site.yml --ask-vault-pass
