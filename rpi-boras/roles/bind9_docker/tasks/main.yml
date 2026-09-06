@@ -1,4 +1,18 @@
 ---
+- name: Validate TSIG key secrets are present
+  ansible.builtin.assert:
+    that:
+      - bind9_ddns_key_vyos_router_secret | length > 0
+      - bind9_ddns_key_dns01_boras_secret | length > 0
+      - bind9_ddns_key_dnsupdate_cloud_secret | length > 0
+    fail_msg: >-
+      One or more TSIG key secrets are empty. Provide the Vault secrets
+      vault_bind9_ddns_key_vyos_router_secret,
+      vault_bind9_ddns_key_dns01_boras_secret, and
+      vault_bind9_ddns_key_dnsupdate_cloud_secret (run with
+      --ask-vault-pass). See README.md.
+    quiet: true
+
 - name: Include bind9 role
   import_role:
     name: bind9
@@ -31,13 +45,13 @@
     ddns_keys:
       - name: "vyos-router.gbg.wahlberger.lan"
         algorithm: HMAC-MD5
-        secret: "KHFvdr5gvaShehvtOLFB1e4ageVxPpWtr8Gw6Gl4t04E+OzKKwQ8fdUYZj7OLbYZxrvh3NRvKGaZuKh4Q/hSbw=="
+        secret: "{{ bind9_ddns_key_vyos_router_secret }}"
       - name: "dns01.boras.int.wahlberger.dev"
         algorithm: HMAC-MD5
-        secret: "t6TB6YsoFMja2zj19WMFcJ2eaNwoywx/ovg0dl7NfVik5JIJiDM88BK2RQwagNornjWMWMdfIER6He6UCF2ECg=="
+        secret: "{{ bind9_ddns_key_dns01_boras_secret }}"
       - name: "dnsupdate.cloud.wahlberger.dev."
         algorithm: HMAC-SHA512
-        secret: "9Mjv6OXVzqYrNRyqZCn8lwtmQh6mbNOa4wsM/y3ngTndA55usfL8OHmxPgd4/jcqk8Vi6bSz8AxR2XTMHuhdJA=="
+        secret: "{{ bind9_ddns_key_dnsupdate_cloud_secret }}"
     zone_transfer_servers:
       - ip: 10.243.0.4
         keys:

@@ -1,0 +1,19 @@
+---
+# EXAMPLE Vault contents — copy the structure, NOT the placeholder values.
+#
+# This file is a committed, plaintext template. The REAL file is the encrypted
+# sibling `vault.yml` (same directory). Create it with:
+#
+#     ansible-vault create group_vars/all/vault.yml
+#
+# then paste real values in. Every key is referenced from vars.yml under a
+# friendly (non-vault_) name.
+#
+# These are TSIG shared secrets used for bind9 zone transfer/DDNS between
+# this host, the VyOS router in Gothenburg, and cloud.wahlberger.dev. They
+# are NOT independently generatable here — rotating one means coordinating a
+# matching change on every other host that holds the same key, since TSIG is
+# a shared secret. See roles/bind9_docker/README.md.
+vault_bind9_ddns_key_vyos_router_secret: "REPLACE-with-the-existing-TSIG-secret"
+vault_bind9_ddns_key_dns01_boras_secret: "REPLACE-with-the-existing-TSIG-secret"
+vault_bind9_ddns_key_dnsupdate_cloud_secret: "REPLACE-with-the-existing-TSIG-secret"

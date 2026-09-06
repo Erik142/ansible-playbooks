@@ -1,0 +1,26 @@
+---
+# group_vars/all/ is a *directory* (not a single file) on purpose: it lets a
+# plaintext `vars.yml` sit next to an encrypted `vault.yml`, so secrets and
+# non-secrets live side by side without mixing. Picked up automatically
+# because it's adjacent to main.yml — see README.md.
+
+# --- TSIG keys (bind9_docker role) ------------------------------------------
+# Never put secrets in plaintext. They live in an encrypted sibling file
+# `vault.yml` in this directory, each with a `vault_` prefix, surfaced here
+# under a friendly name. `| default('')` keeps the role failing with a clear
+# assert (rather than a bare "undefined variable") when the Vault is absent.
+#
+# Scaffold and the exact contents are in `vault.yml.example`. Create the real,
+# encrypted file with:
+#
+#     ansible-vault create group_vars/all/vault.yml
+#
+# and run the playbook with `--ask-vault-pass` (or --vault-password-file
+# .vault_pass). See README.md -> "Secrets with Ansible Vault" for the full
+# workflow.
+#
+# Named after the TSIG key's own name (see roles/bind9_docker/tasks/main.yml)
+# so it's obvious which secret belongs to which key.
+bind9_ddns_key_vyos_router_secret: "{{ vault_bind9_ddns_key_vyos_router_secret | default('') }}"
+bind9_ddns_key_dns01_boras_secret: "{{ vault_bind9_ddns_key_dns01_boras_secret | default('') }}"
+bind9_ddns_key_dnsupdate_cloud_secret: "{{ vault_bind9_ddns_key_dnsupdate_cloud_secret | default('') }}"
