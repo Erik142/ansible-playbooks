@@ -34,6 +34,11 @@ ssh_authorized_keys_list:
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJSKdeHoK+WkyBI69OSZqn0sVqZPPDRs082S/IVoOeSu erikwahlberger@personal"
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMixf1vPbDUankXYuMO0bJFXjQ+Cmh3QsrwC6TzGPkda semaphore-automation@pi.de.int.wahlberger.dev"
 
+# --- ZeroTier (zerotier role) ------------------------------------------------
+# The same network the home LAN and the TrueNAS instance in Sweden are
+# already members of. Not secret — see roles/zerotier/README.md.
+zerotier_network_id: "8056c2e21cc5c789"
+
 # --- Reverse proxy (caddy role) --------------------------------------------
 caddy_acme_email: "ewahlberger@gmail.com"
 caddy_sites:

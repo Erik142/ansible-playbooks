@@ -26,6 +26,10 @@
       tags: [firewall]
     - role: podman
       tags: [podman]
+    # Route to the home LAN (uptime_kuma needs it to reach nas/pi's private
+    # IPs) — see roles/zerotier/README.md.
+    - role: zerotier
+      tags: [zerotier]
     # Ensure this host's public DNS records exist before Caddy needs them.
     - role: cloudflare_dns
       tags: [cloudflare_dns]

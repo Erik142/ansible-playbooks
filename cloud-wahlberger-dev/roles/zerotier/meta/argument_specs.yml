@@ -1,0 +1,17 @@
+---
+argument_specs:
+  main:
+    short_description: Joins this host to the home ZeroTier overlay network.
+    options:
+      zerotier_image:
+        type: str
+        required: false
+        description: Pinned zerotier/zerotier image tag.
+      zerotier_data_dir:
+        type: path
+        required: false
+        description: Host directory persisting ZeroTier's identity keys across restarts.
+      zerotier_network_id:
+        type: str
+        required: true
+        description: 16-character ZeroTier network ID to join.

@@ -1,0 +1,25 @@
+---
+- name: Validate the ZeroTier network ID is present
+  ansible.builtin.assert:
+    that:
+      - zerotier_network_id | length > 0
+    fail_msg: >-
+      zerotier_network_id is empty. Set it in group_vars to the 16-character
+      network ID from ZeroTier Central (or your router's controller). See
+      roles/zerotier/README.md.
+    quiet: true
+
+- name: Create the ZeroTier data directory
+  ansible.builtin.file:
+    path: "{{ zerotier_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Deploy the ZeroTier container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: zerotier
+    container_quadlet_src: zerotier.container.j2
