@@ -1,0 +1,10 @@
+---
+# Default variables for the `notify_failure` role.
+
+# REQUIRED: set vault_notify_failure_resend_api_key in Ansible Vault.
+notify_failure_resend_api_key: ""
+
+# Must be an address on a domain verified in Resend, or sending fails.
+notify_failure_from_address: "alerts@no-reply.wahlberger.dev"
+
+notify_failure_to_address: "ewahlberger@gmail.com"

@@ -1,0 +1,42 @@
+---
+- name: Validate notify_failure inputs are present
+  ansible.builtin.assert:
+    that:
+      - notify_failure_resend_api_key | length > 0
+    fail_msg: >-
+      notify_failure_resend_api_key is empty. Set
+      vault_notify_failure_resend_api_key in Ansible Vault. See README.md.
+    quiet: true
+
+- name: Create the notify_failure config directory
+  ansible.builtin.file:
+    path: /etc/notify-failure
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Render the notify_failure environment file
+  ansible.builtin.template:
+    src: notify-failure.env.j2
+    dest: /etc/notify-failure/notify-failure.env
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Deploy the notification script
+  ansible.builtin.template:
+    src: notify-failure.sh.j2
+    dest: /usr/local/bin/notify-failure.sh
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Deploy the notify-failure@.service template unit
+  ansible.builtin.template:
+    src: "notify-failure@.service.j2"
+    dest: /etc/systemd/system/notify-failure@.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd

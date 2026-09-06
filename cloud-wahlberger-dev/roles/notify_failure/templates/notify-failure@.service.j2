@@ -1,0 +1,7 @@
+[Unit]
+Description=Send a failure notification email for %i
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/notify-failure/notify-failure.env
+ExecStart=/usr/local/bin/notify-failure.sh %i

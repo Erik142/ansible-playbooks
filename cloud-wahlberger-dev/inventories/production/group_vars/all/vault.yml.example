@@ -33,3 +33,7 @@ vault_freshrss_admin_password: "REPLACE-with-24-char-alnum-password"
 # the existing token from nas-de-int-wahlberger-dev/pi-de-int-wahlberger-dev's
 # vault instead of minting a new one — same zone, same purpose.
 vault_cloudflare_dns_api_token: "REPLACE-with-the-existing-cloudflare-token"
+
+# Resend API key for failure notification emails. Same key as
+# nas-de-int-wahlberger-dev and pi-de-int-wahlberger-dev — one Resend account.
+vault_notify_failure_resend_api_key: "REPLACE-with-a-resend-api-key"

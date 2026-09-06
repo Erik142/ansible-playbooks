@@ -90,3 +90,7 @@ freshrss_admin_password: "{{ vault_freshrss_admin_password | default('') }}"
 
 # Cloudflare API token, shared by cloudflare_dns.
 cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token | default('') }}"
+
+# Resend API key for failure notification emails (notify_failure role). Same
+# account/key as nas-de-int-wahlberger-dev and pi-de-int-wahlberger-dev.
+notify_failure_resend_api_key: "{{ vault_notify_failure_resend_api_key | default('') }}"
