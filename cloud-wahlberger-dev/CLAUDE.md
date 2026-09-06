@@ -37,6 +37,7 @@ playbooks in this repo — prefer copying its patterns over the older `rpi-*` on
 | Role | Purpose |
 |------|---------|
 | `common` | apt update/upgrade, baseline packages, timezone |
+| `notify_failure` | Emails via Resend when a monitored systemd unit's OnFailure= fires. Not yet wired to any service on this host |
 | `ssh_authorized_keys` | Authorizes your personal SSH key plus Semaphore's dedicated automation key (both also authorized on the NAS and the Pi) |
 | `geerlingguy.security` (external) | SSH hardening, fail2ban, unattended-upgrades. Tuned via `security_*` in group_vars; installed from Galaxy. |
 | `firewall` | ufw host firewall, default-deny inbound, allows 22/80/443. |

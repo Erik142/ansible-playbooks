@@ -34,6 +34,7 @@ automation host that runs `ansible-playbook` against this host,
 | Role | Purpose |
 |------|---------|
 | `common` | apt update/upgrade, baseline packages, timezone |
+| `notify_failure` | Emails via Resend when a monitored systemd unit's OnFailure= fires. Not yet wired to any service on this host |
 | `ssh_authorized_keys` | Authorizes your personal SSH key plus Semaphore's dedicated automation key (both also authorized on cloud-wahlberger-dev and the NAS) |
 | `geerlingguy.security` (external) | SSH hardening, fail2ban, unattended-upgrades. Also grants `erikwahlberger` passwordless sudo (`security_sudoers_passwordless`) — Semaphore can't type an interactive sudo password |
 | `firewall` | ufw host firewall, default-deny inbound, allows 22/80/443 |
