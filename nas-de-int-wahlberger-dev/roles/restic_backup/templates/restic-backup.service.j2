@@ -5,5 +5,10 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+# systemd services get a minimal environment with no $HOME/$XDG_CACHE_HOME
+# by default — restic needs one of those to locate its local metadata cache
+# ("unable to locate cache directory" otherwise). This service runs as
+# root (no User= set), so root's real home directory is correct here.
+Environment=HOME=/root
 EnvironmentFile={{ restic_backup_staging_dir }}/restic-backup.env
 ExecStart=/usr/local/bin/restic-backup.sh

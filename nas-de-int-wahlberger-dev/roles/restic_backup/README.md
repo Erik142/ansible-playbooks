@@ -8,6 +8,15 @@ to be the *permanent* backup target, not just a stopgap, until a second
 drive is added to this NAS and/or a Hetzner Storage Box is added as a
 further target.
 
+## `Environment=HOME=/root` — why it's needed
+
+systemd services run with a minimal environment: no `$HOME`, no
+`$XDG_CACHE_HOME`. restic needs one of those to locate its local metadata
+cache, and fails with `unable to locate cache directory` without it — the
+repository itself still gets created fine (that step doesn't need the
+cache), so the failure only shows up on the very next restic command. The
+service runs as root (no `User=` set), so `HOME=/root` is correct here.
+
 ## What's backed up, and what isn't
 
 `restic_backup_paths` covers the whole Samba share (`samba_mount_path`) and
