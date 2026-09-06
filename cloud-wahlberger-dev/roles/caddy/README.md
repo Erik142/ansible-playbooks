@@ -17,7 +17,7 @@ network that backend services (e.g. `pocket_id`) attach to.
 | `caddy_http_port` | `80` | Host port → container 80. |
 | `caddy_https_port` | `443` | Host port → container 443. |
 | `caddy_acme_email` | `""` | Let's Encrypt account email (optional). |
-| `caddy_sites` | `[]` | List of `{ host, upstream, extra? }` to serve. |
+| `caddy_sites` | `[]` | List of `{ host, upstream?, extra? }` to serve. |
 
 ## Adding a site
 
@@ -32,6 +32,30 @@ caddy_sites:
     extra: |
       basic_auth {
         admin <hashed-password>
+      }
+```
+
+`upstream` is optional — omit it for a site whose whole body needs to be
+custom, e.g. an auth-gated site where `reverse_proxy` isn't the top-level
+directive at all (see `uptime_kuma`'s `forward_auth`/`handle` block, which
+`extra` alone provides):
+
+```yaml
+caddy_sites:
+  - host: status.wahlberger.dev
+    extra: |
+      handle /oauth2/* {
+        reverse_proxy oauth2-proxy:4180
+      }
+      handle {
+        forward_auth oauth2-proxy:4180 {
+          uri /oauth2/auth
+          @error status 401
+          handle_response @error {
+            redir * /oauth2/sign_in?rd={scheme}://{host}{uri}
+          }
+        }
+        reverse_proxy uptime-kuma:3001
       }
 ```
 

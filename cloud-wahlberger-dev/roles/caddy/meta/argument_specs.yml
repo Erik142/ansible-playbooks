@@ -35,8 +35,12 @@ argument_specs:
             description: Public hostname to serve.
           upstream:
             type: str
-            required: true
-            description: container_name:port to reverse_proxy to.
+            required: false
+            description: >-
+              container_name:port to reverse_proxy to. Omit for a site whose
+              whole body is custom (e.g. an auth-gated site built entirely
+              from `extra`, where reverse_proxy isn't the top-level
+              directive) — see roles/caddy/README.md.
           extra:
             type: str
             required: false

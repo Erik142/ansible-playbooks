@@ -1,0 +1,49 @@
+---
+- name: Validate Uptime Kuma / oauth2-proxy inputs are present
+  ansible.builtin.assert:
+    that:
+      - uptime_kuma_url | length > 0
+      - uptime_kuma_oidc_client_id | length > 0
+      - uptime_kuma_oidc_client_secret | length > 0
+      - uptime_kuma_cookie_secret | length > 0
+    fail_msg: >-
+      Uptime Kuma is not fully configured. Set uptime_kuma_url and
+      uptime_kuma_oidc_client_id in group_vars, and provide the Vault
+      secrets vault_uptime_kuma_oidc_client_secret and
+      vault_uptime_kuma_cookie_secret (run with --ask-vault-pass). See
+      roles/uptime_kuma/README.md.
+    quiet: true
+
+- name: Ensure the Uptime Kuma host data directory exists
+  ansible.builtin.file:
+    path: "{{ uptime_kuma_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+# 0600 so the OIDC client secret / cookie secret are not exposed in the
+# world-readable Quadlet unit. A change here restarts oauth2-proxy via the
+# handler below (flushed inside the container role include).
+- name: Render the oauth2-proxy environment file
+  ansible.builtin.template:
+    src: oauth2-proxy.env.j2
+    dest: "{{ uptime_kuma_data_dir }}/oauth2-proxy.env"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart oauth2-proxy
+
+- name: Deploy the oauth2-proxy container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: oauth2-proxy
+    container_quadlet_src: oauth2-proxy.container.j2
+
+- name: Deploy the Uptime Kuma container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: uptime-kuma
+    container_quadlet_src: uptime-kuma.container.j2

@@ -37,3 +37,7 @@
     # FreshRSS (RSS aggregator), authenticating against Pocket ID via OIDC.
     - role: freshrss
       tags: [freshrss]
+    # External watcher for the whole infrastructure (nas/pi going dark
+    # entirely) — gated by oauth2-proxy + Pocket ID, not its own login.
+    - role: uptime_kuma
+      tags: [uptime_kuma]

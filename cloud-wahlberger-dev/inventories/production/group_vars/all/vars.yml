@@ -41,6 +41,23 @@ caddy_sites:
     upstream: "pocket-id:1411"
   - host: rss.wahlberger.dev
     upstream: "freshrss:80"
+  # No upstream: the whole site body is custom (Pocket ID auth gate via
+  # oauth2-proxy, not a plain reverse_proxy) — see roles/uptime_kuma/README.md.
+  - host: status.wahlberger.dev
+    extra: |
+      handle /oauth2/* {
+        reverse_proxy oauth2-proxy:4180
+      }
+      handle {
+        forward_auth oauth2-proxy:4180 {
+          uri /oauth2/auth
+          @error status 401
+          handle_response @error {
+            redir * /oauth2/sign_in?rd={scheme}://{host}{uri}
+          }
+        }
+        reverse_proxy uptime-kuma:3001
+      }
 
 # --- DNS (cloudflare_dns role) ----------------------------------------------
 # Brings this host's already-existing Cloudflare records (cloud.wahlberger.dev
@@ -63,6 +80,14 @@ freshrss_oidc_client_id: "bfe9129b-8c6e-45b5-b67d-3534299fe264"
 # Feed-refresh cadence: every 10 minutes, offset 3 past the hour (not on the
 # round 00,10,20… that every other reader hits). Overrides the role default.
 freshrss_cron_min: "3,13,23,33,43,53"
+
+# --- Uptime Kuma (uptime_kuma role) ------------------------------------------
+# Must match the caddy_sites host above and the public DNS record.
+uptime_kuma_url: "https://status.wahlberger.dev"
+# OAuth2 client ID issued by Pocket ID when you register the "Uptime Kuma
+# (oauth2-proxy)" client (redirect URI: "{{ uptime_kuma_url }}/oauth2/callback").
+# Not secret (a UUID), so it lives here in plaintext. REQUIRED.
+uptime_kuma_oidc_client_id: "2b082607-f0ae-4c38-a6ca-7d3588de2e21"
 
 # --- Secrets (Ansible Vault) ------------------------------------------------
 # Never put secrets in plaintext. They live in an encrypted sibling file
@@ -94,3 +119,8 @@ cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token | default('') }}"
 # Resend API key for failure notification emails (notify_failure role). Same
 # account/key as nas-de-int-wahlberger-dev and pi-de-int-wahlberger-dev.
 notify_failure_resend_api_key: "{{ vault_notify_failure_resend_api_key | default('') }}"
+
+# Uptime Kuma's OIDC client secret (from Pocket ID) and oauth2-proxy's
+# session cookie encryption key.
+uptime_kuma_oidc_client_secret: "{{ vault_uptime_kuma_oidc_client_secret | default('') }}"
+uptime_kuma_cookie_secret: "{{ vault_uptime_kuma_cookie_secret | default('') }}"

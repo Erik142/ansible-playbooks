@@ -1,0 +1,19 @@
+---
+galaxy_info:
+  role_name: uptime_kuma
+  author: Erik Wahlberger
+  description: Run Uptime Kuma as a Podman Quadlet behind Caddy, gated by oauth2-proxy with Pocket ID OIDC login.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+  galaxy_tags:
+    - monitoring
+    - oidc
+    - sso
+    - podman
+
+dependencies: []

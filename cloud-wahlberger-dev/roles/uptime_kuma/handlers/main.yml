@@ -1,0 +1,10 @@
+---
+# Restarts oauth2-proxy when its environment file changes (the container
+# role's own handler only fires when the .container unit changes, not the
+# env file). Both get flushed by the flush_handlers inside the container
+# role include.
+- name: Restart oauth2-proxy
+  ansible.builtin.systemd:
+    name: oauth2-proxy.service
+    state: restarted
+    daemon_reload: true

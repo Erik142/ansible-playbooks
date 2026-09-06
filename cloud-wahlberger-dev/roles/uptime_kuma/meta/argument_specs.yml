@@ -1,0 +1,41 @@
+---
+argument_specs:
+  main:
+    short_description: Uptime Kuma behind Caddy, gated by oauth2-proxy with Pocket ID OIDC login.
+    options:
+      uptime_kuma_image:
+        type: str
+        required: false
+        description: Pinned Uptime Kuma image tag.
+      uptime_kuma_volume:
+        type: str
+        required: false
+        description: Named Podman volume for Uptime Kuma's own persistent data.
+      uptime_kuma_data_dir:
+        type: path
+        required: false
+        description: Host directory holding the rendered oauth2-proxy environment file.
+      uptime_kuma_url:
+        type: str
+        required: true
+        description: Public https:// URL Uptime Kuma is served on.
+      uptime_kuma_oauth2_proxy_image:
+        type: str
+        required: false
+        description: Pinned oauth2-proxy image tag.
+      uptime_kuma_oauth2_proxy_port:
+        type: int
+        required: false
+        description: Port oauth2-proxy listens on inside its container.
+      uptime_kuma_oidc_client_id:
+        type: str
+        required: true
+        description: OAuth2 client ID issued by Pocket ID.
+      uptime_kuma_oidc_client_secret:
+        type: str
+        required: true
+        description: OAuth2 client secret issued by Pocket ID.
+      uptime_kuma_cookie_secret:
+        type: str
+        required: true
+        description: oauth2-proxy session cookie encryption key (32 raw bytes, base64).

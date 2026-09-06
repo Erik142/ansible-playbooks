@@ -6,7 +6,9 @@
 {% endif %}
 {% for site in caddy_sites %}
 {{ site.host }} {
+{% if site.upstream | default("", true) | length > 0 %}
     reverse_proxy {{ site.upstream }}
+{% endif %}
 {% if site.extra | default("", true) | length > 0 %}
     {{ site.extra }}
 {% endif %}

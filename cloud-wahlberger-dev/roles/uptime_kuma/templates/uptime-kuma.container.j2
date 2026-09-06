@@ -1,0 +1,18 @@
+[Unit]
+Description=Uptime Kuma
+After=network-online.target caddy-network.service
+Wants=network-online.target
+Requires=caddy-network.service
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=uptime-kuma
+Image={{ uptime_kuma_image }}
+Network=caddy.network
+Volume={{ uptime_kuma_volume }}:/app/data:Z
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
