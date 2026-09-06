@@ -8,6 +8,11 @@
       vault_notify_failure_resend_api_key in Ansible Vault. See README.md.
     quiet: true
 
+- name: Install jq
+  community.general.zypper:
+    name: jq
+    state: present
+
 - name: Create the notify_failure config directory
   ansible.builtin.file:
     path: /etc/notify-failure
@@ -23,6 +28,14 @@
     owner: root
     group: root
     mode: "0600"
+
+- name: Deploy the email HTML template
+  ansible.builtin.copy:
+    src: email-template.html
+    dest: /etc/notify-failure/email-template.html
+    owner: root
+    group: root
+    mode: "0644"
 
 - name: Deploy the notification script
   ansible.builtin.template:
