@@ -28,6 +28,15 @@ restorable. Instead, the backup script runs `pg_dump` into
 actually gets backed up. Mealie needs no equivalent treatment — it uses an
 embedded SQLite database, not a separate Postgres container.
 
+`.snapshots` (Snapper's own Btrfs snapshot history, wherever it appears
+under a backed-up path) is also excluded. Backing it up would mean restic
+redundantly versioning Snapper's own historical versions on top of its own
+versioning, and — worse — Snapper rotates (creates/deletes) those snapshots
+on its own schedule, independently of restic's directory walk, which
+produces `incomplete metadata ... no such file or directory` errors for
+files that vanish mid-backup when Snapper deletes a snapshot restic is still
+reading.
+
 ## Why a systemd timer, not a Semaphore-scheduled Ansible run
 
 The backup itself (dump + `restic backup` + `restic forget --prune`) is a
