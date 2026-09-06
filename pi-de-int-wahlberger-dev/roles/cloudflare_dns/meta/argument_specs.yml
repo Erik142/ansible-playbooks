@@ -1,0 +1,17 @@
+---
+argument_specs:
+  main:
+    short_description: Ensures Cloudflare DNS records exist for this host and its Caddy sites.
+    options:
+      cloudflare_dns_api_token:
+        type: str
+        required: true
+        description: Cloudflare API token scoped to Zone:DNS:Edit on cloudflare_dns_zone.
+      cloudflare_dns_zone:
+        type: str
+        required: false
+        description: Cloudflare zone the managed records belong to.
+      cloudflare_dns_ip:
+        type: str
+        required: false
+        description: IP address to publish in this host's own A record.

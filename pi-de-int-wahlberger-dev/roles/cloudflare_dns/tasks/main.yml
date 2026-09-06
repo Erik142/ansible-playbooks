@@ -1,0 +1,37 @@
+---
+- name: Validate Cloudflare DNS inputs
+  ansible.builtin.assert:
+    that:
+      - cloudflare_dns_api_token | length > 0
+    fail_msg: >-
+      cloudflare_dns_api_token is empty. Provide the Vault secret
+      vault_cloudflare_dns_api_token (run with --ask-vault-pass). See
+      roles/cloudflare_dns/README.md.
+    quiet: true
+
+- name: Ensure this host's own A record exists in Cloudflare
+  community.general.cloudflare_dns:
+    api_token: "{{ cloudflare_dns_api_token }}"
+    zone: "{{ cloudflare_dns_zone }}"
+    record: "{{ inventory_hostname }}"
+    type: A
+    value: "{{ cloudflare_dns_ip }}"
+    proxied: false
+    state: present
+
+# One CNAME per caddy_sites entry, pointing at this host's own A record
+# above — mirrors the pattern already used for cloud-wahlberger-dev's
+# existing records (e.g. id.wahlberger.dev CNAMEs to cloud.wahlberger.dev)
+# rather than a separate A record per site.
+- name: Ensure each Caddy site has a CNAME pointing at this host
+  community.general.cloudflare_dns:
+    api_token: "{{ cloudflare_dns_api_token }}"
+    zone: "{{ cloudflare_dns_zone }}"
+    record: "{{ item.host }}"
+    type: CNAME
+    value: "{{ inventory_hostname }}"
+    proxied: false
+    state: present
+  loop: "{{ caddy_sites }}"
+  loop_control:
+    label: "{{ item.host }}"

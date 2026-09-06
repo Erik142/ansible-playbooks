@@ -25,6 +25,9 @@
       tags: [storage]
     - role: podman
       tags: [podman]
+    # Ensure this host's public DNS records exist before Caddy needs them.
+    - role: cloudflare_dns
+      tags: [cloudflare_dns]
     # Reverse proxy (creates the shared network) for Semaphore.
     - role: caddy
       tags: [caddy]

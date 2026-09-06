@@ -1,0 +1,15 @@
+---
+# REQUIRED: scoped Cloudflare API token (Zone:DNS:Edit on cloudflare_dns_zone
+# below). Set vault_cloudflare_dns_api_token in Ansible Vault — the same
+# token the caddy role already uses for DNS-01, reused here rather than
+# minting a new one.
+cloudflare_dns_api_token: ""
+
+# Cloudflare zone the records below belong to. Every hostname managed here
+# must be a (sub)domain of this zone.
+cloudflare_dns_zone: wahlberger.dev
+
+# IP address for this host's own A record. Defaults to the address Ansible
+# actually gathered for this host, so it can't drift out of sync with the
+# real host.
+cloudflare_dns_ip: "{{ ansible_default_ipv4.address }}"
