@@ -15,3 +15,7 @@ argument_specs:
         type: str
         required: false
         description: Destination address for failure notification emails.
+      notify_failure_log_lines:
+        type: int
+        required: false
+        description: Tail length of the journalctl excerpt embedded in the email.

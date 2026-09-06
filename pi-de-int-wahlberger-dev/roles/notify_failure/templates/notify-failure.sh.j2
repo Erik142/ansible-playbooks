@@ -1,6 +1,6 @@
 #!/bin/sh
 # Rendered by the notify_failure role. Do NOT edit on the host — re-run
-# Ansible. RESEND_API_KEY/NOTIFY_FROM/NOTIFY_TO come from
+# Ansible. RESEND_API_KEY/NOTIFY_FROM/NOTIFY_TO/NOTIFY_LOG_LINES come from
 # notify-failure@.service's EnvironmentFile, not this script.
 #
 # Usage: notify-failure.sh <failed-unit-name>
@@ -8,9 +8,52 @@ set -eu
 
 UNIT="${1:?usage: notify-failure.sh <unit-name>}"
 HOST="$(hostname -f)"
+NOW="$(date '+%Y-%m-%d %H:%M:%S %Z')"
+TEMPLATE=/etc/notify-failure/email-template.html
+
+# Scope the log query to the failed unit's own invocation, not its whole
+# history — an id systemd assigns fresh to each start of the unit. Falls
+# back to a plain unit-scoped query if that lookup ever comes back empty
+# (e.g. the unit doesn't exist under that exact name for some reason).
+INVOCATION_ID="$(systemctl show -p InvocationID --value "$UNIT" 2>/dev/null || true)"
+if [ -n "$INVOCATION_ID" ]; then
+  LOGS="$(journalctl "_SYSTEMD_INVOCATION_ID=${INVOCATION_ID}" --no-pager -n "${NOTIFY_LOG_LINES}" -o short-iso 2>/dev/null || true)"
+else
+  LOGS="$(journalctl -u "$UNIT" --no-pager -n "${NOTIFY_LOG_LINES}" -o short-iso 2>/dev/null || true)"
+fi
+[ -n "$LOGS" ] || LOGS="(no log output captured)"
+
+# HTML-escape first, THEN wrap error-looking lines in a colored span — doing
+# it in the other order would have the escape pass mangle the span tags
+# themselves.
+LOGS_HTML="$(printf '%s' "$LOGS" \
+  | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' \
+  | sed -E 's/^(.*(error|Error|ERROR|fail|Fail|FAILED|fatal|Fatal|FATAL).*)$/<span style="color:#ff8a80;">\1<\/span>/')"
+
+BODY="$(jq -n \
+  --arg from "$NOTIFY_FROM" \
+  --arg to "$NOTIFY_TO" \
+  --arg unit "$UNIT" \
+  --arg host "$HOST" \
+  --arg time "$NOW" \
+  --arg logs "$LOGS" \
+  --arg logs_html "$LOGS_HTML" \
+  --arg log_caption "Last ${NOTIFY_LOG_LINES} log lines:" \
+  --rawfile tmpl "$TEMPLATE" \
+  '{
+    from: $from,
+    to: [$to],
+    subject: ("[" + $host + "] " + $unit + " failed"),
+    text: ($unit + " failed on " + $host + " at " + $time + ".\n\n" + $log_caption + "\n" + $logs + "\n\nFull history: journalctl -u " + $unit + " -e"),
+    html: ($tmpl
+      | gsub("@@UNIT@@"; $unit)
+      | gsub("@@HOST@@"; $host)
+      | gsub("@@TIME@@"; $time)
+      | gsub("@@LOG_CAPTION@@"; $log_caption)
+      | gsub("@@LOGS@@"; $logs_html))
+  }' 2>&1)" || { echo "jq failed building the request body: $BODY" >&2; exit 1; }
 
 curl -fsS https://api.resend.com/emails \
   -H "Authorization: Bearer ${RESEND_API_KEY}" \
   -H "Content-Type: application/json" \
-  -d "$(printf '{"from":"%s","to":["%s"],"subject":"[%s] %s failed","text":"%s failed on %s.\n\nCheck: journalctl -u %s -e"}' \
-    "$NOTIFY_FROM" "$NOTIFY_TO" "$HOST" "$UNIT" "$UNIT" "$HOST" "$UNIT")"
+  -d "$BODY"
