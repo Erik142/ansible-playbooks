@@ -28,6 +28,14 @@
       tags: [security]
     - role: firewall
       tags: [firewall]
+    # Before podman/samba: both assert their data directories are already
+    # mounted.
+    - role: storage
+      tags: [storage]
+    # After storage: needs the subvolumes actually mounted to verify their
+    # .snapshots directories.
+    - role: snapper
+      tags: [snapper]
     - role: podman
       tags: [podman]
     # Ensure this host's public DNS records exist before Caddy needs them.

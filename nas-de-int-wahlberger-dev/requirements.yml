@@ -6,12 +6,13 @@
 # Versions are pinned with a floor (">=") so installs are reproducible but can
 # still pick up patch/minor fixes. Bump deliberately.
 collections:
-  # zypper / zypper_repository / timezone modules, used by common/podman/firewall.
+  # zypper / zypper_repository / timezone modules, used by
+  # common/podman/firewall/snapper.
   - name: community.general
     version: ">=8.0.0"
 
   # profile_tasks callback wired up in ansible.cfg, plus the firewalld module
-  # used by the firewall role.
+  # used by the firewall role and the mount module used by the storage role.
   - name: ansible.posix
     version: ">=1.5.0"
 

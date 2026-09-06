@@ -1,0 +1,26 @@
+---
+- name: Ensure mount point directories exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ storage_mounts }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+# Writes/updates the /etc/fstab entry AND (re)mounts if it's not already
+# mounted with these exact options, so it comes back automatically on every
+# future boot. Does NOT format the device or create the subvolume — both
+# already exist on the host (see defaults/main.yml).
+- name: Mount the existing btrfs subvolumes
+  ansible.posix.mount:
+    path: "{{ item.path }}"
+    src: "UUID={{ item.uuid }}"
+    fstype: btrfs
+    opts: "subvol={{ item.subvol }},{{ storage_mount_options }}"
+    state: mounted
+  loop: "{{ storage_mounts }}"
+  loop_control:
+    label: "{{ item.path }}"

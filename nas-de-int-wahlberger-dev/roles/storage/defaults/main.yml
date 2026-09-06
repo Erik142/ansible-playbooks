@@ -1,0 +1,17 @@
+---
+# Default variables for the `storage` role.
+
+# Two separately mounted disks, each a single-subvolume btrfs filesystem
+# (different UUIDs — these are NOT two subvolumes of the same filesystem).
+# Already formatted and already holding data — this role does not format
+# a device or create a subvolume, only manages the /etc/fstab entry and
+# ensures it's mounted. See README.md.
+storage_mounts:
+  - path: /mnt/containers
+    uuid: "496beeaf-d899-4a31-bb13-92df8ccb62a4"
+    subvol: "/@containers"
+  - path: /mnt/data
+    uuid: "95652338-560e-4b40-ad4c-06d942685f19"
+    subvol: "/@data"
+
+storage_mount_options: "compress=zstd,noatime"

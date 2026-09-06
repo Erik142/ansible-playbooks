@@ -1,0 +1,36 @@
+---
+# Default variables for the `snapper` role.
+
+# Pre-existing config(s) this role must not remove from
+# /etc/sysconfig/snapper's SNAPPER_CONFIGS= line — openSUSE's installer
+# creates "root" for the root btrfs subvolume itself, entirely outside this
+# role's management.
+snapper_preexisting_configs:
+  - root
+
+# One entry per roles/storage subvolume — captured from the host's existing,
+# hand-set-up configs (see README.md). subvolume must match a storage_mounts
+# path in the `storage` role.
+snapper_configs:
+  - name: containers
+    subvolume: /mnt/containers
+    timeline_limit_hourly: 6
+    timeline_limit_daily: 5
+    timeline_limit_weekly: 0
+    timeline_limit_monthly: 0
+    timeline_limit_quarterly: 0
+    timeline_limit_yearly: 0
+  - name: data
+    subvolume: /mnt/data
+    timeline_limit_hourly: 0
+    timeline_limit_daily: 7
+    timeline_limit_weekly: 4
+    timeline_limit_monthly: 12
+    timeline_limit_quarterly: 0
+    timeline_limit_yearly: 2
+
+# Shared across both configs above (openSUSE's own snapper defaults).
+snapper_space_limit: "0.5"
+snapper_free_limit: "0.2"
+snapper_number_limit: 50
+snapper_number_limit_important: 10

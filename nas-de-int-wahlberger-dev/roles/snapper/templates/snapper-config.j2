@@ -1,0 +1,69 @@
+# Rendered by the snapper role. Do NOT edit on the host — re-run Ansible.
+
+# subvolume to snapshot
+SUBVOLUME="{{ item.subvolume }}"
+
+# filesystem type
+FSTYPE="btrfs"
+
+
+# btrfs qgroup for space aware cleanup algorithms
+QGROUP=""
+
+
+# fraction or absolute size of the filesystems space the snapshots may use
+SPACE_LIMIT="{{ snapper_space_limit }}"
+
+# fraction or absolute size of the filesystems space that should be free
+FREE_LIMIT="{{ snapper_free_limit }}"
+
+
+# Whether snapshot numbers should be all-time unique. If set to yes, snapshot
+# numbers are not reused even after snapshots are deleted.
+UNIQUE_NUMBERS="yes"
+
+
+# users and groups allowed to work with config
+ALLOW_USERS=""
+ALLOW_GROUPS=""
+
+# sync users and groups from ALLOW_USERS and ALLOW_GROUPS to .snapshots
+# directory
+SYNC_ACL="no"
+
+
+# start comparing pre- and post-snapshot in background after creating
+# post-snapshot
+BACKGROUND_COMPARISON="yes"
+
+
+# run daily number cleanup
+NUMBER_CLEANUP="yes"
+
+# limit for number cleanup
+NUMBER_MIN_AGE="3600"
+NUMBER_LIMIT="{{ snapper_number_limit }}"
+NUMBER_LIMIT_IMPORTANT="{{ snapper_number_limit_important }}"
+
+
+# create hourly snapshots
+TIMELINE_CREATE="yes"
+
+# cleanup hourly snapshots after some time
+TIMELINE_CLEANUP="yes"
+
+# limits for timeline cleanup
+TIMELINE_MIN_AGE="3600"
+TIMELINE_LIMIT_HOURLY="{{ item.timeline_limit_hourly }}"
+TIMELINE_LIMIT_DAILY="{{ item.timeline_limit_daily }}"
+TIMELINE_LIMIT_WEEKLY="{{ item.timeline_limit_weekly }}"
+TIMELINE_LIMIT_MONTHLY="{{ item.timeline_limit_monthly }}"
+TIMELINE_LIMIT_QUARTERLY="{{ item.timeline_limit_quarterly }}"
+TIMELINE_LIMIT_YEARLY="{{ item.timeline_limit_yearly }}"
+
+
+# cleanup empty pre-post-pairs
+EMPTY_PRE_POST_CLEANUP="yes"
+
+# limits for empty pre-post-pair cleanup
+EMPTY_PRE_POST_MIN_AGE="3600"

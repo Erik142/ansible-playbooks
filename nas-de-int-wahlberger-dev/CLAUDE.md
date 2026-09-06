@@ -43,6 +43,8 @@ contrast (Debian, `apt`, `ufw`, `geerlingguy.security`, hyphenated role names).
 | `disk_space` | Periodic disk usage check (systemd timer), emailing via `notify_failure` on a new threshold crossing. |
 | `security` | SSH hardening, fail2ban, weekly `zypper patch` timer (hand-rolled; no openSUSE geerlingguy.security) |
 | `firewall` | firewalld, default-deny inbound, allows ssh/samba/http/https |
+| `storage` | Mounts the two existing btrfs subvolumes (`/mnt/containers`, `/mnt/data`) by UUID, persisted in `/etc/fstab`. Does NOT format/create them |
+| `snapper` | Btrfs snapshot configs for those same two subvolumes (hourly/daily/weekly/monthly/yearly retention), timeline + cleanup timers |
 | `podman` | Podman + Quadlet support, `/mnt/containers` data dir (a separately mounted disk), `podman.socket` |
 | `cloudflare_dns` | Ensures this host's A record + a CNAME per `caddy_sites` entry exist in Cloudflare |
 | `caddy` | Caddy reverse proxy, **custom-built image** (Cloudflare DNS module baked in via xcaddy, see `roles/caddy/files/Containerfile`); auto HTTPS via **DNS-01** (this host has no public inbound port for HTTP-01); creates the shared `caddy.network` |
@@ -77,10 +79,12 @@ purpose. When migrating:
 
 ## Data & secrets
 
-- Two separately mounted disks, asserted as real mountpoints before use (see
-  `roles/podman/tasks/main.yml` and `roles/samba/tasks/main.yml`): `/mnt/data`
-  (only its `samba/` subdirectory is actually shared) and `/mnt/containers/`
-  (everything else).
+- Two separately mounted btrfs disks, mounted by the `storage` role (which
+  does not format them — both already existed) and re-asserted as real
+  mountpoints before use in `roles/podman/tasks/main.yml` and
+  `roles/samba/tasks/main.yml`: `/mnt/data` (only its `samba/` subdirectory
+  is actually shared) and `/mnt/containers/` (everything else). Snapshotted
+  by the `snapper` role.
 - Secrets: encrypted `inventories/production/group_vars/all/vault.yml`,
   exposed via `{{ vault_* }}` indirection in `vars.yml`. Never commit
   plaintext secrets. Four secrets exist here — DB password, two OIDC client

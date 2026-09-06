@@ -1,0 +1,36 @@
+---
+argument_specs:
+  main:
+    short_description: Snapper btrfs snapshot configs, timeline creation, and cleanup timers.
+    options:
+      snapper_preexisting_configs:
+        type: list
+        elements: str
+        required: false
+        description: >-
+          Config names already in /etc/sysconfig/snapper's SNAPPER_CONFIGS=
+          that this role must preserve, not manage.
+      snapper_configs:
+        type: list
+        elements: dict
+        required: false
+        description: >-
+          One entry per subvolume to snapshot: name, subvolume (path — must
+          already have a .snapshots directory, see README.md), and
+          timeline_limit_{hourly,daily,weekly,monthly,quarterly,yearly}.
+      snapper_space_limit:
+        type: str
+        required: false
+        description: Fraction of the filesystem's space snapshots may use (SPACE_LIMIT).
+      snapper_free_limit:
+        type: str
+        required: false
+        description: Fraction of the filesystem's space that should stay free (FREE_LIMIT).
+      snapper_number_limit:
+        type: int
+        required: false
+        description: Max snapshot count kept by daily number cleanup (NUMBER_LIMIT).
+      snapper_number_limit_important:
+        type: int
+        required: false
+        description: Max "important" snapshot count kept (NUMBER_LIMIT_IMPORTANT).

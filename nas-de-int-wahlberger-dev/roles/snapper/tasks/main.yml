@@ -1,0 +1,63 @@
+---
+- name: Install snapper
+  community.general.zypper:
+    name: snapper
+    state: present
+
+# This role does not create the .snapshots subvolume itself (that's what
+# `snapper create-config` does, and it's a one-time, host-specific btrfs
+# operation this repo deliberately doesn't automate — see README.md).
+# Failing fast here beats deploying a config file that points at a
+# subvolume snapper can't actually use yet.
+- name: Verify each subvolume's .snapshots directory already exists
+  ansible.builtin.stat:
+    path: "{{ item.subvolume }}/.snapshots"
+  loop: "{{ snapper_configs }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: snapper_snapshots_dirs
+
+- name: Assert every .snapshots directory was found
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isdir
+    fail_msg: >-
+      {{ item.item.subvolume }}/.snapshots does not exist. Run
+      `snapper -c {{ item.item.name }} create-config {{ item.item.subvolume }}`
+      on the host first — this role manages the config file, not the
+      one-time subvolume creation. See README.md.
+    quiet: true
+  loop: "{{ snapper_snapshots_dirs.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Deploy snapper configs
+  ansible.builtin.template:
+    src: snapper-config.j2
+    dest: "/etc/snapper/configs/{{ item.name }}"
+    owner: root
+    group: root
+    mode: "0640"
+  loop: "{{ snapper_configs }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# Preserves snapper_preexisting_configs (e.g. openSUSE's own "root") rather
+# than overwriting the whole line — this role only ever adds its own names.
+- name: Register the configs in /etc/sysconfig/snapper
+  ansible.builtin.lineinfile:
+    path: /etc/sysconfig/snapper
+    regexp: '^SNAPPER_CONFIGS='
+    line: >-
+      SNAPPER_CONFIGS="{{ (snapper_preexisting_configs +
+      (snapper_configs | map(attribute='name') | list)) | join(' ') }}"
+
+- name: Enable and start the snapper timeline/cleanup timers
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - snapper-timeline.timer
+    - snapper-cleanup.timer

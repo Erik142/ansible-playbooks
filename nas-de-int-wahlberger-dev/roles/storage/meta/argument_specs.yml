@@ -1,0 +1,22 @@
+---
+argument_specs:
+  main:
+    short_description: Mount existing btrfs subvolumes by UUID, persisted in /etc/fstab.
+    description:
+      - Mounts each entry in storage_mounts at its path (via UUID + subvol=,
+        persisted in /etc/fstab). Does NOT format a device or create a
+        subvolume — both must already exist on the host.
+    options:
+      storage_mounts:
+        type: list
+        elements: dict
+        required: false
+        description: >-
+          Mountpoints to manage. Each entry needs path, uuid (the
+          filesystem's UUID — NOT the subvolume, a plain single-subvolume
+          btrfs filesystem's UUID identifies the whole filesystem), and
+          subvol (e.g. "/@data").
+      storage_mount_options:
+        type: str
+        required: false
+        description: Extra /etc/fstab mount options, appended after subvol=.

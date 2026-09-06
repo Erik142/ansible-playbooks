@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: snapper
+  author: Erik Wahlberger
+  description: Snapper btrfs snapshot configs for the storage role's two subvolumes.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - snapshots
+    - btrfs
+
+dependencies: []
