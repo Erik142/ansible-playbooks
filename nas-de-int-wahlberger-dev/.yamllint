@@ -25,3 +25,5 @@ rules:
 ignore: |
   .ansible_cache/
   .ansible/
+  # Encrypted Vault files are ciphertext, not real YAML — see .ansible-lint.
+  **/vault.yml

@@ -7,3 +7,7 @@ profile: production
 exclude_paths:
   - .ansible_cache/
   - .ansible/
+  # Encrypted Ansible Vault files are ciphertext, not real YAML — they can
+  # never have a "---" document start, so yaml[document-start] always fails
+  # them under the production profile. Nothing to fix; exclude instead.
+  - "**/vault.yml"
