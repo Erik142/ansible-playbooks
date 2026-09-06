@@ -53,3 +53,12 @@
     group: root
     mode: "0644"
   notify: Reload systemd
+
+- name: Deploy the notify-failure-immediate@.service template unit
+  ansible.builtin.template:
+    src: "notify-failure-immediate@.service.j2"
+    dest: /etc/systemd/system/notify-failure-immediate@.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd

@@ -114,6 +114,41 @@
     validate: "testparm -s %s"
   notify: Restart samba
 
+# smb/nmb are OS-packaged units, not ones this role renders itself — a
+# drop-in override is the correct way to add a directive without touching
+# the packaged unit file (which a package upgrade would just overwrite
+# anyway). Unlike the Podman-managed services elsewhere in this repo, smb/nmb
+# have no Restart= and no self-healing at all if they crash — one crash
+# just stays down until someone notices, which is exactly the case
+# notify_failure exists for.
+- name: Create systemd override directories for Samba
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item }}.service.d"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - smb
+    - nmb
+
+# The "immediate" notify_failure variant, not the default deduped one:
+# smb/nmb have no Restart=, so there's no repeating flap to deduplicate —
+# one crash is already a distinct, meaningful, non-repeating event.
+- name: Add a systemd override to email on Samba failure
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/{{ item }}.service.d/notify-failure.conf"
+    content: |
+      [Unit]
+      OnFailure=notify-failure-immediate@%n.service
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - smb
+    - nmb
+  notify: Reload the systemd daemon
+
 - name: Enable and start the Samba services
   ansible.builtin.systemd:
     name: "{{ item }}"

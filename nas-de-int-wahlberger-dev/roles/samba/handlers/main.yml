@@ -6,3 +6,7 @@
   loop:
     - smb
     - nmb
+
+- name: Reload the systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true

@@ -2,9 +2,12 @@
 Description=Nightly restic backup to pi-de-int-wahlberger-dev
 After=network-online.target
 Wants=network-online.target
-# Emails ewahlberger@gmail.com via Resend on failure — see the
-# notify_failure role.
-OnFailure=notify-failure@%n.service
+# Emails ewahlberger@gmail.com via Resend on failure — the "immediate"
+# notify_failure variant, not the default deduped one: this is a Type=oneshot
+# job with no Restart=, running once nightly, so there's no repeating flap
+# to deduplicate and the default 5-in-a-row/10-minute window would
+# realistically never be reached at all (failures would be a day apart).
+OnFailure=notify-failure-immediate@%n.service
 
 [Service]
 Type=oneshot

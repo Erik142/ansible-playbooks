@@ -2,6 +2,9 @@
 Description=PostgreSQL (Paperless-ngx database)
 After=network-online.target
 Wants=network-online.target
+# Emails ewahlberger@gmail.com via Resend after 5 consecutive failures —
+# see the notify_failure role.
+OnFailure=notify-failure@%n.service
 
 [Container]
 ContainerName=paperless-db

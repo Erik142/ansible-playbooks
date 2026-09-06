@@ -3,6 +3,9 @@ Description=Paperless-ngx document management
 After=network-online.target caddy-network.service paperless-db.service paperless-redis.service
 Wants=network-online.target paperless-db.service paperless-redis.service
 Requires=caddy-network.service
+# Emails ewahlberger@gmail.com via Resend after 5 consecutive failures —
+# see the notify_failure role.
+OnFailure=notify-failure@%n.service
 
 [Container]
 ContainerName=paperless-ngx
