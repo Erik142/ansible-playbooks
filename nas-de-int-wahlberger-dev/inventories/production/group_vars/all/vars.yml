@@ -129,3 +129,7 @@ restic_backup_repo_password: "{{ vault_restic_backup_repo_password | default('')
 # restic REST server auth password. SHARED SECRET: must be the exact same
 # value as pi-de-int-wahlberger-dev's vault_restic_server_htpasswd_password.
 restic_backup_rest_server_password: "{{ vault_restic_backup_rest_server_password | default('') }}"
+
+# Resend API key for failure notification emails (notify_failure role). Same
+# account/key as cloud-wahlberger-dev and pi-de-int-wahlberger-dev.
+notify_failure_resend_api_key: "{{ vault_notify_failure_resend_api_key | default('') }}"

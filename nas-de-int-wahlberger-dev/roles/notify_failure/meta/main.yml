@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: notify_failure
+  author: Erik Wahlberger
+  description: Sends an email via Resend when a systemd unit's OnFailure= hook fires.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - notifications
+    - systemd
+
+dependencies: []

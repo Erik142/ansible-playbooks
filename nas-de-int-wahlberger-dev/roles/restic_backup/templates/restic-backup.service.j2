@@ -2,6 +2,9 @@
 Description=Nightly restic backup to pi-de-int-wahlberger-dev
 After=network-online.target
 Wants=network-online.target
+# Emails ewahlberger@gmail.com via Resend on failure — see the
+# notify_failure role.
+OnFailure=notify-failure@%n.service
 
 [Service]
 Type=oneshot

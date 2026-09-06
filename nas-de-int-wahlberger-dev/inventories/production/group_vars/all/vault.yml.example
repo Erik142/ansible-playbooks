@@ -36,3 +36,7 @@ vault_restic_backup_repo_password: "REPLACE-with-a-40-char-alnum-password"
 # restic REST server auth password. SHARED SECRET: must be the exact same
 # value as pi-de-int-wahlberger-dev's vault_restic_server_htpasswd_password.
 vault_restic_backup_rest_server_password: "REPLACE-with-a-32-char-alnum-password"
+
+# Resend API key for failure notification emails. Same key as
+# cloud-wahlberger-dev and pi-de-int-wahlberger-dev — one Resend account.
+vault_notify_failure_resend_api_key: "REPLACE-with-a-resend-api-key"

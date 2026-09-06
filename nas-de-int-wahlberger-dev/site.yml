@@ -12,6 +12,10 @@
   roles:
     - role: common
       tags: [common]
+    # Early: other roles' units (e.g. restic_backup) hook OnFailure= into
+    # the unit this role deploys.
+    - role: notify_failure
+      tags: [notify_failure]
     # Personal + Semaphore automation SSH keys, authorized before hardening.
     - role: ssh_authorized_keys
       tags: [ssh_authorized_keys]

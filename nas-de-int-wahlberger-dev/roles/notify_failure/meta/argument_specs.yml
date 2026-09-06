@@ -1,0 +1,17 @@
+---
+argument_specs:
+  main:
+    short_description: Sends an email via Resend when a systemd unit's OnFailure= hook fires.
+    options:
+      notify_failure_resend_api_key:
+        type: str
+        required: true
+        description: Resend API key used to send failure notification emails.
+      notify_failure_from_address:
+        type: str
+        required: false
+        description: From address; must be on a domain verified in Resend.
+      notify_failure_to_address:
+        type: str
+        required: false
+        description: Destination address for failure notification emails.
