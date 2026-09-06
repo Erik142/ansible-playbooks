@@ -12,3 +12,11 @@ notify_failure_to_address: "ewahlberger@gmail.com"
 # Tail length of the journalctl excerpt embedded in the email, scoped to
 # just the failed unit's own invocation (see notify-failure.sh.j2).
 notify_failure_log_lines: 50
+
+# Crash-loop dedup: a self-healing blip (OnFailure= fires on every restart,
+# not just a final give-up) should never reach an inbox. Only sends once a
+# unit has failed this many times within this many seconds — a single
+# alert, not one per restart, and nothing at all for a unit that recovers
+# before reaching the threshold. See notify-failure.sh.j2.
+notify_failure_crash_threshold: 5
+notify_failure_crash_window_seconds: 600
