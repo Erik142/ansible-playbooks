@@ -1,8 +1,12 @@
 # common
 
 Baseline OS configuration for Debian hosts: refreshes the apt cache, optionally
-runs a full upgrade, installs a small baseline package set, and sets the system
-timezone.
+runs a full upgrade, installs a small baseline package set, sets the system
+timezone, and sets the actual OS hostname to `inventory_hostname` (this
+host's real FQDN) — not something a VM's initial provisioning necessarily
+gets right on its own; `/etc/hosts` gets a matching static fallback entry
+too, so `sudo` never prints "unable to resolve host" if DNS is briefly
+unavailable.
 
 ## Role variables
 
