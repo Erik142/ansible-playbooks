@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: restic_backup
+  author: Erik Wahlberger
+  description: Nightly restic backup of the Samba share and container data to pi-de-int-wahlberger-dev.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - backup
+    - restic
+
+dependencies: []

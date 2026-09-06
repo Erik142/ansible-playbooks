@@ -39,3 +39,7 @@
     # Dashboard linking this NAS's and cloud-wahlberger-dev's services.
     - role: homepage
       tags: [homepage]
+    # After samba and paperless_ngx: backs up samba_mount_path and needs
+    # paperless_ngx's DB container/password to dump it before backing up.
+    - role: restic_backup
+      tags: [restic_backup]

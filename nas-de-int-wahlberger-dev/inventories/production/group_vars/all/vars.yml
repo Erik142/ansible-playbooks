@@ -121,3 +121,11 @@ mealie_oidc_client_secret: "{{ vault_mealie_oidc_client_secret | default('') }}"
 # wahlberger.dev). Same token rpi-karlsruhe's Traefik already uses for the
 # same zone — reused rather than minted fresh.
 cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token | default('') }}"
+
+# restic repository encryption password. Keep a copy outside Vault too (e.g.
+# 1Password) — see roles/restic_backup/README.md.
+restic_backup_repo_password: "{{ vault_restic_backup_repo_password | default('') }}"
+
+# restic REST server auth password. SHARED SECRET: must be the exact same
+# value as pi-de-int-wahlberger-dev's vault_restic_server_htpasswd_password.
+restic_backup_rest_server_password: "{{ vault_restic_backup_rest_server_password | default('') }}"

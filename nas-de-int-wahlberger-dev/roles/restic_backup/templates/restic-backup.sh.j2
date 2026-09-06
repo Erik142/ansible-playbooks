@@ -1,0 +1,34 @@
+#!/bin/sh
+# Rendered by the restic_backup role. Do NOT edit on the host — re-run
+# Ansible. RESTIC_REPOSITORY/RESTIC_PASSWORD come from
+# restic-backup.service's EnvironmentFile, not this script.
+set -eu
+
+STAGING_DIR="{{ restic_backup_staging_dir }}"
+
+# Dump Paperless-ngx's database to a consistent snapshot file first — the
+# raw Postgres data directory (restic_backup_exclude) is excluded from the
+# backup below, since a live filesystem copy of it isn't guaranteed
+# restorable.
+podman exec --env-file "$STAGING_DIR/pgpass.env" {{ restic_backup_paperless_db_container }} \
+  pg_dump -U {{ restic_backup_paperless_db_user }} {{ restic_backup_paperless_db_name }} \
+  > "$STAGING_DIR/paperless.sql"
+
+# Bootstrap the repository on first run; a no-op every run after.
+restic snapshots --latest 1 >/dev/null 2>&1 || restic init
+
+restic backup \
+{% for path in restic_backup_paths %}
+  "{{ path }}" \
+{% endfor %}
+  "$STAGING_DIR" \
+{% for path in restic_backup_exclude %}
+  --exclude "{{ path }}" \
+{% endfor %}
+  --exclude "$STAGING_DIR/pgpass.env"
+
+restic forget \
+  --keep-daily {{ restic_backup_keep_daily }} \
+  --keep-weekly {{ restic_backup_keep_weekly }} \
+  --keep-monthly {{ restic_backup_keep_monthly }} \
+  --prune

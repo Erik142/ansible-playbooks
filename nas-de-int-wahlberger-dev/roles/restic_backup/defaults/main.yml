@@ -1,0 +1,50 @@
+---
+# Default variables for the `restic_backup` role.
+
+# What actually gets backed up: the Samba share, and every container's data
+# — not the raw Paperless-ngx Postgres data directory (excluded below),
+# which is replaced by a consistent pg_dump instead. Cross-role variables:
+# samba and paperless_ngx must already have run (see site.yml).
+restic_backup_paths:
+  - "{{ samba_mount_path }}"
+  - /mnt/containers
+
+restic_backup_exclude:
+  - "{{ paperless_ngx_db_data_dir_root }}"
+
+# Where the nightly pg_dump lands before restic picks it up. Root-only —
+# this directory is not itself a restic_backup_paths entry, only the dump
+# file placed inside it is (via restic_backup_paths / staging_dir path
+# concatenation in the backup script).
+restic_backup_staging_dir: /var/lib/restic-backup
+
+# Paperless-ngx's Postgres container/database — hardcoded to match
+# paperless_ngx's own hardcoded POSTGRES_DB/POSTGRES_USER (see
+# roles/paperless_ngx/templates/paperless-db.container.j2), which aren't
+# templated at the source either.
+restic_backup_paperless_db_container: paperless-db
+restic_backup_paperless_db_name: paperless
+restic_backup_paperless_db_user: paperless
+
+# REQUIRED: repository encryption password. Set
+# vault_restic_backup_repo_password in Ansible Vault. Losing this makes
+# every backup permanently unrecoverable — keep a copy outside Vault too
+# (e.g. 1Password), not just inside it. See README.md.
+restic_backup_repo_password: ""
+
+restic_backup_rest_server_host: pi.de.int.wahlberger.dev
+restic_backup_rest_server_port: 8000
+restic_backup_rest_server_username: nas
+# REQUIRED: set vault_restic_backup_rest_server_password in Ansible Vault —
+# a SHARED SECRET that must match pi-de-int-wahlberger-dev's
+# vault_restic_server_htpasswd_password exactly.
+restic_backup_rest_server_password: ""
+
+# Retention: 7 daily + 4 weekly + 6 monthly snapshots kept, everything older
+# pruned. Applied every night right after the backup completes.
+restic_backup_keep_daily: 7
+restic_backup_keep_weekly: 4
+restic_backup_keep_monthly: 6
+
+# Nightly at 03:00 — systemd OnCalendar syntax.
+restic_backup_on_calendar: "*-*-* 03:00:00"

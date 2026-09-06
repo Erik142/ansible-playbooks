@@ -1,0 +1,9 @@
+[Unit]
+Description=Nightly restic backup to pi-de-int-wahlberger-dev
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile={{ restic_backup_staging_dir }}/restic-backup.env
+ExecStart=/usr/local/bin/restic-backup.sh
