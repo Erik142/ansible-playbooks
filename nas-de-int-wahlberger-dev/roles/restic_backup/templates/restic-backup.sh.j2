@@ -17,7 +17,12 @@ podman exec --env-file "$STAGING_DIR/pgpass.env" {{ restic_backup_paperless_db_c
 # Bootstrap the repository on first run; a no-op every run after.
 restic snapshots --latest 1 >/dev/null 2>&1 || restic init
 
-restic backup \
+# Captured (not just streamed) so a success email can embed restic's own
+# summary — but still echoed below so `journalctl` shows it either way.
+# Deliberately NOT `restic backup ... | tee ...`: a pipeline's exit status
+# is the LAST command's (tee, which always succeeds), which would silently
+# hide a real backup failure from `set -e`.
+if ! BACKUP_OUTPUT="$(restic backup \
 {% for path in restic_backup_paths %}
   "{{ path }}" \
 {% endfor %}
@@ -25,10 +30,50 @@ restic backup \
 {% for path in restic_backup_exclude %}
   --exclude "{{ path }}" \
 {% endfor %}
-  --exclude "$STAGING_DIR/pgpass.env"
+  --exclude "$STAGING_DIR/pgpass.env" 2>&1)"; then
+  printf '%s\n' "$BACKUP_OUTPUT"
+  exit 1
+fi
+printf '%s\n' "$BACKUP_OUTPUT"
 
 restic forget \
   --keep-daily {{ restic_backup_keep_daily }} \
   --keep-weekly {{ restic_backup_keep_weekly }} \
   --keep-monthly {{ restic_backup_keep_monthly }} \
   --prune
+
+# Only sends if restic_backup_notify_on_success wired up the notify_failure
+# role's Resend credentials as a second EnvironmentFile on this service
+# (see restic-backup.service.j2) — a missing key means that's off, not an
+# error.
+if [ -n "${RESEND_API_KEY:-}" ]; then
+  HOST="$(hostname -f)"
+  NOW="$(date '+%Y-%m-%d %H:%M:%S %Z')"
+  SUMMARY_HTML="$(printf '%s' "$BACKUP_OUTPUT" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g')"
+
+  BODY="$(jq -n \
+    --arg from "$NOTIFY_FROM" \
+    --arg to "$NOTIFY_TO" \
+    --arg unit "restic-backup.service" \
+    --arg host "$HOST" \
+    --arg time "$NOW" \
+    --arg summary "$BACKUP_OUTPUT" \
+    --arg summary_html "$SUMMARY_HTML" \
+    --rawfile tmpl /etc/restic-backup/success-email-template.html \
+    '{
+      from: $from,
+      to: [$to],
+      subject: ("[" + $host + "] " + $unit + " succeeded"),
+      text: ($unit + " succeeded on " + $host + " at " + $time + ".\n\nBackup summary:\n" + $summary),
+      html: ($tmpl
+        | gsub("@@UNIT@@"; $unit)
+        | gsub("@@HOST@@"; $host)
+        | gsub("@@TIME@@"; $time)
+        | gsub("@@SUMMARY@@"; $summary_html))
+    }' 2>&1)" || { echo "jq failed building the success email body: $BODY" >&2; exit 0; }
+
+  curl -fsS https://api.resend.com/emails \
+    -H "Authorization: Bearer ${RESEND_API_KEY}" \
+    -H "Content-Type: application/json" \
+    -d "$BODY" || echo "Sending the success email failed (backup itself still succeeded)" >&2
+fi

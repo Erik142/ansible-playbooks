@@ -54,3 +54,9 @@ restic_backup_keep_monthly: 6
 
 # Nightly at 03:00 — systemd OnCalendar syntax.
 restic_backup_on_calendar: "*-*-* 03:00:00"
+
+# Emails a backup summary via Resend on every successful run, not just
+# failures (notify_failure already covers those) — reuses notify_failure's
+# Resend credentials, so it must have already run (see site.yml). Set to
+# false to only ever hear about this backup when it fails.
+restic_backup_notify_on_success: true

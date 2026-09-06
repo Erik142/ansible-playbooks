@@ -37,6 +37,31 @@ produces `incomplete metadata ... no such file or directory` errors for
 files that vanish mid-backup when Snapper deletes a snapshot restic is still
 reading.
 
+## Success emails
+
+`restic_backup_notify_on_success` (default `true`) emails a summary — the
+same "Files: N new, Added to repository: X GiB, processed in HH:MM" restic
+prints itself — via Resend on every successful run, not just failures
+(`notify_failure` already covers those). It reuses `notify_failure`'s
+Resend credentials rather than duplicating that secret into a second Vault
+entry, by adding its env file as a second `EnvironmentFile=` on
+`restic-backup.service` — which means `notify_failure` **must** run before
+this role (already the case in `site.yml`). Set the flag to `false` to only
+ever hear about this backup when it fails.
+
+The backup's own output is captured (not just streamed to the journal) so
+it can be embedded in the email, but still gets echoed afterward either way
+— it's not swallowed. It's captured via `if ! OUTPUT="$(restic backup ...)"`,
+deliberately not `restic backup ... | tee ...`: a pipeline's exit status is
+its *last* command's (`tee`, which always succeeds), which would silently
+hide a real backup failure from `set -e`.
+
+A failure to *send* the success email (a bad API response, a `jq` bug) is
+swallowed rather than propagated — the backup itself already succeeded by
+that point, and letting a notification hiccup flip the whole service to
+"failed" would perversely trigger `notify_failure`'s failure email over a
+backup that actually worked.
+
 ## Why a systemd timer, not a Semaphore-scheduled Ansible run
 
 The backup itself (dump + `restic backup` + `restic forget --prune`) is a

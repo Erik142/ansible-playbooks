@@ -41,6 +41,22 @@
     group: root
     mode: "0600"
 
+- name: Create the restic_backup config directory
+  ansible.builtin.file:
+    path: /etc/restic-backup
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy the success email HTML template
+  ansible.builtin.copy:
+    src: success-email-template.html
+    dest: /etc/restic-backup/success-email-template.html
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Deploy the backup script
   ansible.builtin.template:
     src: restic-backup.sh.j2

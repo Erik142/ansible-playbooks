@@ -14,4 +14,10 @@ Type=oneshot
 # root (no User= set), so root's real home directory is correct here.
 Environment=HOME=/root
 EnvironmentFile={{ restic_backup_staging_dir }}/restic-backup.env
+{% if restic_backup_notify_on_success %}
+# Resend credentials for the success email — the notify_failure role's own
+# env file, reused rather than duplicating the secret into a second Vault
+# entry. Requires notify_failure to have already run (see site.yml).
+EnvironmentFile=/etc/notify-failure/notify-failure.env
+{% endif %}
 ExecStart=/usr/local/bin/restic-backup.sh

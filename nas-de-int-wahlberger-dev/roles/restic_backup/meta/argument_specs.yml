@@ -65,3 +65,7 @@ argument_specs:
         type: str
         required: false
         description: systemd OnCalendar expression for the backup timer.
+      restic_backup_notify_on_success:
+        type: bool
+        required: false
+        description: Email a backup summary via Resend on every successful run, not just failures.
