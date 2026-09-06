@@ -39,8 +39,10 @@ automation host that runs `ansible-playbook` against this host,
 | `firewall` | ufw host firewall, default-deny inbound, allows 22/80/443 |
 | `storage` | Mounts the external USB drive (stable `/dev/disk/by-id/...` path, `nofail` in fstab) at `/mnt/data`; does NOT format it — `storage_fstype` must be set to what's already on it |
 | `podman` | Podman + Quadlet support, `/mnt/data/containers` data dir (inside the `storage` mount), `podman.socket` |
+| `cloudflare_dns` | Ensures this host's A record + a CNAME per `caddy_sites` entry exist in Cloudflare |
 | `caddy` | Caddy reverse proxy, **custom-built image** (Cloudflare DNS module via xcaddy — copied from the NAS's role, not cloud-wahlberger-dev's); auto HTTPS via **DNS-01** (this Pi has no public inbound port, same reasoning as the NAS); creates the shared `caddy.network` |
 | `semaphore` | Semaphore UI (self-hosted Ansible runner), SQLite backend, Pocket ID OIDC login with a kept-deliberately local admin fallback |
+| `restic_server` | restic REST server — the backup target nas-de-int-wahlberger-dev's `restic_backup` pushes to nightly. LAN/ZeroTier-only, never proxied through Caddy |
 | `container` | Generic helper: renders one `.container` Quadlet template and restarts on change. Included by service roles, not listed in `site.yml`. |
 
 ## Why this host exists (the CI/CD reachability problem)

@@ -37,9 +37,11 @@ playbooks in this repo — prefer copying its patterns over the older `rpi-*` on
 | Role | Purpose |
 |------|---------|
 | `common` | apt update/upgrade, baseline packages, timezone |
+| `ssh_authorized_keys` | Authorizes your personal SSH key plus Semaphore's dedicated automation key (both also authorized on the NAS and the Pi) |
 | `geerlingguy.security` (external) | SSH hardening, fail2ban, unattended-upgrades. Tuned via `security_*` in group_vars; installed from Galaxy. |
 | `firewall` | ufw host firewall, default-deny inbound, allows 22/80/443. |
 | `podman` | Podman + Quadlet support, `/opt/podman` data dir, `podman.socket` |
+| `cloudflare_dns` | Brings this host's already-existing Cloudflare records under Ansible management |
 | `caddy` | Official Caddy reverse proxy; auto HTTPS (HTTP-01); creates the shared `systemd-caddy` network; routes from `caddy_sites`. |
 | `pocket_id` | Pocket ID OIDC provider (image pinned). Internal only (1411); data in the `pocket-id` named volume (`/app/data`). |
 | `freshrss` | FreshRSS RSS aggregator (image pinned). Internal only (80); login via Pocket ID OIDC; data in the `freshrss` named volume (`/var/www/FreshRSS/data`). |
