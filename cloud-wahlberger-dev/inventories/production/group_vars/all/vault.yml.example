@@ -27,3 +27,9 @@ vault_freshrss_oidc_crypto_key: "REPLACE-64-hex-chars"
 # image entrypoint's shell, so avoid quotes/$/spaces).
 #     LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 24; echo
 vault_freshrss_admin_password: "REPLACE-with-24-char-alnum-password"
+
+# Cloudflare API token (cloudflare_dns role) — a scoped token with
+# Zone:DNS:Edit on the wahlberger.dev zone, needs no other permission. Reuse
+# the existing token from nas-de-int-wahlberger-dev/pi-de-int-wahlberger-dev's
+# vault instead of minting a new one — same zone, same purpose.
+vault_cloudflare_dns_api_token: "REPLACE-with-the-existing-cloudflare-token"

@@ -42,6 +42,10 @@ caddy_sites:
   - host: rss.wahlberger.dev
     upstream: "freshrss:80"
 
+# --- DNS (cloudflare_dns role) ----------------------------------------------
+# Brings this host's already-existing Cloudflare records (cloud.wahlberger.dev
+# plus a CNAME per caddy_sites entry above) under Ansible management.
+
 # --- Pocket ID (pocket_id role) --------------------------------------------
 # Must match the caddy_sites host above and the public DNS record.
 pocket_id_app_url: "https://id.wahlberger.dev"
@@ -83,3 +87,6 @@ pocket_id_encryption_key: "{{ vault_pocket_id_encryption_key | default('') }}"
 freshrss_oidc_client_secret: "{{ vault_freshrss_oidc_client_secret | default('') }}"
 freshrss_oidc_crypto_key: "{{ vault_freshrss_oidc_crypto_key | default('') }}"
 freshrss_admin_password: "{{ vault_freshrss_admin_password | default('') }}"
+
+# Cloudflare API token, shared by cloudflare_dns.
+cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token | default('') }}"
