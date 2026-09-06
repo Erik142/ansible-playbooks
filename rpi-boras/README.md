@@ -16,8 +16,10 @@ in `vault.yml.example`. Create the real file with:
 ansible-vault create group_vars/all/vault.yml
 ```
 
-then run the playbook with `--ask-vault-pass` (or
-`--vault-password-file .vault_pass`).
+By default the vault password is fetched from 1Password automatically — see
+`.vault_pass.sh` (requires the `op` CLI signed in and the desktop app
+unlocked). Without 1Password, run with `--ask-vault-pass` (or
+`--vault-password-file .vault_pass`) instead.
 
 **These are shared secrets, not independently rotatable.** Each TSIG key in
 `roles/bind9_docker/tasks/main.yml` is also held by another host — the VyOS
@@ -30,5 +32,5 @@ multi-host change, not a single-file edit.
 
 ```sh
 ansible-galaxy role install -r requirements.yml
-ansible-playbook -i inventory/pi/inventory.yaml main.yml --ask-vault-pass --ask-become-pass
+/Users/erikwahlberger/.pyenv/versions/ansible-bind9-venv/bin/ansible-playbook -i inventory/pi/inventory.yaml main.yml --ask-become-pass
 ```
