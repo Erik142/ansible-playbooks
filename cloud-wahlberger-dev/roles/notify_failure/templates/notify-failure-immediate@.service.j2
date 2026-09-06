@@ -1,0 +1,15 @@
+[Unit]
+Description=Send an immediate failure notification email for %i
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/notify-failure/notify-failure.env
+# Overrides NOTIFY_CRASH_THRESHOLD from the file above — a later
+# Environment=/EnvironmentFile= wins over an earlier one for the same key.
+# For units with no Restart= (a one-shot job like restic-backup.service, or
+# a native service like Samba with no auto-restart at all) there's no
+# repeating flap to deduplicate — every failure is already a distinct,
+# meaningful event, so this skips the dedup entirely instead of waiting for
+# a streak that (for a once-nightly job) would realistically never form.
+Environment=NOTIFY_CRASH_THRESHOLD=1
+ExecStart=/usr/local/bin/notify-failure.sh %i

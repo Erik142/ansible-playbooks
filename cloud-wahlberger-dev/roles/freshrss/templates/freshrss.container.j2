@@ -3,6 +3,9 @@ Description=FreshRSS feed aggregator
 After=network-online.target caddy-network.service
 Wants=network-online.target
 Requires=caddy-network.service
+# Emails ewahlberger@gmail.com via Resend after 5 consecutive failures —
+# see the notify_failure role.
+OnFailure=notify-failure@%n.service
 
 [Container]
 ContainerName=freshrss

@@ -12,30 +12,45 @@ dead host can report its own death. That's a separate, external watcher
 
 ## How it works
 
-This role deploys four things:
+This role deploys five things:
 
 1. `/usr/local/bin/notify-failure.sh` — a script that `curl`s Resend's REST
    API directly. No mail transport agent (postfix/msmtp) needed on any
    host — deliberately lighter than setting up real SMTP relaying
    identically across Debian and openSUSE.
-2. `notify-failure@.service` — a systemd **template** unit. Any monitored
-   unit adds `OnFailure=notify-failure@%n.service` to its own `[Unit]`
-   section; `%n` expands to that unit's own name, which systemd passes
-   through as the `%i` instance parameter, so one template handles any
-   number of monitored services.
-3. `/etc/notify-failure/notify-failure.env` — the Resend API key, from/to
-   addresses, and the log-tail length, root-only.
-4. `/etc/notify-failure/email-template.html` — a static HTML email, with
-   `@@UNIT@@`/`@@HOST@@`/`@@TIME@@`/`@@LOG_CAPTION@@`/`@@LOGS@@` tokens the
-   script fills in at send time via `jq` (not Jinja2 — nothing here is known
-   until the actual failure happens).
+2. `notify-failure@.service` — a systemd **template** unit, the default
+   entry point. Any monitored unit adds `OnFailure=notify-failure@%n.service`
+   to its own `[Unit]` section; `%n` expands to that unit's own name, which
+   systemd passes through as the `%i` instance parameter, so one template
+   handles any number of monitored services. Applies the crash-loop dedup
+   below.
+3. `notify-failure-immediate@.service` — the same script, but with
+   `NOTIFY_CRASH_THRESHOLD` forced to `1` via a unit-level `Environment=`
+   (which wins over the same key from `EnvironmentFile=` below it — see the
+   comment in the template). For units with **no `Restart=`** at all — a
+   `Type=oneshot` job like `restic-backup.service`, or a native service like
+   Samba's `smb`/`nmb` with no auto-restart configured — there's no
+   repeating flap to deduplicate in the first place, and for a job that only
+   runs once a night, the default 5-in-10-minutes window would realistically
+   never even be reached (each failure would be a day apart). Use this
+   variant (`OnFailure=notify-failure-immediate@%n.service`) for any unit
+   like that; use the default for anything with `Restart=always` — a real
+   sustained failure there retries fast enough (no `RestartSec=` set
+   anywhere in this repo, so ~100ms apart) to still hit the default
+   threshold almost instantly, so the dedup there is only filtering out
+   one-off transient blips, not delaying real detection.
+4. `/etc/notify-failure/notify-failure.env` — the Resend API key, from/to
+   addresses, log-tail length, and crash-loop settings, root-only.
+5. `/etc/notify-failure/email-template.html` — a static HTML email, with
+   `@@UNIT@@`/`@@HOST@@`/`@@TIME@@`/`@@STREAK@@`/`@@LOG_CAPTION@@`/`@@LOGS@@`
+   tokens the script fills in at send time via `jq` (not Jinja2 — nothing
+   here is known until the actual failure happens).
 
 This role only deploys the *mechanism*. It does not add `OnFailure=` to any
 service itself — that's a one-line addition in the monitored service's own
-role/template. Currently wired up for
-`nas-de-int-wahlberger-dev`'s `restic-backup.service` only; add it to
-another unit by adding `OnFailure=notify-failure@%n.service` to that unit's
-`[Unit]` section.
+role/template. Currently wired up for every container Quadlet across all
+three playbooks (deduped) plus `nas-de-int-wahlberger-dev`'s
+`restic-backup.service` and `smb`/`nmb` (immediate).
 
 ## What the email includes
 
