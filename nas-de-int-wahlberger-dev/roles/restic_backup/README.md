@@ -76,3 +76,18 @@ Paperless-ngx's data comes back as `paperless.sql` inside the restored
 tree — restore it with `psql` (or `podman exec -i paperless-db psql -U
 paperless paperless < paperless.sql` after stopping the app container),
 not by copying files into the live Postgres data directory.
+
+**Expect an `xattr.LRemove ... security.selinux: permission denied` error on
+one or two top-level directories, even as root.** This host runs SELinux,
+and `security.*` xattrs are gated by SELinux policy itself, not regular
+Linux file permissions — restic captures the label but can't always
+re-apply it to a different restore path. This is metadata-only: the restore
+summary (`Restored N / N+1 files/dirs`) confirms every file's actual
+content still came back intact. After restoring to the real, live path
+(not a scratch test directory), just let SELinux recompute the correct
+labels itself instead of relying on the captured xattr round-tripping
+exactly, the same way the `samba` role already does:
+
+```sh
+restorecon -Rv /mnt/containers /mnt/data
+```
