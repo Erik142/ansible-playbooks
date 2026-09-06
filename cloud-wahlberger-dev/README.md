@@ -158,12 +158,14 @@ cloudflare_api_token: "{{ vault_cloudflare_api_token }}"
 Run with the vault password:
 
 ```sh
-# Interactive:
-ansible-playbook site.yml --ask-vault-pass
+# Default: ansible.cfg's vault_password_file points at .vault_pass.sh, which
+# fetches the password from 1Password (op CLI, desktop app unlocked) — no
+# flag needed.
+/Users/erikwahlberger/.pyenv/versions/ansible-bind9-venv/bin/ansible-playbook site.yml
 
-# Or store the password in a gitignored file and point Ansible at it:
-echo 'my-vault-password' > .vault_pass        # already in .gitignore
-ansible-playbook site.yml --vault-password-file .vault_pass
+# Without 1Password, fall back to one of:
+ansible-playbook site.yml --ask-vault-pass
+echo 'my-vault-password' > .vault_pass && ansible-playbook site.yml --vault-password-file .vault_pass
 ```
 
 ## Linting & validation

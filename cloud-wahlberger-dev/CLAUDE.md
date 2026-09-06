@@ -9,7 +9,7 @@ playbooks in this repo — prefer copying its patterns over the older `rpi-*` on
 ## Entry point & commands
 
 - Playbook: `site.yml` (top-level). Default inventory is set in `ansible.cfg`.
-- Run: `ansible-playbook site.yml` (add `--check --diff` for a dry run).
+- Run: `ansible-playbook site.yml` (add `--check --diff` for a dry run). The vault password comes from 1Password automatically via `.vault_pass.sh` (`ansible.cfg`'s `vault_password_file`) — no `--ask-vault-pass` needed.
 - Install deps first: `ansible-galaxy collection install -r requirements.yml` then `ansible-galaxy role install -r requirements.yml`.
 - Validate: `yamllint .`, `ansible-lint`, `ansible-playbook site.yml --syntax-check`.
 
