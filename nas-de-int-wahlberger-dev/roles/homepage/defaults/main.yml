@@ -19,6 +19,7 @@ homepage_url: ""
 homepage_pocket_id_url: "{{ pocket_id_app_url }}"
 homepage_freshrss_url: "https://rss.wahlberger.dev"
 homepage_uptime_kuma_url: "https://status.wahlberger.dev"
+homepage_beszel_url: "https://beszel.wahlberger.dev"
 
 # Cross-playbook link to pi-de-int-wahlberger-dev's Semaphore UI.
 homepage_semaphore_url: "https://semaphore.de.int.wahlberger.dev"
