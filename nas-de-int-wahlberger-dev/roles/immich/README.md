@@ -26,8 +26,18 @@ Create an OIDC client in the Pocket ID dashboard:
 
 - Redirect URIs: `{{ immich_url }}/auth/login`, `{{ immich_url }}/user-settings`,
   and `app.immich:///oauth-callback` (required for the mobile app).
-- Backchannel logout URL (if Pocket ID supports it):
-  `{{ immich_url }}/api/oauth/backchannel-logout`.
+- Logout callback URL: `{{ immich_url }}/auth/login`. **Not**
+  `{{ immich_url }}/api/oauth/backchannel-logout`, despite Immich's own
+  [OAuth docs](https://immich.app/docs/administration/oauth) suggesting a
+  "Backchannel logout URL" there — Pocket ID has no true (server-to-server)
+  backchannel logout. Its "Logout callback URL" is the OIDC
+  `post_logout_redirect_uri`: purely where your *browser* lands after
+  Pocket ID ends your session (confirmed in Pocket ID's own source,
+  `end_session_service.go`: "returns the client's post-logout callback
+  URL"). Pointing it at Immich's backend-only, POST-only backchannel
+  endpoint made the browser GET it on every logout, showing
+  `{"message":"Cannot GET /api/oauth/backchannel-logout"}` instead of
+  actually landing anywhere.
 
 Then set `immich_oidc_client_id` in group_vars and
 `vault_immich_oidc_client_secret` in Vault to the values Pocket ID gives you.
