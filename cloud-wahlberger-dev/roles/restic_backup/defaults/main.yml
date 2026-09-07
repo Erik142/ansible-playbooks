@@ -1,0 +1,51 @@
+---
+# Default variables for the `restic_backup` role.
+
+# What actually gets backed up: the whole Podman data root — Pocket ID,
+# FreshRSS, and Beszel's hub. Unlike nas-de-int-wahlberger-dev's equivalent
+# role, nothing here needs a pre-backup pg_dump: none of this host's
+# services use a separate Postgres container, just embedded SQLite (Pocket
+# ID, FreshRSS) or PocketBase's own SQLite (Beszel) — a live filesystem
+# copy of those is fine, same reasoning as nas's Mealie note.
+restic_backup_paths:
+  - /opt/podman
+
+restic_backup_exclude: []
+
+# Root-only directory holding just the rendered restic-backup.env file (the
+# repository URL/passwords restic reads via EnvironmentFile=) — unlike
+# nas-de-int-wahlberger-dev's staging_dir, nothing here is itself a backup
+# source, so it's not one of restic_backup_paths.
+restic_backup_staging_dir: /var/lib/restic-backup
+
+# REQUIRED: repository encryption password. Set
+# vault_restic_backup_repo_password in Ansible Vault. Losing this makes
+# every backup permanently unrecoverable — keep a copy outside Vault too
+# (e.g. 1Password), not just inside it. See README.md.
+restic_backup_repo_password: ""
+
+restic_backup_rest_server_host: pi.de.int.wahlberger.dev
+restic_backup_rest_server_port: 8000
+restic_backup_rest_server_username: cloud
+# REQUIRED: set vault_restic_backup_rest_server_password in Ansible Vault —
+# a SHARED SECRET that must match pi-de-int-wahlberger-dev's
+# vault_restic_server_cloud_htpasswd_password exactly.
+restic_backup_rest_server_password: ""
+
+# Retention: 7 daily + 4 weekly + 6 monthly snapshots kept, everything older
+# pruned. Applied every night right after the backup completes. Same
+# defaults as nas-de-int-wahlberger-dev's role.
+restic_backup_keep_daily: 7
+restic_backup_keep_weekly: 4
+restic_backup_keep_monthly: 6
+
+# Nightly at 03:30 — systemd OnCalendar syntax. Offset half an hour from
+# nas-de-int-wahlberger-dev's 03:00 run so both backups don't hit
+# pi-de-int-wahlberger-dev's REST server at the exact same moment.
+restic_backup_on_calendar: "*-*-* 03:30:00"
+
+# Emails a backup summary via Resend on every successful run, not just
+# failures (notify_failure already covers those) — reuses notify_failure's
+# Resend credentials, so it must have already run (see site.yml). Set to
+# false to only ever hear about this backup when it fails.
+restic_backup_notify_on_success: true

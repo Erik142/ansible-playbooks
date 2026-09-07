@@ -42,12 +42,15 @@ playbooks in this repo — prefer copying its patterns over the older `rpi-*` on
 | `ssh_authorized_keys` | Authorizes your personal SSH key plus Semaphore's dedicated automation key (both also authorized on the NAS and the Pi) |
 | `geerlingguy.security` (external) | SSH hardening, fail2ban, unattended-upgrades. Tuned via `security_*` in group_vars; installed from Galaxy. |
 | `reboot_notify` | Emails a heads-up (reusing `notify_failure`'s Resend credentials; its own notification class, not a failure alert) right before an unattended-upgrades-triggered reboot. Installs `needrestart` to maintain `/var/run/reboot-required`, which Debian has no other source for. |
-| `firewall` | ufw host firewall, default-deny inbound, allows 22/80/443. |
+| `firewall` | ufw host firewall, default-deny inbound, allows 22/80/443; also allows the beszel_agent port, but only from the Podman bridge interface |
 | `podman` | Podman + Quadlet support, `/opt/podman` data dir, `podman.socket` |
+| `beszel_agent` | Beszel monitoring agent — native systemd service (not a container), reports to `beszel_hub` below (this same host, reached over the Podman bridge) |
 | `cloudflare_dns` | Brings this host's already-existing Cloudflare records under Ansible management |
 | `caddy` | Official Caddy reverse proxy; auto HTTPS (HTTP-01); creates the shared `systemd-caddy` network; routes from `caddy_sites`. |
 | `pocket_id` | Pocket ID OIDC provider (image pinned). Internal only (1411); data in the `pocket-id` named volume (`/app/data`). |
 | `freshrss` | FreshRSS RSS aggregator (image pinned). Internal only (80); login via Pocket ID OIDC; data in the `freshrss` named volume (`/var/www/FreshRSS/data`). |
+| `beszel_hub` | Beszel monitoring hub (PocketBase-based, image pinned). Collects metrics from `beszel_agent` on all three hosts; superuser account and OIDC login both set up manually (no config-file mechanism) |
+| `restic_backup` | Nightly restic backup of `/opt/podman` to `pi-de-int-wahlberger-dev`'s `restic_server`, via a systemd timer. Simpler than the NAS's role of the same name — no Postgres here, so no pg_dump step |
 | `container` | Generic helper: renders one `.container` Quadlet template and restarts on change. Included by service roles, not listed in `site.yml`. |
 
 ## Adding a service

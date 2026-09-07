@@ -29,6 +29,19 @@
     proto: tcp
     comment: "Allow Podman containers to access host DNS proxy (TCP fallback)"
 
+# Scoped to the Podman bridge only (not opened to the internet, unlike
+# firewall_allowed_tcp_ports below): the beszel_hub container reaches this
+# host's own beszel_agent via host.containers.internal, which crosses this
+# same interface — see roles/beszel_agent/README.md.
+- name: Allow Beszel agent traffic from Podman interfaces in UFW
+  community.general.ufw:
+    rule: allow
+    direction: in
+    interface: podman+
+    to_port: "{{ beszel_agent_port }}"
+    proto: tcp
+    comment: "Allow the local Beszel hub container to reach the beszel_agent on this host"
+
 # Allow the service ports BEFORE enabling, so enabling can never lock out SSH.
 - name: Allow inbound TCP service ports
   community.general.ufw:

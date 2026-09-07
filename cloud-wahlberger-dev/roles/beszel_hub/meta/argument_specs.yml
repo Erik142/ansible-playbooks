@@ -1,0 +1,29 @@
+---
+argument_specs:
+  main:
+    short_description: Beszel monitoring hub behind Caddy.
+    options:
+      beszel_hub_image:
+        type: str
+        required: false
+        description: Beszel hub container image.
+      beszel_hub_data_dir:
+        type: path
+        required: false
+        description: Host directory for the hub's PocketBase data (database, generated SSH keypair).
+      beszel_hub_url:
+        type: str
+        required: true
+        description: Public https:// URL the hub is served on.
+      beszel_hub_oauth_disable_popup:
+        type: bool
+        required: false
+        description: Use a full-page redirect for OAuth login instead of Beszel's default (unreliable on some browsers) popup.
+      beszel_hub_oauth_user_creation:
+        type: bool
+        required: false
+        description: Scope the users collection's create rule to allow OAuth2-context record creation, required for OAuth login to work at all.
+      beszel_hub_disable_password_auth:
+        type: bool
+        required: false
+        description: Disable password login for the users collection (app login), leaving the separate _superusers /_/ panel's password login untouched.

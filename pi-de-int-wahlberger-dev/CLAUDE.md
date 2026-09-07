@@ -39,13 +39,14 @@ automation host that runs `ansible-playbook` against this host,
 | `ssh_authorized_keys` | Authorizes your personal SSH key plus Semaphore's dedicated automation key (both also authorized on cloud-wahlberger-dev and the NAS) |
 | `geerlingguy.security` (external) | SSH hardening, fail2ban, unattended-upgrades. Also grants `erikwahlberger` passwordless sudo (`security_sudoers_passwordless`) — Semaphore can't type an interactive sudo password |
 | `reboot_notify` | Emails a heads-up (reusing `notify_failure`'s Resend credentials; its own notification class, not a failure alert) right before an unattended-upgrades-triggered reboot. Installs `needrestart` to maintain `/var/run/reboot-required`, which Debian has no other source for. |
-| `firewall` | ufw host firewall, default-deny inbound, allows 22/80/443 |
+| `firewall` | ufw host firewall, default-deny inbound, allows 22/80/443 + the beszel_agent port |
 | `storage` | Mounts the external USB drive (stable `/dev/disk/by-id/...` path, `nofail` in fstab) at `/mnt/data`; does NOT format it — `storage_fstype` must be set to what's already on it |
 | `podman` | Podman + Quadlet support, `/mnt/data/containers` data dir (inside the `storage` mount), `podman.socket` |
+| `beszel_agent` | Beszel monitoring agent — native systemd service (not a container), reports to `beszel_hub` on cloud-wahlberger-dev |
 | `cloudflare_dns` | Ensures this host's A record + a CNAME per `caddy_sites` entry exist in Cloudflare |
 | `caddy` | Caddy reverse proxy, **custom-built image** (Cloudflare DNS module via xcaddy — copied from the NAS's role, not cloud-wahlberger-dev's); auto HTTPS via **DNS-01** (this Pi has no public inbound port, same reasoning as the NAS); creates the shared `caddy.network` |
 | `semaphore` | Semaphore UI (self-hosted Ansible runner), SQLite backend, Pocket ID OIDC login with a kept-deliberately local admin fallback |
-| `restic_server` | restic REST server — the backup target nas-de-int-wahlberger-dev's `restic_backup` pushes to nightly. LAN/ZeroTier-only, never proxied through Caddy |
+| `restic_server` | restic REST server — the backup target nas-de-int-wahlberger-dev's and cloud-wahlberger-dev's `restic_backup` roles both push to nightly, one `restic_server_clients` entry each. LAN/ZeroTier-only, never proxied through Caddy |
 | `container` | Generic helper: renders one `.container` Quadlet template and restarts on change. Included by service roles, not listed in `site.yml`. |
 
 ## Why this host exists (the CI/CD reachability problem)
@@ -83,10 +84,11 @@ playbook deploys it (see `roles/semaphore/README.md`).
   itself, since the user explicitly wants it auto-mounted on boot.
 - Secrets: encrypted `inventories/production/group_vars/all/vault.yml`,
   exposed via `{{ vault_* }}` indirection in `vars.yml`. Never commit
-  plaintext secrets. Five secrets exist here: the Cloudflare DNS token,
+  plaintext secrets. Six secrets exist here: the Cloudflare DNS token,
   Semaphore's admin password, its access-key encryption key (MUST stay
   stable — rotating it orphans previously stored SSH keys/vault passwords in
-  Semaphore's own database), its cookie keys, and its OIDC client secret.
+  Semaphore's own database), its cookie keys, its OIDC client secret, and one
+  restic REST-server htpasswd password per backup client (`restic_server_clients`).
 - `ssh_authorized_keys_list` entries are NOT secrets (public keys) — they're a
   plain `vars.yml` value, duplicated identically across all three playbooks.
 

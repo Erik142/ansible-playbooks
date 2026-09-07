@@ -1,0 +1,26 @@
+[Unit]
+Description=Nightly restic backup to pi-de-int-wahlberger-dev
+After=network-online.target
+Wants=network-online.target
+# Emails ewahlberger@gmail.com via Resend on failure — the "immediate"
+# notify_failure variant, not the default deduped one: this is a Type=oneshot
+# job with no Restart=, running once nightly, so there's no repeating flap
+# to deduplicate and the default 5-in-a-row/10-minute window would
+# realistically never be reached at all (failures would be a day apart).
+OnFailure=notify-failure-immediate@%n.service
+
+[Service]
+Type=oneshot
+# systemd services get a minimal environment with no $HOME/$XDG_CACHE_HOME
+# by default — restic needs one of those to locate its local metadata cache
+# ("unable to locate cache directory" otherwise). This service runs as
+# root (no User= set), so root's real home directory is correct here.
+Environment=HOME=/root
+EnvironmentFile={{ restic_backup_staging_dir }}/restic-backup.env
+{% if restic_backup_notify_on_success %}
+# Resend credentials for the success email — the notify_failure role's own
+# env file, reused rather than duplicating the secret into a second Vault
+# entry. Requires notify_failure to have already run (see site.yml).
+EnvironmentFile=/etc/notify-failure/notify-failure.env
+{% endif %}
+ExecStart=/usr/local/bin/restic-backup.sh

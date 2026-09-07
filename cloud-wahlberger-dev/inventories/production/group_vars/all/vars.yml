@@ -51,6 +51,8 @@ caddy_sites:
     upstream: "pocket-id:1411"
   - host: rss.wahlberger.dev
     upstream: "freshrss:80"
+  - host: beszel.wahlberger.dev
+    upstream: "beszel-hub:8090"
   # No upstream: the whole site body is custom (Pocket ID auth gate via
   # oauth2-proxy, not a plain reverse_proxy) — see roles/uptime_kuma/README.md.
   - host: status.wahlberger.dev
@@ -99,6 +101,21 @@ uptime_kuma_url: "https://status.wahlberger.dev"
 # Not secret (a UUID), so it lives here in plaintext. REQUIRED.
 uptime_kuma_oidc_client_id: "2b082607-f0ae-4c38-a6ca-7d3588de2e21"
 
+# --- Beszel (beszel_hub / beszel_agent roles) --------------------------------
+# Must match the caddy_sites host above and the public DNS record.
+beszel_hub_url: "https://beszel.wahlberger.dev"
+
+# Explicit here (not left as the beszel_agent role's own default) so the
+# firewall role — which runs BEFORE beszel_agent in site.yml — can
+# reference it without depending on role-loading order.
+beszel_agent_port: 45876
+
+# REQUIRED, but can't be set until beszel_hub has booted once and generated
+# its own SSH keypair — see roles/beszel_agent/README.md. Leaving this empty
+# makes the role's assert fail cleanly rather than deploying an agent that
+# will never be able to connect to anything. Same value on all three hosts.
+beszel_agent_hub_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKz/U0NWhnhm19QvVrNu6sVuXiEPVdoPCrGMC8MzTNdH"
+
 # --- Secrets (Ansible Vault) ------------------------------------------------
 # Never put secrets in plaintext. They live in an encrypted sibling file
 # `vault.yml` in this directory, each with a `vault_` prefix, surfaced here
@@ -134,3 +151,11 @@ notify_failure_resend_api_key: "{{ vault_notify_failure_resend_api_key | default
 # session cookie encryption key.
 uptime_kuma_oidc_client_secret: "{{ vault_uptime_kuma_oidc_client_secret | default('') }}"
 uptime_kuma_cookie_secret: "{{ vault_uptime_kuma_cookie_secret | default('') }}"
+
+# restic repository encryption password. Keep a copy outside Vault too (e.g.
+# 1Password) — see roles/restic_backup/README.md.
+restic_backup_repo_password: "{{ vault_restic_backup_repo_password | default('') }}"
+
+# restic REST server auth password. SHARED SECRET: must be the exact same
+# value as pi-de-int-wahlberger-dev's vault_restic_server_cloud_htpasswd_password.
+restic_backup_rest_server_password: "{{ vault_restic_backup_rest_server_password | default('') }}"

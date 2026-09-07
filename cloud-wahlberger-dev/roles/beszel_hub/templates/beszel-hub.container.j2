@@ -1,0 +1,46 @@
+[Unit]
+Description=Beszel monitoring hub
+After=network-online.target caddy-network.service
+Wants=network-online.target
+Requires=caddy-network.service
+# Emails ewahlberger@gmail.com via Resend after 5 consecutive failures —
+# see the notify_failure role.
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=beszel-hub
+Image={{ beszel_hub_image }}
+Network=caddy.network
+Volume={{ beszel_hub_data_dir }}:/beszel_data:Z
+# Lets this rootful container reach the host's own beszel_agent (also
+# running on this machine) — Podman's documented mechanism for a container
+# to reach its host, the same way Docker's host.docker.internal works. See
+# roles/beszel_agent/README.md -> "The hub reaching its own host".
+AddHost=host.containers.internal:host-gateway
+Environment=APP_URL={{ beszel_hub_url }}
+# Beszel's default OAuth login opens a popup and closes it itself once
+# login completes. On some browsers (Safari on macOS notably) that popup
+# doesn't open as a real separate window and ends up being the only tab —
+# so "closing the popup" closes the whole browser tab. This switches OAuth
+# to a plain full-page redirect instead, avoiding the popup entirely. See
+# https://github.com/pocketbase/pocketbase/discussions/2429#discussioncomment-5943061
+Environment=OAUTH_DISABLE_POPUP={{ beszel_hub_oauth_disable_popup | ternary('true', 'false') }}
+# Without this, the "users" collection's create rule is superusers-only via
+# the API — which blocks not just brand-new OAuth signups but also the
+# very first OAuth login to an ALREADY-EXISTING account (Beszel has to
+# create a linking record the first time), producing "Only superusers can
+# perform this action" on /api/collections/users/auth-with-oauth2. This
+# scopes the create rule to @request.context = 'oauth2' instead of opening
+# it up generally. See roles/beszel_hub/README.md.
+Environment=USER_CREATION={{ beszel_hub_oauth_user_creation | ternary('true', 'false') }}
+# Only touches the "users" collection's own password login (the app at /)
+# — the separate _superusers collection backing the /_/ admin panel keeps
+# its own independent password login regardless, so this can't lock out
+# emergency access. See roles/beszel_hub/README.md.
+Environment=DISABLE_PASSWORD_AUTH={{ beszel_hub_disable_password_auth | ternary('true', 'false') }}
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

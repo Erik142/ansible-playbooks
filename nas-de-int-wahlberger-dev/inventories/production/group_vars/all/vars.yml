@@ -44,6 +44,12 @@ disk_space_paths:
   - /mnt/data
   - /mnt/containers
 
+# --- Firewall -----------------------------------------------------------------
+# Beszel's hub (cloud-wahlberger-dev) connects to this host's beszel_agent
+# over the ZeroTier-routed home LAN — must match beszel_agent_port.
+firewall_allowed_ports:
+  - "45876/tcp"
+
 # --- Reverse proxy (caddy role) ----------------------------------------------
 # DNS-01 via Cloudflare (not HTTP-01): this host has no public inbound port,
 # so certificates are issued via a Cloudflare DNS API token instead. See
@@ -103,6 +109,13 @@ mealie_oidc_user_group: ""
 immich_url: "https://photos.de.int.wahlberger.dev"
 immich_oidc_provider_name: "Pocket ID"
 immich_oidc_client_id: "90017f0a-235c-4314-9728-9e2e2dc057b5"
+
+# --- Beszel agent ---------------------------------------------------------------
+# REQUIRED, but can't be set until roles/beszel_hub has booted once and
+# generated its own SSH keypair — see roles/beszel_agent/README.md. Leaving
+# this empty makes the role's assert fail cleanly rather than deploying an
+# agent that will never be able to connect to anything.
+beszel_agent_hub_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKz/U0NWhnhm19QvVrNu6sVuXiEPVdoPCrGMC8MzTNdH"
 
 # --- Homepage (dashboard) ------------------------------------------------------
 # Links cloud-wahlberger-dev's and this NAS's services. rpi-karlsruhe is

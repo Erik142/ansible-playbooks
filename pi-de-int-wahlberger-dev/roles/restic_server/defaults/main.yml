@@ -12,16 +12,12 @@ restic_server_data_dir: "{{ storage_mount_path }}/restic-repos"
 
 restic_server_port: 8000
 
-# One user per backup source. --private-repos (below) confines each user to
-# a same-named subdirectory of restic_server_data_dir, so adding a second
-# backup client later (another host, or eventually a Hetzner Storage Box
-# acting as a client of its own) is just another htpasswd entry, not a
-# reconfiguration.
-restic_server_htpasswd_username: nas
-# REQUIRED: set vault_restic_server_htpasswd_password in Ansible Vault. This
-# is a shared secret with nas-de-int-wahlberger-dev's
-# vault_restic_backup_rest_server_password — both MUST hold the same value.
-restic_server_htpasswd_password: ""
+# REQUIRED, no usable default: one {username, password} entry per backup
+# client. --private-repos (below) confines each user to a same-named
+# subdirectory of restic_server_data_dir, so adding a client is just another
+# list entry, not a reconfiguration. Real values (including passwords, via
+# vault_* indirection) live in group_vars — see README.md.
+restic_server_clients: []
 
 # Confines each htpasswd user to their own subdirectory under
 # restic_server_data_dir instead of one shared namespace.

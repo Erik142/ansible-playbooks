@@ -38,6 +38,10 @@
       tags: [storage]
     - role: podman
       tags: [podman]
+    # Reports to beszel_hub on cloud-wahlberger-dev. After podman: needs its
+    # rootful API socket to already exist to grant this agent access to it.
+    - role: beszel_agent
+      tags: [beszel_agent]
     # Ensure this host's public DNS records exist before Caddy needs them.
     - role: cloudflare_dns
       tags: [cloudflare_dns]

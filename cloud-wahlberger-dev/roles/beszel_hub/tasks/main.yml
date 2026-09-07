@@ -1,0 +1,25 @@
+---
+- name: Validate beszel_hub inputs are present
+  ansible.builtin.assert:
+    that:
+      - beszel_hub_url | length > 0
+    fail_msg: >-
+      Set beszel_hub_url in group_vars (the public https:// URL the hub is
+      served on, matching a caddy_sites entry). See
+      roles/beszel_hub/README.md.
+    quiet: true
+
+- name: Create the Beszel hub data directory
+  ansible.builtin.file:
+    path: "{{ beszel_hub_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Deploy the Beszel hub container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: beszel-hub
+    container_quadlet_src: beszel-hub.container.j2

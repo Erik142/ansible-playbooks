@@ -1,0 +1,41 @@
+---
+argument_specs:
+  main:
+    short_description: Beszel monitoring agent, native systemd service, reporting to the hub over the network.
+    options:
+      beszel_agent_version:
+        type: str
+        required: false
+        description: Beszel release version to install.
+      beszel_agent_arch:
+        type: str
+        required: false
+        description: Beszel release architecture name for this host (derived from ansible_architecture).
+      beszel_agent_install_dir:
+        type: path
+        required: false
+        description: Directory the agent binary is installed into.
+      beszel_agent_bin_path:
+        type: path
+        required: false
+        description: Full path to the installed agent binary.
+      beszel_agent_user:
+        type: str
+        required: false
+        description: Dedicated unprivileged system account the agent runs as.
+      beszel_agent_group:
+        type: str
+        required: false
+        description: Primary group of beszel_agent_user.
+      beszel_agent_port:
+        type: int
+        required: false
+        description: TCP port the agent listens on for the hub to connect to.
+      beszel_agent_hub_key:
+        type: str
+        required: true
+        description: The Beszel hub's SSH public key, so this agent knows which hub to trust.
+      beszel_agent_podman_group:
+        type: str
+        required: false
+        description: Group granted access to Podman's rootful API socket.

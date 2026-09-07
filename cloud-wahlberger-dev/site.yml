@@ -35,6 +35,11 @@
       tags: [firewall]
     - role: podman
       tags: [podman]
+    # Reports to beszel_hub below (this same host, over the Podman bridge —
+    # see roles/beszel_agent/README.md). After podman: needs its rootful
+    # API socket to already exist to grant this agent access to it.
+    - role: beszel_agent
+      tags: [beszel_agent]
     # Route to the home LAN (uptime_kuma needs it to reach nas/pi's private
     # IPs) — see roles/zerotier/README.md.
     - role: zerotier
@@ -50,7 +55,18 @@
     # FreshRSS (RSS aggregator), authenticating against Pocket ID via OIDC.
     - role: freshrss
       tags: [freshrss]
+    # Monitoring hub for beszel_agent on all three hosts (including this
+    # one's own, deployed above). Collects CPU/memory/disk/network/container
+    # metrics — complements uptime_kuma's external up/down checks below.
+    - role: beszel_hub
+      tags: [beszel_hub]
     # External watcher for the whole infrastructure (nas/pi going dark
     # entirely) — gated by oauth2-proxy + Pocket ID, not its own login.
     - role: uptime_kuma
       tags: [uptime_kuma]
+    # Nightly backup of /opt/podman (Pocket ID, FreshRSS, Beszel's hub) to
+    # pi-de-int-wahlberger-dev's restic_server. After every role that writes
+    # under /opt/podman, so a first backup run has something to actually
+    # capture.
+    - role: restic_backup
+      tags: [restic_backup]

@@ -46,3 +46,13 @@ vault_uptime_kuma_oidc_client_secret: "REPLACE-with-pocket-id-client-secret"
 # base64-encoded, or oauth2-proxy refuses to start.
 #     openssl rand -base64 32 | tr -- '+/' '-_'
 vault_uptime_kuma_cookie_secret: "REPLACE-32-random-bytes-base64"
+
+# restic repository encryption password. Keep a copy outside Vault too (e.g.
+# 1Password) — losing this makes every backup permanently unrecoverable.
+#     LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 40; echo
+vault_restic_backup_repo_password: "REPLACE-with-a-40-char-alnum-password"
+
+# restic REST server auth password. SHARED SECRET: must be the exact same
+# value as pi-de-int-wahlberger-dev's vault_restic_server_cloud_htpasswd_password.
+#     LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo
+vault_restic_backup_rest_server_password: "REPLACE-with-a-32-char-alnum-password"

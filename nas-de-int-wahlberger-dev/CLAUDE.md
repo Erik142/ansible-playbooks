@@ -43,10 +43,11 @@ contrast (Debian, `apt`, `ufw`, `geerlingguy.security`, hyphenated role names).
 | `disk_space` | Periodic disk usage check (systemd timer), emailing via `notify_failure` on a new threshold crossing. |
 | `security` | SSH hardening, fail2ban, weekly `zypper patch` timer, automatic reboot via rebootmgr when needed (hand-rolled; no openSUSE geerlingguy.security) |
 | `reboot_notify` | Emails a heads-up (reusing `notify_failure`'s Resend credentials; its own notification class, not a failure alert) right before a rebootmgr-triggered reboot. |
-| `firewall` | firewalld, default-deny inbound, allows ssh/samba/http/https |
+| `firewall` | firewalld, default-deny inbound, allows ssh/samba/http/https + the beszel_agent port |
 | `storage` | Mounts the two existing btrfs subvolumes (`/mnt/containers`, `/mnt/data`) by UUID, persisted in `/etc/fstab`. Does NOT format/create them |
 | `snapper` | Btrfs snapshot configs for those same two subvolumes (hourly/daily/weekly/monthly/yearly retention), timeline + cleanup timers |
 | `podman` | Podman + Quadlet support, `/mnt/containers` data dir (a separately mounted disk), `podman.socket` |
+| `beszel_agent` | Beszel monitoring agent — native systemd service (not a container), reports to `beszel_hub` on cloud-wahlberger-dev |
 | `cloudflare_dns` | Ensures this host's A record + a CNAME per `caddy_sites` entry exist in Cloudflare |
 | `caddy` | Caddy reverse proxy, **custom-built image** (Cloudflare DNS module baked in via xcaddy, see `roles/caddy/files/Containerfile`); auto HTTPS via **DNS-01** (this host has no public inbound port for HTTP-01); creates the shared `caddy.network` |
 | `samba` | **Native** Samba (`smbd`/`nmbd`), guest-only share at `/mnt/data/samba` (the `samba/` subdirectory of the `/mnt/data` mount) — deliberately NOT a Podman container, unlike rpi-karlsruhe's `dockurr/samba` image |

@@ -1,10 +1,11 @@
 # restic_server
 
 [restic](https://restic.net/)'s own REST server — a backup target
-`nas-de-int-wahlberger-dev` pushes nightly backups to, running as a Podman
-Quadlet. This is meant to become the *permanent* home for the NAS's backups
-(not just a stopgap), until a Hetzner Storage Box is added as a second
-target.
+`nas-de-int-wahlberger-dev` and `cloud-wahlberger-dev` both push nightly
+backups to, running as a Podman Quadlet. This is meant to become the
+*permanent* home for both hosts' backups (not just a stopgap), until a
+Hetzner Storage Box (and/or the TrueNAS instance in Borås) is added as a
+further target.
 
 ## Why rest-server over SFTP
 
@@ -30,25 +31,41 @@ this server is ever exposed beyond the LAN.
 
 ## Role variables
 
-See `defaults/main.yml`. `restic_server_htpasswd_password` is required and
-is a **shared secret**: `vault_restic_server_htpasswd_password` here must
-hold the exact same value as
-`nas-de-int-wahlberger-dev`'s `vault_restic_backup_rest_server_password`.
-Generate it once, put it in both playbooks' Vaults.
+See `defaults/main.yml`. `restic_server_clients` is required — a list of
+`{username, password}` entries, one per backup client:
 
-## Adding a second backup client later
+```yaml
+restic_server_clients:
+  - username: nas
+    password: "{{ vault_restic_server_htpasswd_password | default('') }}"
+  - username: cloud
+    password: "{{ vault_restic_server_cloud_htpasswd_password | default('') }}"
+```
+
+Each password is a **shared secret** with the matching client playbook's own
+`vault_restic_backup_rest_server_password` — `nas-de-int-wahlberger-dev`'s
+must equal `vault_restic_server_htpasswd_password` here, and
+`cloud-wahlberger-dev`'s must equal `vault_restic_server_cloud_htpasswd_password`
+here. Generate each once, put it in both playbooks' Vaults. Deliberately a
+*different* Vault key per client (not one shared `restic_server_htpasswd_password`
+reused for everyone) — a single client's password can be rotated without
+touching any other client's.
+
+## Adding another backup client later
 
 With `--private-repos` enabled, each htpasswd user's repository is confined
 to `{{ restic_server_data_dir }}/<username>/`. Adding a client (another
 host, or a future Hetzner Storage Box relay) is just another
-`community.general.htpasswd` entry — no other reconfiguration.
+`restic_server_clients` list entry plus its own Vault secret — no other
+reconfiguration.
 
 ## Not yet done: `--append-only`
 
-rest-server supports `--append-only`, which would stop a compromised NAS
-from being able to delete or tamper with existing backups via the REST API
-— real defense in depth, since the NAS holds a guest-accessible Samba
-share. It's not enabled here because it also blocks `restic forget --prune`
-over the same API, which the NAS's nightly job relies on for retention;
-using it well needs a separate, more careful prune workflow. Worth adding
-once this setup is proven out.
+rest-server supports `--append-only`, which would stop a compromised backup
+client (the NAS, which holds a guest-accessible Samba share, or the cloud
+VPS, the one host in this repo directly reachable from the internet) from
+being able to delete or tamper with existing backups via the REST API —
+real defense in depth. It's not enabled here because it also blocks `restic
+forget --prune` over the same API, which both hosts' nightly jobs rely on
+for retention; using it well needs a separate, more careful prune workflow.
+Worth adding once this setup is proven out.

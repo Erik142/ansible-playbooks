@@ -1,0 +1,59 @@
+---
+argument_specs:
+  main:
+    short_description: Nightly restic backup to pi-de-int-wahlberger-dev.
+    options:
+      restic_backup_paths:
+        type: list
+        elements: str
+        required: false
+        description: Host paths to back up.
+      restic_backup_exclude:
+        type: list
+        elements: str
+        required: false
+        description: Paths to exclude from the backup.
+      restic_backup_staging_dir:
+        type: path
+        required: false
+        description: Directory the rendered restic environment file lives in.
+      restic_backup_repo_password:
+        type: str
+        required: true
+        description: restic repository encryption password.
+      restic_backup_rest_server_host:
+        type: str
+        required: false
+        description: Hostname of the restic REST server backup target.
+      restic_backup_rest_server_port:
+        type: int
+        required: false
+        description: Port of the restic REST server backup target.
+      restic_backup_rest_server_username:
+        type: str
+        required: false
+        description: Username to authenticate to the REST server as.
+      restic_backup_rest_server_password:
+        type: str
+        required: true
+        description: Password to authenticate to the REST server with.
+      restic_backup_keep_daily:
+        type: int
+        required: false
+        description: Number of daily snapshots to retain.
+      restic_backup_keep_weekly:
+        type: int
+        required: false
+        description: Number of weekly snapshots to retain.
+      restic_backup_keep_monthly:
+        type: int
+        required: false
+        description: Number of monthly snapshots to retain.
+      restic_backup_on_calendar:
+        type: str
+        required: false
+        description: systemd OnCalendar expression for the backup timer.
+      restic_backup_notify_on_success:
+        type: bool
+        required: false
+        description: Email a backup summary via Resend on every successful run, not just failures.

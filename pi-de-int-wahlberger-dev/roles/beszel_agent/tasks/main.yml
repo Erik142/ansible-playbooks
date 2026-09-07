@@ -1,0 +1,153 @@
+---
+- name: Validate beszel_agent inputs are present
+  ansible.builtin.assert:
+    that:
+      - beszel_agent_hub_key | length > 0
+    fail_msg: >-
+      beszel_agent_hub_key is empty. Deploy roles/beszel_hub first, copy its
+      generated SSH public key from the hub's web UI, set
+      beszel_agent_hub_key in group_vars, and re-run. See
+      roles/beszel_agent/README.md.
+    quiet: true
+
+- name: Create the beszel system group
+  ansible.builtin.group:
+    name: "{{ beszel_agent_group }}"
+    system: true
+
+# No login shell, no home directory: this account only ever runs the agent
+# binary under systemd, matching Beszel's own installer.
+- name: Create the beszel system user
+  ansible.builtin.user:
+    name: "{{ beszel_agent_user }}"
+    group: "{{ beszel_agent_group }}"
+    system: true
+    create_home: false
+    shell: /usr/sbin/nologin
+
+# Podman's rootful API socket is group-owned by "root" by default (see
+# roles/podman/README.md) — much too broad to add this unprivileged agent
+# to. Give it its own narrowly-scoped group instead.
+- name: Create the podman socket access group
+  ansible.builtin.group:
+    name: "{{ beszel_agent_podman_group }}"
+    system: true
+
+- name: Add the beszel user to the podman socket access group
+  ansible.builtin.user:
+    name: "{{ beszel_agent_user }}"
+    groups: "{{ beszel_agent_podman_group }}"
+    append: true
+
+- name: Create a systemd drop-in directory for podman.socket
+  ansible.builtin.file:
+    path: /etc/systemd/system/podman.socket.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Override podman.socket's group so beszel_agent_podman_group can use it
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/podman.socket.d/beszel-agent.conf
+    content: |
+      [Socket]
+      SocketGroup={{ beszel_agent_podman_group }}
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart podman.socket
+
+# Flushed immediately (not at end-of-play) so the socket's new group is
+# actually in place before the agent first starts further down.
+- name: Apply the podman.socket override now
+  ansible.builtin.meta: flush_handlers
+
+# The socket FILE's own group (set above) isn't enough on its own: reaching
+# it at all requires *search* permission on every directory component of
+# its path, same underlying rule as the samba role's SELinux search-access
+# note. podman.socket creates this directory itself on activation, and its
+# default mode is apparently not guaranteed the same across hosts/versions
+# — confirmed 0700 root:root on nas-de-int-wahlberger-dev/cloud-wahlberger-dev
+# (blocking beszel_agent_user entirely) versus 0755 here. Applied
+# unconditionally anyway rather than relying on this host's current mode
+# staying that way across a future Podman package upgrade.
+- name: Make the Podman socket directory traversable by the podman group
+  ansible.builtin.file:
+    path: /run/podman
+    state: directory
+    owner: root
+    group: "{{ beszel_agent_podman_group }}"
+    mode: "0755"
+  notify: Restart beszel-agent
+
+# /run is tmpfs — recreated from scratch on every boot, at which point
+# podman.socket (not this role) creates /run/podman again with whatever
+# mode it defaults to, undoing the fix above. A tmpfiles.d rule reapplies
+# it automatically every boot, ordered by systemd to run before regular
+# services (including podman.socket) start.
+- name: Persist the Podman socket directory permissions across reboots
+  ansible.builtin.copy:
+    dest: /etc/tmpfiles.d/beszel-agent-podman.conf
+    content: "z /run/podman 0755 root {{ beszel_agent_podman_group }} -\n"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Fetch the Beszel release checksums
+  ansible.builtin.uri:
+    url: "https://github.com/henrygd/beszel/releases/download/v{{ beszel_agent_version }}/beszel_{{ beszel_agent_version }}_checksums.txt"
+    return_content: true
+  register: beszel_agent_checksums
+
+- name: Determine this host's expected checksum
+  ansible.builtin.set_fact:
+    beszel_agent_checksum: >-
+      {{ (beszel_agent_checksums.content.splitlines()
+          | select('search', 'beszel-agent_linux_' ~ beszel_agent_arch ~ '\.tar\.gz$')
+          | first).split()[0] }}
+
+- name: Download and verify the Beszel agent archive
+  ansible.builtin.get_url:
+    url: "https://github.com/henrygd/beszel/releases/download/v{{ beszel_agent_version }}/beszel-agent_linux_{{ beszel_agent_arch }}.tar.gz"
+    dest: "/tmp/beszel-agent_{{ beszel_agent_version }}_{{ beszel_agent_arch }}.tar.gz"
+    checksum: "sha256:{{ beszel_agent_checksum }}"
+    mode: "0644"
+
+- name: Create the Beszel agent install directory
+  ansible.builtin.file:
+    path: "{{ beszel_agent_install_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Extract the Beszel agent binary
+  ansible.builtin.unarchive:
+    src: "/tmp/beszel-agent_{{ beszel_agent_version }}_{{ beszel_agent_arch }}.tar.gz"
+    dest: "{{ beszel_agent_install_dir }}"
+    remote_src: true
+    creates: "{{ beszel_agent_bin_path }}"
+
+- name: Ensure the Beszel agent binary is executable
+  ansible.builtin.file:
+    path: "{{ beszel_agent_bin_path }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy the Beszel agent systemd unit
+  ansible.builtin.template:
+    src: beszel-agent.service.j2
+    dest: /etc/systemd/system/beszel-agent.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart beszel-agent
+
+- name: Enable and start the Beszel agent
+  ansible.builtin.systemd:
+    name: beszel-agent.service
+    enabled: true
+    state: started
+    daemon_reload: true

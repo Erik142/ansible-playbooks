@@ -15,14 +15,11 @@ argument_specs:
         type: int
         required: false
         description: Host port the REST server listens on.
-      restic_server_htpasswd_username:
-        type: str
-        required: false
-        description: Username backup clients authenticate as.
-      restic_server_htpasswd_password:
-        type: str
+      restic_server_clients:
+        type: list
+        elements: dict
         required: true
-        description: Password backup clients authenticate with.
+        description: One {username, password} entry per backup client.
       restic_server_private_repos:
         type: bool
         required: false

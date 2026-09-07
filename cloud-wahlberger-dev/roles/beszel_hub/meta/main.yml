@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: beszel_hub
+  author: Erik Wahlberger
+  description: Beszel monitoring hub, running as a Podman Quadlet behind Caddy, collecting metrics from beszel_agent on every host.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - trixie
+  galaxy_tags:
+    - beszel
+    - monitoring
+    - debian
+
+dependencies: []

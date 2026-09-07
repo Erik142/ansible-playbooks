@@ -1,0 +1,35 @@
+---
+# Default variables for the `beszel_agent` role.
+
+# Server and machine-learning-style version pinning doesn't apply here (this
+# is a single static binary) — just pin the one version.
+beszel_agent_version: "0.19.0"
+
+# Beszel's release assets use Go's arch names, not uname's — map the one
+# fact to the other so this role needs no per-host override.
+beszel_agent_arch_map:
+  x86_64: amd64
+  aarch64: arm64
+beszel_agent_arch: "{{ beszel_agent_arch_map[ansible_architecture] }}"
+
+beszel_agent_install_dir: /opt/beszel-agent
+beszel_agent_bin_path: "{{ beszel_agent_install_dir }}/beszel-agent"
+
+# Dedicated, unprivileged system account (matches Beszel's own installer).
+beszel_agent_user: beszel
+beszel_agent_group: beszel
+
+# The hub (cloud-wahlberger-dev) connects OUT to this agent, over the
+# ZeroTier-routed home LAN — see roles/beszel_hub/README.md for why the hub
+# initiates the connection rather than this agent dialing out.
+beszel_agent_port: 45876
+
+# REQUIRED: the Beszel hub's SSH public key, so this agent knows which hub
+# to accept connections from. Only obtainable AFTER the hub's first boot
+# (it generates its own keypair) — see roles/beszel_agent/README.md.
+beszel_agent_hub_key: ""
+
+# Group granted read/write access to Podman's rootful API socket, so this
+# unprivileged agent can report container stats without running as root or
+# joining the (much broader) root group. See README.md.
+beszel_agent_podman_group: podman

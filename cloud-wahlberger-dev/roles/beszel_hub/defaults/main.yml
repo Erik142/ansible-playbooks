@@ -1,0 +1,26 @@
+---
+# Default variables for the `beszel_hub` role.
+
+beszel_hub_image: "docker.io/henrygd/beszel:0.19.0"
+
+beszel_hub_data_dir: /opt/podman/beszel-hub
+
+# REQUIRED: public https:// URL the hub is served on (set in group_vars).
+# Must match the caddy_sites host entry. Sets PocketBase's Meta.AppUrl
+# (APP_URL env var), used to build absolute links (e.g. in emails).
+beszel_hub_url: ""
+
+# Use a full-page redirect for OAuth login instead of Beszel's default
+# popup — see the OAUTH_DISABLE_POPUP comment in beszel-hub.container.j2
+# for why the popup is unreliable on some browsers.
+beszel_hub_oauth_disable_popup: true
+
+# Required for OAuth login to work at all (both a brand-new account and the
+# very first OAuth login to an already-existing one) — see the
+# USER_CREATION comment in beszel-hub.container.j2.
+beszel_hub_oauth_user_creation: true
+
+# Pocket ID becomes the only way into the "users" collection app login (the
+# separate _superusers /_/ admin panel is unaffected either way — see the
+# DISABLE_PASSWORD_AUTH comment in beszel-hub.container.j2).
+beszel_hub_disable_password_auth: true

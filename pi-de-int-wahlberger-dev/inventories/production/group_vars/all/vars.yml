@@ -52,6 +52,15 @@ disk_space_paths:
 # or `lsblk -f` on the Pi. This role does not format the device.
 storage_fstype: "ext4"
 
+# --- Firewall -----------------------------------------------------------------
+# Beszel's hub (cloud-wahlberger-dev) connects to this host's beszel_agent
+# over the ZeroTier-routed home LAN — must match beszel_agent_port.
+firewall_allowed_tcp_ports:
+  - 22
+  - 80
+  - 443
+  - 45876
+
 # --- Reverse proxy (caddy role) ----------------------------------------------
 # DNS-01 via Cloudflare (not HTTP-01): this host has no public inbound port
 # (a Pi at home, same as the NAS), so certificates are issued via a
@@ -73,6 +82,13 @@ semaphore_url: "https://semaphore.de.int.wahlberger.dev"
 # "{{ semaphore_url }}/api/auth/oidc/pocketid/redirect/"). Not secret (a
 # UUID), so it lives here in plaintext.
 semaphore_oidc_client_id: "63093482-d2cc-4c77-89df-9f6ff78b160e"
+
+# --- Beszel agent ---------------------------------------------------------------
+# REQUIRED, but can't be set until roles/beszel_hub has booted once and
+# generated its own SSH keypair — see roles/beszel_agent/README.md. Leaving
+# this empty makes the role's assert fail cleanly rather than deploying an
+# agent that will never be able to connect to anything.
+beszel_agent_hub_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKz/U0NWhnhm19QvVrNu6sVuXiEPVdoPCrGMC8MzTNdH"
 
 # --- Secrets (Ansible Vault) ---------------------------------------------------
 # Never put secrets in plaintext. They live in an encrypted sibling file
@@ -113,9 +129,14 @@ semaphore_cookie_encryption: "{{ vault_semaphore_cookie_encryption | default('')
 # OIDC client secret from Pocket ID (pairs with semaphore_oidc_client_id above).
 semaphore_oidc_client_secret: "{{ vault_semaphore_oidc_client_secret | default('') }}"
 
-# Shared with nas-de-int-wahlberger-dev's vault_restic_backup_rest_server_password
-# — both MUST hold the same value. See roles/restic_server/README.md.
-restic_server_htpasswd_password: "{{ vault_restic_server_htpasswd_password | default('') }}"
+# One entry per backup client. Each password is a shared secret with that
+# client's own vault_restic_backup_rest_server_password — see
+# roles/restic_server/README.md.
+restic_server_clients:
+  - username: nas
+    password: "{{ vault_restic_server_htpasswd_password | default('') }}"
+  - username: cloud
+    password: "{{ vault_restic_server_cloud_htpasswd_password | default('') }}"
 
 # Resend API key for failure notification emails (notify_failure role). Same
 # account/key as cloud-wahlberger-dev and nas-de-int-wahlberger-dev.

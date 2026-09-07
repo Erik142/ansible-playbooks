@@ -31,10 +31,12 @@ vault_semaphore_cookie_encryption: "REPLACE-32-random-bytes-base64"
 # app (the client_id lives in vars.yml).
 vault_semaphore_oidc_client_secret: "REPLACE-with-pocket-id-client-secret"
 
-# restic REST server auth password. SHARED SECRET: must be the exact same
-# value as nas-de-int-wahlberger-dev's vault_restic_backup_rest_server_password.
+# restic REST server auth passwords, one per backup client. Each is a
+# SHARED SECRET: must be the exact same value as that client playbook's own
+# vault_restic_backup_rest_server_password.
 #     LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo
 vault_restic_server_htpasswd_password: "REPLACE-with-a-32-char-alnum-password"
+vault_restic_server_cloud_htpasswd_password: "REPLACE-with-a-32-char-alnum-password"
 
 # Resend API key for failure notification emails. Same key as
 # cloud-wahlberger-dev and nas-de-int-wahlberger-dev — one Resend account.
