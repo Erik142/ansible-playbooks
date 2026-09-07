@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: immich
+  author: Erik Wahlberger
+  description: Immich photo/video backup (PostgreSQL + Valkey + machine learning + app), running as Podman Quadlets behind Caddy with Pocket ID OIDC login.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - immich
+    - podman
+
+dependencies: []

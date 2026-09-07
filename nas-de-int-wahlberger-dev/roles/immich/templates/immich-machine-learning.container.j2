@@ -1,0 +1,27 @@
+[Unit]
+Description=Immich machine learning (face/object detection, CLIP smart search)
+After=network-online.target
+Wants=network-online.target
+# Emails ewahlberger@gmail.com via Resend after 5 consecutive failures —
+# see the notify_failure role.
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=immich-machine-learning
+Image={{ immich_ml_image }}
+Network=immich
+Volume={{ immich_data_dir }}/model-cache:/cache:Z
+Environment=TZ={{ immich_timezone }}
+{% if immich_hwaccel_enabled %}
+# OpenVINO inference on the host's Intel iGPU — needs the "-openvino" image
+# tag (see immich_ml_image) plus the render device. Immich's own
+# hwaccel.ml.yml recipe also adds a USB passthrough + cgroup rule for
+# Coral/NPU accelerators; not needed for an iGPU-only host like this one.
+AddDevice=/dev/dri:/dev/dri
+{% endif %}
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

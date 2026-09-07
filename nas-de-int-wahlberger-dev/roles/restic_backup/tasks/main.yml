@@ -25,10 +25,18 @@
     group: root
     mode: "0700"
 
-- name: Render the Postgres auth file for pg_dump
+- name: Render the Paperless-ngx Postgres auth file for pg_dump
   ansible.builtin.template:
     src: pgpass.env.j2
     dest: "{{ restic_backup_staging_dir }}/pgpass.env"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Render the Immich Postgres auth file for pg_dump
+  ansible.builtin.template:
+    src: immich-pgpass.env.j2
+    dest: "{{ restic_backup_staging_dir }}/immich-pgpass.env"
     owner: root
     group: root
     mode: "0600"

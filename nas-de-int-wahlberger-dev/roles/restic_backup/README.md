@@ -20,13 +20,16 @@ service runs as root (no `User=` set), so `HOME=/root` is correct here.
 ## What's backed up, and what isn't
 
 `restic_backup_paths` covers the whole Samba share (`samba_mount_path`) and
-`/mnt/containers` (every service's data) — but the raw Paperless-ngx
-Postgres data directory is excluded (`restic_backup_exclude`). A live
-filesystem copy of a Postgres data directory mid-write isn't guaranteed
-restorable. Instead, the backup script runs `pg_dump` into
-`restic_backup_staging_dir` first, and that consistent dump file is what
-actually gets backed up. Mealie needs no equivalent treatment — it uses an
-embedded SQLite database, not a separate Postgres container.
+`/mnt/containers` (every service's data) — but the raw Paperless-ngx and
+Immich Postgres data directories are both excluded (`restic_backup_exclude`).
+A live filesystem copy of a Postgres data directory mid-write isn't
+guaranteed restorable. Instead, the backup script runs `pg_dump` for each
+into `restic_backup_staging_dir` first, and those consistent dump files
+(`paperless.sql`, `immich.sql`) are what actually get backed up — each
+authenticated via its own `*-pgpass.env` file (different DB passwords), both
+excluded from the backup themselves the same way `restic-backup.env` is.
+Mealie needs no equivalent treatment — it uses an embedded SQLite database,
+not a separate Postgres container.
 
 `.snapshots` (Snapper's own Btrfs snapshot history, wherever it appears
 under a backed-up path) is also excluded. Backing it up would mean restic

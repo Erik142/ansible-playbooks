@@ -1,0 +1,85 @@
+---
+# Default variables for the `immich` role.
+
+# Server and machine-learning images MUST use matching versions — a mismatch
+# between them is a common (and confusing) Immich misconfiguration.
+immich_version: v3.1.0
+immich_server_image: "ghcr.io/immich-app/immich-server:{{ immich_version }}"
+# The "-openvino" tag variant is required for GPU-accelerated ML inference;
+# see immich_hwaccel_enabled.
+immich_ml_image: "ghcr.io/immich-app/immich-machine-learning:{{ immich_version }}{{ '-openvino' if immich_hwaccel_enabled else '' }}"
+# NOT a vanilla postgres image: this must be Immich's own build with the
+# vectorchord extension baked in. Pin alongside immich_version and re-check
+# Immich's docker/docker-compose.yml when bumping either — they aren't
+# always released in lockstep.
+immich_db_image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+immich_redis_image: docker.io/valkey/valkey:9
+
+immich_data_dir: /mnt/containers/immich
+immich_db_data_dir: "{{ immich_data_dir }}/postgres"
+immich_ml_cache_dir: "{{ immich_data_dir }}/model-cache"
+
+# Immich's ENTIRE UPLOAD_LOCATION (its own "library", "thumbs",
+# "encoded-video", "profile", "upload" and "backups" subfolders — see
+# https://github.com/immich-app/immich/blob/main/server/src/enum.ts's
+# StorageFolder enum). Deliberately on the bulk HDD (/mnt/data), but
+# deliberately NOT inside a Samba share directly: most of these subfolders
+# are Immich-internal caches, not something you'd want to see browsing a
+# share. Root-only (0750) — nothing outside Immich needs to touch this.
+immich_library_root: /mnt/data/immich-library
+
+# "Bilder" ("pictures"): a subdirectory of the existing Delat share
+# (samba_share_path comes from the samba role's defaults, which must have
+# already run), and everything under it (library/, import/) belongs to
+# Immich — rather than a separate share of its own.
+immich_photos_dir: "{{ samba_share_path }}/Bilder/immich"
+
+# Only the "library" subfolder — the actual per-user original photo/video
+# files Immich manages (see README.md's "How Immich organizes files") — gets
+# bind-mounted into immich_photos_dir so it's browsable there too.
+# storageTemplate in immich-config.json.j2 organizes files under here into
+# human-browsable {{ y }}/{{ y }}-{{ MM }}-{{ dd }}/ folders per user instead
+# of Immich's opaque internal default.
+immich_library_export_dir: "{{ immich_photos_dir }}/library"
+
+# One subfolder of immich_photos_dir per user, for photos dropped in
+# directly (old archives, scans, …) rather than ones Immich itself
+# uploaded/organized — each registered as its own read-only Immich
+# "External Library" (a one-time manual step per user, see README.md). Each
+# name here is just a folder name (not tied to Pocket ID directly) — kept
+# matching the person's actual Immich storage label (Administration ->
+# Users, see "How Immich organizes files" below) purely so both folders
+# under immich_photos_dir agree on the same name for the same person. Add a
+# name here, re-run the playbook, then do that one manual step, to onboard
+# another family member.
+immich_import_users:
+  - erikwahlberger
+
+immich_timezone: Europe/Berlin
+
+# Hardware acceleration on this host's Intel iGPU (confirmed present via
+# `/dev/dri` and `ansible_devices` on nas.de.int.wahlberger.dev, Sept 2026):
+# QuickSync video transcoding (immich-server) + OpenVINO ML inference
+# (immich-machine-learning). Set to false if this host's hardware changes.
+immich_hwaccel_enabled: true
+
+# REQUIRED: public https:// URL Immich is served on (set in group_vars).
+# Must match the caddy_sites host entry and the OAuth redirect URI
+# registered in Pocket ID.
+immich_url: ""
+
+# Label shown on the Immich login button.
+immich_oidc_provider_name: "Pocket ID"
+# OAuth2 client ID issued by Pocket ID when you register the Immich app.
+# Not secret (a UUID), so it lives in group_vars in plaintext. REQUIRED.
+immich_oidc_client_id: ""
+# Auto-provision an Immich account on first OIDC login. Fine for a personal/
+# family instance; set false to require accounts to already exist and only
+# let OIDC log them in.
+immich_oidc_auto_register: true
+# Skip Immich's own login page and go straight to Pocket ID.
+immich_oidc_redirect_login: true
+# Disable the username/password login form entirely — Pocket ID becomes the
+# only way in. There is no local admin fallback while this is true; set it
+# back to false and re-run (or edit the database directly) to recover.
+immich_disable_local_login: true

@@ -1,0 +1,33 @@
+{# Rendered by the immich role to {{ immich_data_dir }}/immich.json (0600) #}
+{# and mounted read-only into immich-server at /etc/immich/config.json #}
+{# (IMMICH_CONFIG_FILE). Holds the Pocket ID OAuth client secret, so it must #}
+{# stay root-only. Only the settings below are overridden — every other #}
+{# Immich setting keeps its built-in default (Administration > Settings #}
+{# shows overridden fields as read-only in the web UI). Do NOT edit on the #}
+{# host — re-run Ansible. #}
+{
+  "oauth": {
+    "enabled": true,
+    "issuerUrl": "{{ pocket_id_app_url }}/.well-known/openid-configuration",
+    "clientId": "{{ immich_oidc_client_id }}",
+    "clientSecret": "{{ immich_oidc_client_secret }}",
+    "buttonText": "{{ immich_oidc_provider_name }}",
+    "autoRegister": {{ immich_oidc_auto_register | ternary('true', 'false') }},
+    "autoLaunch": {{ immich_oidc_redirect_login | ternary('true', 'false') }},
+    "storageLabelClaim": "preferred_username"
+  },
+  "passwordLogin": {
+    "enabled": {{ immich_disable_local_login | ternary('false', 'true') }}
+  },
+  "ffmpeg": {
+    "accel": "{{ 'qsv' if immich_hwaccel_enabled else 'disabled' }}"
+  },
+  "storageTemplate": {
+    "enabled": true
+  },
+  "library": {
+    "watch": {
+      "enabled": true
+    }
+  }
+}

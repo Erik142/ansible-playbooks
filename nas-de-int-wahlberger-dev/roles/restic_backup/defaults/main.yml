@@ -2,15 +2,22 @@
 # Default variables for the `restic_backup` role.
 
 # What actually gets backed up: the Samba share, and every container's data
-# — not the raw Paperless-ngx Postgres data directory (excluded below),
-# which is replaced by a consistent pg_dump instead. Cross-role variables:
-# samba and paperless_ngx must already have run (see site.yml).
+# — not the raw Postgres data directories (excluded below), each replaced by
+# a consistent pg_dump instead. Cross-role variables: samba, paperless_ngx
+# and immich must already have run (see site.yml).
 restic_backup_paths:
   - "{{ samba_mount_path }}"
   - /mnt/containers
 
 restic_backup_exclude:
   - "{{ paperless_ngx_db_data_dir_root }}"
+  - "{{ immich_db_data_dir }}"
+  # immich_library_export_dir is a BIND MOUNT of immich_library_root/library
+  # (see roles/immich/README.md) — same underlying files, reachable at two
+  # paths. Both are under samba_mount_path above, so without this exclude
+  # restic would walk (checksum, though not double-store — it dedupes by
+  # content) every file in the library twice, once via each path.
+  - "{{ immich_library_export_dir }}"
   # Snapper's own Btrfs snapshot history (".snapshots/<N>/snapshot/...",
   # wherever it appears — bare patterns match at any depth, see README.md).
   # Backing this up is both redundant with restic's own snapshotting and a
@@ -31,6 +38,13 @@ restic_backup_staging_dir: /var/lib/restic-backup
 restic_backup_paperless_db_container: paperless-db
 restic_backup_paperless_db_name: paperless
 restic_backup_paperless_db_user: paperless
+
+# Immich's Postgres container/database — same reasoning as Paperless-ngx's
+# above, matching roles/immich/templates/immich-postgres.container.j2's own
+# hardcoded POSTGRES_DB/POSTGRES_USER.
+restic_backup_immich_db_container: immich-postgres
+restic_backup_immich_db_name: immich
+restic_backup_immich_db_user: immich
 
 # REQUIRED: repository encryption password. Set
 # vault_restic_backup_repo_password in Ansible Vault. Losing this makes

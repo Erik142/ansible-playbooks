@@ -1,0 +1,30 @@
+[Unit]
+Description=PostgreSQL + vectorchord (Immich database)
+After=network-online.target
+Wants=network-online.target
+# Emails ewahlberger@gmail.com via Resend after 5 consecutive failures —
+# see the notify_failure role.
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=immich-postgres
+Image={{ immich_db_image }}
+Network=immich
+# Unlike paperless_ngx's Postgres 18+ image, this one uses the older,
+# version-agnostic data layout: /var/lib/postgresql/data directly, no
+# version-specific subdirectory. See README.md before bumping immich_db_image
+# across a Postgres major version.
+Volume={{ immich_db_data_dir }}:/var/lib/postgresql/data:Z
+Environment=POSTGRES_DB=immich
+Environment=POSTGRES_USER=immich
+Environment=POSTGRES_INITDB_ARGS=--data-checksums
+# POSTGRES_PASSWORD rendered to a root-only 0600 file by this role from
+# Ansible Vault (must match DB_PASSWORD in immich-server.env).
+EnvironmentFile={{ immich_data_dir }}/immich-postgres.env
+ShmSize=128mb
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

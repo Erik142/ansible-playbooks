@@ -1,0 +1,170 @@
+---
+- name: Validate Immich OIDC inputs are present
+  ansible.builtin.assert:
+    that:
+      - immich_db_password | length > 0
+      - immich_oidc_client_id | length > 0
+      - immich_oidc_client_secret | length > 0
+    fail_msg: >-
+      Immich is not fully configured. Set immich_oidc_client_id in group_vars
+      and provide the Vault secrets vault_immich_db_password and
+      vault_immich_oidc_client_secret (run with --ask-vault-pass). See
+      roles/immich/README.md.
+    quiet: true
+
+# world-writable (0777): the immich-server image runs as root by default (no
+# non-root user, no UID/GID remap) so 0750 root:root would work for
+# model-cache alone — kept uniform with the Postgres dir below, which DOES
+# need it (the official-pattern postgres image drops to a non-root user with
+# no remap option). Matches paperless_ngx's reasoning for the same loop.
+- name: Create the Immich container data directories
+  ansible.builtin.file:
+    path: "{{ immich_data_dir }}/{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0777"
+  loop:
+    - postgres
+    - model-cache
+
+# Root-only (0750): nothing outside Immich itself (which runs as root — see
+# README.md) needs to touch this. Its "library" subfolder is a different
+# story — see below.
+- name: Create the Immich library root
+  ansible.builtin.file:
+    path: "{{ immich_library_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+# World-readable (0755), NOT root-only: this directory is bind-mounted into
+# the guest Samba share below. A bind mount replaces the TARGET's ownership
+# and permissions with the SOURCE's — so it's THIS directory's mode that
+# samba_guest_account (nobody) actually hits when browsing
+# immich_library_export_dir, regardless of whatever mode that target
+# directory gets before the mount is applied. 0750 here (matching
+# immich_library_root above) left guests with zero access — no read, no
+# traverse. Pre-creating it (normally done lazily by Immich on first run) so
+# the bind mount has a source to mount.
+- name: Create the Immich library root's "library" subfolder
+  ansible.builtin.file:
+    path: "{{ immich_library_root }}/library"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create the Immich library export directory inside the Samba share
+  ansible.builtin.file:
+    path: "{{ immich_library_export_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0777"
+
+# Bind-mounting (not a symlink) the real library data in here: Samba's
+# default "wide links = no" refuses to follow a symlink that leaves the
+# share's own directory tree (immich_library_root lives outside the Delat
+# share entirely), but a bind mount makes the kernel present the same files
+# as if they were natively at this path — no Samba-side traversal exception
+# needed at all.
+#
+# Read-only (bind,ro): Immich isn't told about this path (it's not a
+# registered External Library, just this same data reachable a second way),
+# so it has no idea if a Samba client changes something here — writing or
+# deleting through this path would silently desync Immich's database from
+# the actual files. Immich itself still gets full read-write, via its own
+# separate, non-read-only mount of immich_library_root as immich-server's
+# /data (see immich-server.container.j2) — :ro here only blocks Samba
+# clients. Want Samba write access here anyway? Use immich_import_users
+# instead (see README.md) — that path is a registered, rescanned External
+# Library, so external changes there are expected and handled.
+- name: Bind-mount the Immich library into the Samba share for browsing
+  ansible.posix.mount:
+    path: "{{ immich_library_export_dir }}"
+    src: "{{ immich_library_root }}/library"
+    fstype: none
+    opts: bind,ro
+    state: mounted
+
+# One subfolder per immich_import_users entry — each meant to become its own
+# read-only Immich External Library (a manual step, see README.md).
+- name: Create the Immich import directories inside the Samba share
+  ansible.builtin.file:
+    path: "{{ immich_photos_dir }}/import/{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0777"
+  loop: "{{ immich_import_users }}"
+
+- name: Create the Immich Podman network
+  containers.podman.podman_network:
+    name: immich
+
+# Rendered immediately before each container's include_role: container call,
+# not batched upfront — see roles/paperless_ngx/tasks/main.yml for why
+# (the container role's flush_handlers is global, so an early render's
+# restart handler can fire before the matching Quadlet unit exists on disk).
+- name: Deploy the Immich Redis (Valkey) container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: immich-redis
+    container_quadlet_src: immich-redis.container.j2
+
+# Secret (DB password), rendered root-only so it never appears in the
+# world-readable Quadlet unit. Must match DB_PASSWORD in immich-server.env.
+- name: Render the Immich Postgres environment file
+  ansible.builtin.template:
+    src: immich-postgres.env.j2
+    dest: "{{ immich_data_dir }}/immich-postgres.env"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart immich-postgres
+
+- name: Deploy the Immich Postgres container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: immich-postgres
+    container_quadlet_src: immich-postgres.container.j2
+
+- name: Deploy the Immich machine-learning container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: immich-machine-learning
+    container_quadlet_src: immich-machine-learning.container.j2
+
+# Config file holds the Pocket ID OAuth client secret, so it's rendered
+# root-only just like the env files below — mounted read-only into the
+# container rather than passed as an env var, since Immich's OAuth settings
+# aren't exposed as plain environment variables (see README.md).
+- name: Render the Immich config file
+  ansible.builtin.template:
+    src: immich-config.json.j2
+    dest: "{{ immich_data_dir }}/immich.json"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart immich-server
+
+- name: Render the Immich server environment file
+  ansible.builtin.template:
+    src: immich-server.env.j2
+    dest: "{{ immich_data_dir }}/immich-server.env"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart immich-server
+
+- name: Deploy the Immich server container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: immich-server
+    container_quadlet_src: immich-server.container.j2

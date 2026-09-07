@@ -52,6 +52,7 @@ contrast (Debian, `apt`, `ufw`, `geerlingguy.security`, hyphenated role names).
 | `samba` | **Native** Samba (`smbd`/`nmbd`), guest-only share at `/mnt/data/samba` (the `samba/` subdirectory of the `/mnt/data` mount) — deliberately NOT a Podman container, unlike rpi-karlsruhe's `dockurr/samba` image |
 | `mealie` | Mealie recipe manager. Pocket ID OIDC login |
 | `paperless_ngx` | Paperless-ngx (Redis + PostgreSQL + app, image pinned). Pocket ID OIDC login; inbox inside the Samba share |
+| `immich` | Immich photo/video backup (Valkey + PostgreSQL/vectorchord + machine learning + app). Pocket ID OIDC login via a config file (not env vars); QuickSync/OpenVINO hardware acceleration on the host's iGPU |
 | `homepage` | Homepage dashboard behind Caddy — static grouped links + ping status, no API keys, no Podman socket exposed. Links cloud-wahlberger-dev's services too (Pocket ID, FreshRSS); rpi-karlsruhe excluded (legacy) |
 | `restic_backup` | Nightly restic backup of the Samba share and container data to pi-de-int-wahlberger-dev's `restic_server`, via a systemd timer |
 | `container` | Generic helper: renders one `.container` Quadlet template and restarts on change. Included by service roles, not listed in `site.yml`. |
@@ -88,9 +89,9 @@ purpose. When migrating:
   by the `snapper` role.
 - Secrets: encrypted `inventories/production/group_vars/all/vault.yml`,
   exposed via `{{ vault_* }}` indirection in `vars.yml`. Never commit
-  plaintext secrets. Four secrets exist here — DB password, two OIDC client
-  secrets, and the Cloudflare DNS API token — Samba itself needs none, being
-  guest-only.
+  plaintext secrets. Six secrets exist here — two DB passwords, three OIDC
+  client secrets, and the Cloudflare DNS API token — Samba itself needs none,
+  being guest-only.
 
 ## Adding a containerized service
 

@@ -1,0 +1,86 @@
+---
+argument_specs:
+  main:
+    short_description: Immich (PostgreSQL + Valkey + machine learning + app) behind Caddy, with Pocket ID OIDC login.
+    options:
+      immich_version:
+        type: str
+        required: false
+        description: Immich version tag, shared by immich_server_image and immich_ml_image.
+      immich_server_image:
+        type: str
+        required: false
+        description: Immich server container image.
+      immich_ml_image:
+        type: str
+        required: false
+        description: Immich machine-learning container image.
+      immich_db_image:
+        type: str
+        required: false
+        description: Immich's PostgreSQL (with vectorchord) container image.
+      immich_redis_image:
+        type: str
+        required: false
+        description: Valkey container image.
+      immich_data_dir:
+        type: path
+        required: false
+        description: Root host directory for Immich's data, config and env files.
+      immich_library_root:
+        type: path
+        required: false
+        description: Host directory mounted as Immich's entire UPLOAD_LOCATION (library, thumbs, encoded-video, profile, upload, backups).
+      immich_photos_dir:
+        type: path
+        required: false
+        description: Subdirectory of the existing Samba share (samba_share_path) holding everything Immich-related (library/, import/).
+      immich_library_export_dir:
+        type: path
+        required: false
+        description: Bind-mount target ("library" subfolder of immich_photos_dir), exposing immich_library_root's "library" subfolder for browsing.
+      immich_import_users:
+        type: list
+        elements: str
+        required: false
+        description: One subfolder of immich_photos_dir per listed user, each meant to be registered as its own read-only Immich External Library.
+      immich_db_data_dir:
+        type: path
+        required: false
+        description: Host directory mounted as the Postgres data volume.
+      immich_ml_cache_dir:
+        type: path
+        required: false
+        description: Host directory mounted as the machine-learning model cache.
+      immich_timezone:
+        type: str
+        required: false
+        description: Container timezone.
+      immich_hwaccel_enabled:
+        type: bool
+        required: false
+        description: Pass the host's /dev/dri through for QuickSync transcoding and OpenVINO ML inference.
+      immich_url:
+        type: str
+        required: true
+        description: Public https:// URL Immich is served on.
+      immich_oidc_provider_name:
+        type: str
+        required: false
+        description: Label shown on the Immich login button.
+      immich_oidc_client_id:
+        type: str
+        required: true
+        description: OAuth2 client ID issued by Pocket ID.
+      immich_oidc_auto_register:
+        type: bool
+        required: false
+        description: Auto-provision an Immich account on first OIDC login.
+      immich_oidc_redirect_login:
+        type: bool
+        required: false
+        description: Redirect the login page straight to Pocket ID.
+      immich_disable_local_login:
+        type: bool
+        required: false
+        description: Disable the username/password login form entirely.

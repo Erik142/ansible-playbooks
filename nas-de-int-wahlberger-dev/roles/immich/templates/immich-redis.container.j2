@@ -1,0 +1,18 @@
+[Unit]
+Description=Valkey (Immich job queue/cache)
+After=network-online.target
+Wants=network-online.target
+# Emails ewahlberger@gmail.com via Resend after 5 consecutive failures —
+# see the notify_failure role.
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=immich-redis
+Image={{ immich_redis_image }}
+Network=immich
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

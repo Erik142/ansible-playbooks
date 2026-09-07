@@ -1,0 +1,48 @@
+[Unit]
+Description=Immich photo/video backup server
+After=network-online.target caddy-network.service immich-postgres.service immich-redis.service immich-machine-learning.service
+Wants=network-online.target immich-postgres.service immich-redis.service immich-machine-learning.service
+Requires=caddy-network.service
+# Emails ewahlberger@gmail.com via Resend after 5 consecutive failures —
+# see the notify_failure role.
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=immich-server
+Image={{ immich_server_image }}
+Network=immich
+Network=caddy.network
+# immich_library_root lives outside the Samba share (see README.md ->
+# Storage layout), so this is a normal :Z-labeled volume like any other
+# service in this repo — no SELinux exception needed for it.
+Volume={{ immich_library_root }}:/data:Z
+{% for user in immich_import_users %}
+# {{ user }}'s import folder: read-only, and :Z-relabeled (container_file_t)
+# same as any other private volume. It's still inside the Samba share
+# (samba_share_t before this), but samba_export_all_rw (see the samba role)
+# already makes smbd ignore per-file SELinux types on export, so there's no
+# tug-of-war to avoid here the way immich_library_export_dir's bind mount
+# would have — relabeling this one is simplest.
+Volume={{ immich_photos_dir }}/import/{{ user }}:/mnt/media/import/{{ user }}:ro,Z
+{% endfor %}
+Volume={{ immich_data_dir }}/immich.json:/etc/immich/config.json:ro,Z
+{% if immich_hwaccel_enabled %}
+# QuickSync-accelerated video transcoding on the host's Intel iGPU — also
+# needs ffmpeg.accel: "qsv" in immich.json (see immich-config.json.j2).
+AddDevice=/dev/dri:/dev/dri
+{% endif %}
+Environment=TZ={{ immich_timezone }}
+Environment=DB_HOSTNAME=immich-postgres
+Environment=DB_USERNAME=immich
+Environment=DB_DATABASE_NAME=immich
+Environment=REDIS_HOSTNAME=immich-redis
+Environment=IMMICH_CONFIG_FILE=/etc/immich/config.json
+# DB_PASSWORD rendered to a root-only 0600 file by this role from Ansible
+# Vault, so it never appears in this world-readable Quadlet unit.
+EnvironmentFile={{ immich_data_dir }}/immich-server.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

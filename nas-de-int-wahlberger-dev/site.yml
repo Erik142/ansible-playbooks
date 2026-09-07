@@ -46,7 +46,7 @@
     # Ensure this host's public DNS records exist before Caddy needs them.
     - role: cloudflare_dns
       tags: [cloudflare_dns]
-    # Reverse proxy (creates the shared network) for mealie/paperless-ngx.
+    # Reverse proxy (creates the shared network) for mealie/paperless-ngx/immich.
     - role: caddy
       tags: [caddy]
     # Native Samba file server (not a container) with guest access.
@@ -57,10 +57,15 @@
     # After samba: its inbox directory lives inside the Samba share.
     - role: paperless_ngx
       tags: [paperless_ngx]
+    # Photo/video backup. After samba: its library/import directories live
+    # inside the Samba share.
+    - role: immich
+      tags: [immich]
     # Dashboard linking this NAS's and cloud-wahlberger-dev's services.
     - role: homepage
       tags: [homepage]
-    # After samba and paperless_ngx: backs up samba_mount_path and needs
-    # paperless_ngx's DB container/password to dump it before backing up.
+    # After samba, paperless_ngx and immich: backs up samba_mount_path and
+    # needs paperless_ngx's/immich's DB containers+passwords to dump them
+    # before backing up.
     - role: restic_backup
       tags: [restic_backup]

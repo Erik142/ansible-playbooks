@@ -6,13 +6,17 @@ set -eu
 
 STAGING_DIR="{{ restic_backup_staging_dir }}"
 
-# Dump Paperless-ngx's database to a consistent snapshot file first — the
-# raw Postgres data directory (restic_backup_exclude) is excluded from the
-# backup below, since a live filesystem copy of it isn't guaranteed
-# restorable.
+# Dump Paperless-ngx's and Immich's databases to consistent snapshot files
+# first — their raw Postgres data directories (restic_backup_exclude) are
+# excluded from the backup below, since a live filesystem copy of either
+# isn't guaranteed restorable.
 podman exec --env-file "$STAGING_DIR/pgpass.env" {{ restic_backup_paperless_db_container }} \
   pg_dump -U {{ restic_backup_paperless_db_user }} {{ restic_backup_paperless_db_name }} \
   > "$STAGING_DIR/paperless.sql"
+
+podman exec --env-file "$STAGING_DIR/immich-pgpass.env" {{ restic_backup_immich_db_container }} \
+  pg_dump -U {{ restic_backup_immich_db_user }} {{ restic_backup_immich_db_name }} \
+  > "$STAGING_DIR/immich.sql"
 
 # Bootstrap the repository on first run; a no-op every run after.
 restic snapshots --latest 1 >/dev/null 2>&1 || restic init
@@ -30,7 +34,8 @@ if ! BACKUP_OUTPUT="$(restic backup \
 {% for path in restic_backup_exclude %}
   --exclude "{{ path }}" \
 {% endfor %}
-  --exclude "$STAGING_DIR/pgpass.env" 2>&1)"; then
+  --exclude "$STAGING_DIR/pgpass.env" \
+  --exclude "$STAGING_DIR/immich-pgpass.env" 2>&1)"; then
   printf '%s\n' "$BACKUP_OUTPUT"
   exit 1
 fi

@@ -22,6 +22,14 @@ vault_paperless_ngx_oidc_client_secret: "REPLACE-with-pocket-id-client-secret"
 # Mealie OIDC client secret, issued by Pocket ID. Same migration note as above.
 vault_mealie_oidc_client_secret: "REPLACE-with-pocket-id-client-secret"
 
+# PostgreSQL password for Immich's database.
+#     openssl rand -hex 24
+vault_immich_db_password: "REPLACE-with-a-generated-password"
+
+# Immich OIDC client secret, issued by Pocket ID when you register the app —
+# see roles/immich/README.md for the exact redirect URIs to use.
+vault_immich_oidc_client_secret: "REPLACE-with-pocket-id-client-secret"
+
 # Cloudflare DNS API token for Caddy's DNS-01 challenge — scoped to
 # Zone:DNS:Edit on the wahlberger.dev zone, nothing broader. Migrating from
 # rpi-karlsruhe? Its Traefik role already uses a token for the same zone —

@@ -54,6 +54,8 @@ caddy_sites:
     upstream: "mealie:9000"
   - host: docs.de.int.wahlberger.dev
     upstream: "paperless-ngx:8000"
+  - host: photos.de.int.wahlberger.dev
+    upstream: "immich-server:2283"
   - host: www.de.int.wahlberger.dev
     upstream: "homepage:3000"
 
@@ -95,6 +97,13 @@ mealie_oidc_user_claim: "email"
 mealie_oidc_admin_group: ""
 mealie_oidc_user_group: ""
 
+# --- Immich -------------------------------------------------------------------
+# New service — registered as its own Pocket ID app (see roles/immich/README.md
+# for the redirect URIs used).
+immich_url: "https://photos.de.int.wahlberger.dev"
+immich_oidc_provider_name: "Pocket ID"
+immich_oidc_client_id: "90017f0a-235c-4314-9728-9e2e2dc057b5"
+
 # --- Homepage (dashboard) ------------------------------------------------------
 # Links cloud-wahlberger-dev's and this NAS's services. rpi-karlsruhe is
 # intentionally excluded — it's legacy, being retired.
@@ -129,6 +138,10 @@ paperless_ngx_db_password: "{{ vault_paperless_ngx_db_password | default('') }}"
 # EXISTING values — they belong to the client_ids above, not to this host.
 paperless_ngx_oidc_client_secret: "{{ vault_paperless_ngx_oidc_client_secret | default('') }}"
 mealie_oidc_client_secret: "{{ vault_mealie_oidc_client_secret | default('') }}"
+
+# Immich's Postgres password and OIDC client secret.
+immich_db_password: "{{ vault_immich_db_password | default('') }}"
+immich_oidc_client_secret: "{{ vault_immich_oidc_client_secret | default('') }}"
 
 # Cloudflare DNS API token for Caddy's DNS-01 challenge (Zone:DNS:Edit on
 # wahlberger.dev). Same token rpi-karlsruhe's Traefik already uses for the

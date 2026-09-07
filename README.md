@@ -12,7 +12,7 @@ secrets. No shared/external roles repo on purpose — see
 | Playbook | Host | What it runs |
 |----------|------|---------------|
 | [`cloud-wahlberger-dev`](cloud-wahlberger-dev) | `cloud.wahlberger.dev` (Hetzner Cloud VM, Debian) | **Reference design** for this repo. Pocket ID (passkey OIDC) + FreshRSS behind Caddy (HTTP-01). |
-| [`nas-de-int-wahlberger-dev`](nas-de-int-wahlberger-dev) | `nas.de.int.wahlberger.dev` (home NAS, openSUSE Tumbleweed) | Native Samba file share, Mealie + Paperless-ngx behind Caddy (DNS-01), a Homepage dashboard. |
+| [`nas-de-int-wahlberger-dev`](nas-de-int-wahlberger-dev) | `nas.de.int.wahlberger.dev` (home NAS, openSUSE Tumbleweed) | Native Samba file share, Mealie + Paperless-ngx + Immich behind Caddy (DNS-01), a Homepage dashboard. |
 | [`pi-de-int-wahlberger-dev`](pi-de-int-wahlberger-dev) | `pi.de.int.wahlberger.dev` (Raspberry Pi at home, Raspberry Pi OS) | Semaphore UI — runs all the playbooks in this repo (see [Automated runs](#automated-runs)). |
 | [`rpi-boras`](rpi-boras) | Raspberry Pi in Borås | Legacy: bind9 + isc-kea DHCP with dynamic DNS updates. No CI lint config yet. |
 | [`dns-server`](dns-server) | — | Skeleton/in-progress: bind9 + Pi-hole. No CI lint config yet. |
