@@ -56,13 +56,21 @@
     group: root
     mode: "0755"
 
+# owner/group/mode set to match the bind mount SOURCE exactly (the "library"
+# subfolder above) on purpose, not out of guest-access necessity: this path
+# is a bind-mount TARGET, so once mounted, its attributes are entirely
+# shadowed by the source's anyway, and re-running ansible.builtin.file
+# against an already-mounted, already-read-only path fails with "Read-only
+# file system" the moment current and desired attributes DIFFER (Ansible
+# only calls chown/chmod on a mismatch). Matching the source's values here
+# keeps this a true no-op on every run after the first, mounted or not.
 - name: Create the Immich library export directory inside the Samba share
   ansible.builtin.file:
     path: "{{ immich_library_export_dir }}"
     state: directory
     owner: root
     group: root
-    mode: "0777"
+    mode: "0755"
 
 # Bind-mounting (not a symlink) the real library data in here: Samba's
 # default "wide links = no" refuses to follow a symlink that leaves the
