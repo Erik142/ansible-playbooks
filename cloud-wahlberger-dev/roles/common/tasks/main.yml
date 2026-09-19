@@ -44,11 +44,17 @@
 # A static fallback for resolving this host's own hostname, so `sudo`
 # doesn't print "unable to resolve host" if DNS is ever briefly unavailable
 # — not a replacement for the real public DNS record (cloudflare_dns role)
-# this host already has.
+# this host already has. The real IP, not 127.0.1.1: Podman's default
+# base_hosts_file behavior copies the host's /etc/hosts into every
+# container it creates, and a loopback entry means something INSIDE a
+# container that resolves this host's own FQDN gets the container's own
+# loopback, not the host's — broke pi-de-int-wahlberger-dev's Semaphore
+# (which runs as a container) SSHing to its own inventory entry; fixed
+# here too so no container on this host can hit the same trap.
 - name: Ensure /etc/hosts resolves this host's own hostname locally
   ansible.builtin.lineinfile:
     path: /etc/hosts
-    regexp: '^127\.0\.1\.1\s'
-    line: "127.0.1.1\t{{ inventory_hostname }}\t{{ inventory_hostname.split('.')[0] }}"
+    regexp: '(^|\s){{ inventory_hostname }}(\s|$)'
+    line: "{{ ansible_default_ipv4.address }}\t{{ inventory_hostname }}\t{{ inventory_hostname.split('.')[0] }}"
     create: true
     mode: "0644"
