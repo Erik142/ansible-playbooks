@@ -10,7 +10,7 @@
 - name: Verify the container data directory is on a mounted filesystem
   ansible.builtin.assert:
     that:
-      - ansible_mounts | selectattr('mount', 'equalto', podman_data_dir) | list | length > 0
+      - ansible_facts.mounts | selectattr('mount', 'equalto', podman_data_dir) | list | length > 0
     fail_msg: >-
       {{ podman_data_dir }} is not a mountpoint. Mount the intended storage
       device there before running this playbook.

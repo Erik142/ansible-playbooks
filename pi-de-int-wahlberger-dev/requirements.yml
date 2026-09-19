@@ -13,8 +13,13 @@ collections:
 
   # profile_tasks callback wired up in ansible.cfg, the authorized_key module
   # used by ssh_authorized_keys, and the mount module used by storage.
+  # Floor is 2.2.2, not just "newer": 1.5.4 (what >=1.5.0 had resolved to
+  # and stayed pinned at) still imports from the ansible-core paths that
+  # ansible-core 2.20+ deprecates (to_native/to_bytes location, exit_json's
+  # warnings kwarg) and its profile_tasks callback hadn't yet implemented
+  # the v2_* method ansible-core 2.20+ wants — 2.2.2 fixes all of it.
   - name: ansible.posix
-    version: ">=1.5.0"
+    version: ">=2.2.2"
 
   # Not used yet, but the canonical collection for the Podman service roles
   # you'll add later (podman_image, podman_network, podman_login, ...).

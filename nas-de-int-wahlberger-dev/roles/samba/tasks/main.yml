@@ -12,7 +12,7 @@
 - name: Verify the Samba data directory is on a mounted filesystem
   ansible.builtin.assert:
     that:
-      - ansible_mounts | selectattr('mount', 'equalto', samba_mount_path) | list | length > 0
+      - ansible_facts.mounts | selectattr('mount', 'equalto', samba_mount_path) | list | length > 0
     fail_msg: >-
       {{ samba_mount_path }} is not a mountpoint. Mount the intended storage
       device there before running this playbook.

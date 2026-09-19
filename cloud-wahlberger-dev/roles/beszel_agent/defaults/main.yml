@@ -10,7 +10,7 @@ beszel_agent_version: "0.19.0"
 beszel_agent_arch_map:
   x86_64: amd64
   aarch64: arm64
-beszel_agent_arch: "{{ beszel_agent_arch_map[ansible_architecture] }}"
+beszel_agent_arch: "{{ beszel_agent_arch_map[ansible_facts.architecture] }}"
 
 beszel_agent_install_dir: /opt/beszel-agent
 beszel_agent_bin_path: "{{ beszel_agent_install_dir }}/beszel-agent"

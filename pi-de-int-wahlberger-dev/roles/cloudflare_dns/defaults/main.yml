@@ -12,4 +12,4 @@ cloudflare_dns_zone: wahlberger.dev
 # IP address for this host's own A record. Defaults to the address Ansible
 # actually gathered for this host, so it can't drift out of sync with the
 # real host.
-cloudflare_dns_ip: "{{ ansible_default_ipv4.address }}"
+cloudflare_dns_ip: "{{ ansible_facts.default_ipv4.address }}"

@@ -41,6 +41,6 @@
   ansible.builtin.lineinfile:
     path: /etc/hosts
     regexp: '(^|\s){{ inventory_hostname }}(\s|$)'
-    line: "{{ ansible_default_ipv4.address }}\t{{ inventory_hostname }}\t{{ inventory_hostname.split('.')[0] }}"
+    line: "{{ ansible_facts.default_ipv4.address }}\t{{ inventory_hostname }}\t{{ inventory_hostname.split('.')[0] }}"
     create: true
     mode: "0644"
