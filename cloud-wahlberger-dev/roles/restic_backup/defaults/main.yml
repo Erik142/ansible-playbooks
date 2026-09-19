@@ -39,6 +39,14 @@ restic_backup_keep_daily: 7
 restic_backup_keep_weekly: 4
 restic_backup_keep_monthly: 6
 
+# Fraction of the repository's actual data blobs re-read and re-hashed by
+# `restic check` every night, rotating through a different slice each run
+# (restic's own behavior for this flag) — full data-integrity coverage
+# completes roughly every 10 nights without ever re-downloading the whole
+# repository in one run. The cheap structural/index check (no data read)
+# always runs in full every time regardless of this setting.
+restic_backup_check_read_data_subset: "10%"
+
 # Nightly at 03:30 — systemd OnCalendar syntax. Offset half an hour from
 # nas-de-int-wahlberger-dev's 03:00 run so both backups don't hit
 # pi-de-int-wahlberger-dev's REST server at the exact same moment.

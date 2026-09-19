@@ -31,6 +31,20 @@ restic forget \
   --keep-monthly {{ restic_backup_keep_monthly }} \
   --prune
 
+# Verifies the repository's structure/index every run (cheap: no data
+# read), plus re-reads and re-hashes a rotating slice of the actual data
+# blobs each run — full data-integrity coverage completes roughly every
+# 10 nightly runs without ever re-downloading the whole repository in one
+# go. Same capture-for-email, fail-the-script pattern as the backup step
+# above; a corrupt repository raises through `set -e` into the same
+# OnFailure= alert a failed backup would.
+if ! CHECK_OUTPUT="$(restic check --read-data-subset={{ restic_backup_check_read_data_subset }} 2>&1)"; then
+  printf '%s\n' "$CHECK_OUTPUT"
+  exit 1
+fi
+printf '%s\n' "$CHECK_OUTPUT"
+SUMMARY="$(printf '%s\n\nIntegrity check:\n%s\n' "$BACKUP_OUTPUT" "$CHECK_OUTPUT")"
+
 # Only sends if restic_backup_notify_on_success wired up the notify_failure
 # role's Resend credentials as a second EnvironmentFile on this service
 # (see restic-backup.service.j2) — a missing key means that's off, not an
@@ -38,7 +52,7 @@ restic forget \
 if [ -n "${RESEND_API_KEY:-}" ]; then
   HOST="$(hostname -f)"
   NOW="$(date '+%Y-%m-%d %H:%M:%S %Z')"
-  SUMMARY_HTML="$(printf '%s' "$BACKUP_OUTPUT" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g')"
+  SUMMARY_HTML="$(printf '%s' "$SUMMARY" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g')"
 
   BODY="$(jq -n \
     --arg from "$NOTIFY_FROM" \
@@ -46,7 +60,7 @@ if [ -n "${RESEND_API_KEY:-}" ]; then
     --arg unit "restic-backup.service" \
     --arg host "$HOST" \
     --arg time "$NOW" \
-    --arg summary "$BACKUP_OUTPUT" \
+    --arg summary "$SUMMARY" \
     --arg summary_html "$SUMMARY_HTML" \
     --rawfile tmpl /etc/restic-backup/success-email-template.html \
     '{

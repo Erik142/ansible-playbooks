@@ -50,7 +50,7 @@ playbooks in this repo — prefer copying its patterns over the older `rpi-*` on
 | `pocket_id` | Pocket ID OIDC provider (image pinned). Internal only (1411); data in the `pocket-id` named volume (`/app/data`). |
 | `freshrss` | FreshRSS RSS aggregator (image pinned). Internal only (80); login via Pocket ID OIDC; data in the `freshrss` named volume (`/var/www/FreshRSS/data`). |
 | `beszel_hub` | Beszel monitoring hub (PocketBase-based, image pinned). Collects metrics from `beszel_agent` on all three hosts; superuser account and OIDC login both set up manually (no config-file mechanism) |
-| `restic_backup` | Nightly restic backup of `/opt/podman` to `pi-de-int-wahlberger-dev`'s `restic_server`, via a systemd timer. Simpler than the NAS's role of the same name — no Postgres here, so no pg_dump step |
+| `restic_backup` | Nightly restic backup of `/opt/podman` to `pi-de-int-wahlberger-dev`'s `restic_server`, via a systemd timer, plus a `restic check` (rotating 10%/night data subset) every run. Simpler than the NAS's role of the same name — no Postgres here, so no pg_dump step |
 | `container` | Generic helper: renders one `.container` Quadlet template and restarts on change. Included by service roles, not listed in `site.yml`. |
 
 ## Adding a service

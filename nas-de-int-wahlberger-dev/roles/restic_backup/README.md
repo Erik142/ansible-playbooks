@@ -65,6 +65,21 @@ that point, and letting a notification hiccup flip the whole service to
 "failed" would perversely trigger `notify_failure`'s failure email over a
 backup that actually worked.
 
+## Integrity checking
+
+Every run also does `restic check` (the repository's structure/index —
+cheap, no data read) followed by `restic check --read-data-subset=10%`
+(actually re-reads and re-hashes that fraction of the real data blobs,
+rotating through a different slice each run). Full data-integrity coverage
+completes roughly every 10 nights, without ever re-downloading the whole
+repository in one go — a `restic backup` succeeding only proves the upload
+worked, not that the stored data is still intact months later; this is
+what actually catches that. A failed check fails the whole script (same
+`set -e` propagation as a failed backup), so it raises the exact same
+`notify_failure` alert. Tune the fraction with
+`restic_backup_check_read_data_subset` (accepts restic's own syntax, e.g.
+`"10%"` or `"1/10"`).
+
 ## Why a systemd timer, not a Semaphore-scheduled Ansible run
 
 The backup itself (dump + `restic backup` + `restic forget --prune`) is a

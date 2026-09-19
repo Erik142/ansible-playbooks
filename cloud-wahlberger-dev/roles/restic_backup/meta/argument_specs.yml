@@ -49,6 +49,10 @@ argument_specs:
         type: int
         required: false
         description: Number of monthly snapshots to retain.
+      restic_backup_check_read_data_subset:
+        type: str
+        required: false
+        description: Fraction of data blobs restic check re-reads and re-hashes each run (e.g. "10%" or "1/10").
       restic_backup_on_calendar:
         type: str
         required: false

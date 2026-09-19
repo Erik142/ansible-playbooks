@@ -55,7 +55,7 @@ contrast (Debian, `apt`, `ufw`, `geerlingguy.security`, hyphenated role names).
 | `paperless_ngx` | Paperless-ngx (Redis + PostgreSQL + app, image pinned). Pocket ID OIDC login; inbox inside the Samba share |
 | `immich` | Immich photo/video backup (Valkey + PostgreSQL/vectorchord + machine learning + app). Pocket ID OIDC login via a config file (not env vars); QuickSync/OpenVINO hardware acceleration on the host's iGPU |
 | `homepage` | Homepage dashboard behind Caddy — static grouped links + ping status, no API keys, no Podman socket exposed. Links cloud-wahlberger-dev's services too (Pocket ID, FreshRSS); rpi-karlsruhe excluded (legacy) |
-| `restic_backup` | Nightly restic backup of the Samba share and container data to pi-de-int-wahlberger-dev's `restic_server`, via a systemd timer |
+| `restic_backup` | Nightly restic backup of the Samba share and container data to pi-de-int-wahlberger-dev's `restic_server`, via a systemd timer, plus a `restic check` (rotating 10%/night data subset) every run |
 | `container` | Generic helper: renders one `.container` Quadlet template and restarts on change. Included by service roles, not listed in `site.yml`. |
 
 No `zerotier` role: ZeroTier is configured transparently for the whole LAN at
