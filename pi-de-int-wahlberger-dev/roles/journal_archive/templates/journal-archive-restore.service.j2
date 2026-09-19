@@ -5,6 +5,11 @@ ConditionPathIsDirectory=/var/log/journal-archive
 
 [Service]
 Type=oneshot
+# Without this, a oneshot unit reverts to "inactive" the instant ExecStart=
+# finishes — Ansible's systemd module then sees "not active" on every
+# subsequent run and reissues `systemctl start`, reporting changed=true
+# forever even though nothing is actually different.
+RemainAfterExit=true
 ExecStart=/usr/local/bin/journal-archive-sync.sh from-disk
 
 [Install]
