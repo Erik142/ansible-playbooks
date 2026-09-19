@@ -36,7 +36,12 @@ points instead of continuously:
   `RemainAfterExit=true`, and `Before=shutdown.target reboot.target
   halt.target`, so its `ExecStop=` runs as part of every shutdown
   transaction. No `After=network-online.target` needed here — this is pure
-  local disk I/O.
+  local disk I/O. Also `Before=reboot-notify.service`, so this unit stops
+  (and flushes) *after* reboot-notify's own `ExecStop=` has already logged
+  its outcome — without that explicit ordering, both units only being
+  `Before=` the same targets leaves their relative order unspecified, and
+  this flush could run first and miss exactly the log line this role
+  exists to capture.
 - **`journal-archive-restore.service`** — once at boot, disk → tmpfs, so
   `journalctl` shows history from previous boots too, exactly like real
   persistent storage would, just without journald ever writing to the SD

@@ -2,6 +2,15 @@
 Description=Flush the volatile systemd journal to the SD card before shutdown
 DefaultDependencies=no
 Before=shutdown.target reboot.target halt.target
+# Both this unit and reboot-notify.service are only ordered Before= the
+# shutdown targets, which leaves their relative order unspecified — this
+# unit could stop (and flush) before reboot-notify.service's own ExecStop=
+# has logged anything. Starting before it means stopping after it (systemd
+# stops in reverse of start order), which is what actually guarantees this
+# flush captures whatever reboot-notify logged, the whole reason this role
+# exists. Harmless if reboot-notify.service isn't installed on some future
+# host that reuses this role.
+Before=reboot-notify.service
 
 [Service]
 Type=oneshot
