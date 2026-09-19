@@ -34,6 +34,7 @@ automation host that runs `ansible-playbook` against this host,
 | Role | Purpose |
 |------|---------|
 | `common` | apt update/upgrade, baseline packages, timezone |
+| `journal_archive` | Keeps journald on volatile (tmpfs) storage to spare the SD card, but periodically (and right before every shutdown/reboot) archives it to disk and restores it at boot, so `journalctl` still shows history across reboots. |
 | `notify_failure` | Emails via Resend when a monitored systemd unit's OnFailure= fires. |
 | `disk_space` | Periodic disk usage check (systemd timer), emailing via `notify_failure` on a new threshold crossing. |
 | `ssh_authorized_keys` | Authorizes your personal SSH key plus Semaphore's dedicated automation key (both also authorized on cloud-wahlberger-dev and the NAS) |

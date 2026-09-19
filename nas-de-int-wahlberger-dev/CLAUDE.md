@@ -38,7 +38,7 @@ contrast (Debian, `apt`, `ufw`, `geerlingguy.security`, hyphenated role names).
 
 | Role | Purpose |
 |------|---------|
-| `common` | zypper update, baseline packages, timezone |
+| `common` | zypper update, baseline packages, timezone, persistent systemd journal |
 | `notify_failure` | Emails via Resend when a monitored systemd unit's OnFailure= fires. Wired to `restic_backup`'s service |
 | `disk_space` | Periodic disk usage check (systemd timer), emailing via `notify_failure` on a new threshold crossing. |
 | `security` | SSH hardening, fail2ban, weekly `zypper patch` timer, automatic reboot via rebootmgr when needed (hand-rolled; no openSUSE geerlingguy.security) |

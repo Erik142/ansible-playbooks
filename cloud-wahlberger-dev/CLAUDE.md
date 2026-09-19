@@ -36,7 +36,7 @@ playbooks in this repo — prefer copying its patterns over the older `rpi-*` on
 
 | Role | Purpose |
 |------|---------|
-| `common` | apt update/upgrade, baseline packages, timezone |
+| `common` | apt update/upgrade, baseline packages, timezone, persistent systemd journal |
 | `notify_failure` | Emails via Resend when a monitored systemd unit's OnFailure= fires. |
 | `disk_space` | Periodic disk usage check (systemd timer), emailing via `notify_failure` on a new threshold crossing. |
 | `ssh_authorized_keys` | Authorizes your personal SSH key plus Semaphore's dedicated automation key (both also authorized on the NAS and the Pi) |

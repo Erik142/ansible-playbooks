@@ -1,0 +1,11 @@
+[Unit]
+Description=Restore the archived systemd journal into tmpfs at boot
+After=systemd-journald.service
+ConditionPathIsDirectory=/var/log/journal-archive
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/journal-archive-sync.sh from-disk
+
+[Install]
+WantedBy=multi-user.target

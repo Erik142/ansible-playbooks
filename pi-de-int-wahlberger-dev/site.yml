@@ -11,6 +11,9 @@
   roles:
     - role: common
       tags: [common]
+    # Early, so history survives whatever reboots any later role triggers.
+    - role: journal_archive
+      tags: [journal_archive]
     # Early: other roles' units can hook OnFailure= into the unit this role
     # deploys.
     - role: notify_failure

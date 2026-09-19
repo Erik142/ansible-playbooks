@@ -15,6 +15,20 @@
   community.general.timezone:
     name: "{{ common_timezone }}"
 
+# journald only auto-switches from volatile (/run/log/journal, wiped every
+# reboot) to persistent storage if this exact directory exists — no config
+# file needed. Proper disk here, so the continuous writes this causes
+# aren't a wear concern (unlike pi-de-int-wahlberger-dev's SD card — see
+# that repo's journal_archive role for the different approach taken there).
+- name: Enable persistent systemd journal storage
+  ansible.builtin.file:
+    path: /var/log/journal
+    state: directory
+    owner: root
+    group: systemd-journal
+    mode: "2755"
+  notify: Restart systemd-journald
+
 # inventory_hostname is already this host's real FQDN (matches ansible.cfg's
 # inventory file) — no new variable needed. Fixes cases like a VM's hostname
 # having been left at whatever the provisioning process set it to (seen

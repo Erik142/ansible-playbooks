@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: journal_archive
+  author: Erik Wahlberger
+  description: Keeps the systemd journal in tmpfs (SD-card-friendly) while periodically archiving it to disk, and restores it on boot.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - "all"
+  galaxy_tags:
+    - logging
+    - systemd
+
+dependencies: []

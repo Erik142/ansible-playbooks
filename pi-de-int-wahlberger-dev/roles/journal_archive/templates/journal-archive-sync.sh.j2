@@ -1,0 +1,25 @@
+#!/bin/sh
+# Rendered by the journal_archive role. Do NOT edit on the host — re-run
+# Ansible. Syncs the volatile in-RAM journal (/run/log/journal, tmpfs) with
+# its persistent copy on the SD card (/var/log/journal-archive). Direction
+# is the sole argument:
+#   to-disk   - tmpfs -> SD (periodic timer, and once more right before
+#               shutdown/reboot)
+#   from-disk - SD -> tmpfs (once at boot, so `journalctl` shows history
+#               from earlier boots despite the live journal being volatile)
+# Kept as periodic + boundary syncs, rather than pointing journald itself
+# at persistent storage, to avoid the continuous small writes that wear
+# out SD cards.
+set -eu
+
+[ -d /run/log/journal ] || exit 0
+mkdir -p /var/log/journal-archive
+
+case "${1:?direction required: to-disk|from-disk}" in
+  to-disk) rsync -a --delete /run/log/journal/ /var/log/journal-archive/ ;;
+  from-disk) rsync -a /var/log/journal-archive/ /run/log/journal/ ;;
+  *)
+    echo "unknown direction: $1" >&2
+    exit 1
+    ;;
+esac

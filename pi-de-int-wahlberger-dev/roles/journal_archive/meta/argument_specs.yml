@@ -1,0 +1,16 @@
+---
+argument_specs:
+  main:
+    short_description: Persist the systemd journal across reboots without wearing out the SD card.
+    description:
+      - journald's own persistent storage mode (creating /var/log/journal)
+        writes continuously, which is fine on real disks
+        (cloud-wahlberger-dev, nas-de-int-wahlberger-dev's common role does
+        exactly that) but wears out an SD card. This role instead leaves
+        journald on its default volatile (tmpfs) storage, and adds a
+        periodic timer plus a pre-shutdown systemd hook that rsync the
+        in-RAM journal to /var/log/journal-archive, and a boot-time unit
+        that restores it back into tmpfs — so `journalctl` still shows
+        history across reboots, just synced in batches instead of
+        continuously. No variables of its own; see README.md.
+    options: {}

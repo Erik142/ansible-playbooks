@@ -1,0 +1,14 @@
+[Unit]
+Description=Flush the volatile systemd journal to the SD card before shutdown
+DefaultDependencies=no
+Before=shutdown.target reboot.target halt.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/bin/true
+ExecStop=/usr/local/bin/journal-archive-sync.sh to-disk
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

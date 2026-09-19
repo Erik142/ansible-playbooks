@@ -1,0 +1,6 @@
+---
+# Default variables for the `journal_archive` role.
+#
+# No variables of its own — see README.md. journald's storage stays
+# volatile (RAM-only), and the archive lives at a fixed path deliberately
+# different from /var/log/journal (see README.md for why).

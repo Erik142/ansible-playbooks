@@ -1,0 +1,48 @@
+---
+- name: Install rsync
+  ansible.builtin.apt:
+    name: rsync
+    state: present
+
+# Deliberately NOT /var/log/journal — journald auto-switches to continuous
+# persistent writes the moment that exact path exists, which is the
+# constant SD-card wear this role exists to avoid. See README.md.
+- name: Create the journal archive directory
+  ansible.builtin.file:
+    path: /var/log/journal-archive
+    state: directory
+    owner: root
+    group: systemd-journal
+    mode: "2755"
+
+- name: Deploy the journal archive sync script
+  ansible.builtin.template:
+    src: journal-archive-sync.sh.j2
+    dest: /usr/local/bin/journal-archive-sync.sh
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Deploy the journal archive systemd units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - journal-archive-restore.service
+    - journal-archive-flush.service
+    - journal-archive-flush.timer
+    - journal-archive-shutdown.service
+
+- name: Enable and start the journal archive units
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop:
+    - journal-archive-restore.service
+    - journal-archive-flush.timer
+    - journal-archive-shutdown.service
