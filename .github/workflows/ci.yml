@@ -40,11 +40,13 @@ jobs:
         with:
           python-version: "3.12"
 
-      # ansible-core pinned <2.17 to match the pyenv venv every playbook here
-      # is developed against (see each playbook's CLAUDE.md) — some tasks use
-      # module names/behaviors tied to that version.
+      # Pinned to 2.20.8 — Semaphore's own actual bundled Ansible version
+      # (confirmed via `podman exec semaphore ansible --version` on
+      # pi-de-int-wahlberger-dev), not the older 2.16 the local pyenv venv
+      # happens to run. Syntax-check itself doesn't care much either way,
+      # but matching this here keeps this job's stated target honest.
       - name: Install Ansible tooling
-        run: pip install "ansible-core>=2.16,<2.17" ansible-lint yamllint
+        run: pip install "ansible-core==2.20.8" ansible-lint yamllint
 
       # Every playbook's ansible.cfg defaults vault_password_file to
       # .vault_pass.sh, which shells out to the 1Password CLI (op) for local
@@ -81,6 +83,73 @@ jobs:
           entrypoint=site.yml
           [ -f site.yml ] || entrypoint=main.yml
           ansible-playbook "$entrypoint" --syntax-check
+
+  # Converges (twice, checking for idempotence) a curated subset of each
+  # playbook's roles against a disposable Docker container standing in for
+  # its OS — never touches real infrastructure. Only roles safe to test this
+  # way are included (pure OS config: no real mounted drives, no
+  # Podman-in-Docker nesting, no real external API credentials/hardware) —
+  # see molecule/default/converge.yml in each directory for exactly which
+  # roles and why. Real module execution (unlike syntax-check) also surfaces
+  # ansible-core's own deprecation warnings, so this job fails on those too.
+  molecule:
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJson(needs.discover.outputs.dirs) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: has_molecule
+        run: |
+          present=false
+          [ -f "${{ matrix.dir }}/molecule/default/molecule.yml" ] && present=true
+          echo "present=$present" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        if: steps.has_molecule.outputs.present == 'true'
+        with:
+          python-version: "3.12"
+
+      # Pinned to 2.20.8 — Semaphore's own actual bundled Ansible version
+      # (confirmed via `podman exec semaphore ansible --version` on
+      # pi-de-int-wahlberger-dev). Testing against anything else would
+      # validate a version nothing actually deploys with.
+      - name: Install Molecule tooling
+        if: steps.has_molecule.outputs.present == 'true'
+        run: pip install "ansible-core==2.20.8" molecule "molecule-plugins[docker]" docker
+
+      - name: Provide a dummy vault password (CI never decrypts real secrets)
+        if: steps.has_molecule.outputs.present == 'true'
+        run: |
+          echo "ci-cannot-decrypt-this-is-expected" > "$RUNNER_TEMP/dummy-vault-pass"
+          echo "ANSIBLE_VAULT_PASSWORD_FILE=$RUNNER_TEMP/dummy-vault-pass" >> "$GITHUB_ENV"
+
+      - name: Install collection/role requirements
+        if: steps.has_molecule.outputs.present == 'true'
+        working-directory: ${{ matrix.dir }}
+        run: |
+          ansible-galaxy collection install -r requirements.yml
+          ansible-galaxy role install -r requirements.yml
+
+      - name: Run Molecule (converge + idempotence)
+        if: steps.has_molecule.outputs.present == 'true'
+        working-directory: ${{ matrix.dir }}
+        run: |
+          set -o pipefail
+          molecule test 2>&1 | tee molecule-output.log
+
+      - name: Fail on any ansible-core deprecation warning
+        if: steps.has_molecule.outputs.present == 'true'
+        working-directory: ${{ matrix.dir }}
+        run: |
+          if grep -q '\[DEPRECATION WARNING\]' molecule-output.log; then
+            echo "::error::ansible-core deprecation warning(s) found — see the 'Run Molecule' step output above"
+            grep '\[DEPRECATION WARNING\]' molecule-output.log
+            exit 1
+          fi
 
   vault-encrypted:
     runs-on: ubuntu-latest

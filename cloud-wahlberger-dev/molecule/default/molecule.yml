@@ -1,0 +1,45 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ${MOLECULE_PROJECT_DIRECTORY}/requirements.yml
+    role-file: ${MOLECULE_PROJECT_DIRECTORY}/requirements.yml
+driver:
+  name: docker
+platforms:
+  - name: cloud-instance
+    image: geerlingguy/docker-debian13-ansible:latest
+    privileged: true
+    cgroupns_mode: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /run
+      - /run/lock
+    command: /lib/systemd/systemd
+provisioner:
+  name: ansible
+  env:
+    ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/roles
+    ANSIBLE_VAULT_PASSWORD_FILE: ${ANSIBLE_VAULT_PASSWORD_FILE}
+  inventory:
+    host_vars:
+      cloud-instance:
+        notify_failure_resend_api_key: "molecule-fake-key-never-used"
+        # erikwahlberger doesn't exist as a real user on a bare test
+        # container (real hosts get it from initial provisioning outside
+        # this playbook's scope) — root always exists, so use that instead
+        # just to exercise the role's own logic/idempotency.
+        ssh_authorized_keys_user: root
+        ssh_authorized_keys_list:
+          - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeMoleculeTestKeyNeverUsedXXXXXXXXXXXXXXX molecule-test"
+verifier:
+  name: ansible
+scenario:
+  test_sequence:
+    - dependency
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - destroy

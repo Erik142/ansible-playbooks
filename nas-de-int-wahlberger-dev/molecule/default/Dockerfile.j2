@@ -1,0 +1,8 @@
+FROM {{ item.image }}
+
+RUN zypper --non-interactive install --no-recommends systemd sudo python3 shadow iproute2 openssh dbus-1 && \
+    zypper clean --all && \
+    ssh-keygen -A
+
+STOPSIGNAL SIGRTMIN+3
+CMD ["/usr/lib/systemd/systemd"]

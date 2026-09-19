@@ -55,3 +55,8 @@
     line: "{{ ansible_facts.default_ipv4.address }}\t{{ inventory_hostname }}\t{{ inventory_hostname.split('.')[0] }}"
     create: true
     mode: "0644"
+  # Docker bind-mounts /etc/hosts, so an atomic rename-based write always
+  # fails with EBUSY inside any container — a Molecule/CI-only limitation,
+  # not a real bug. molecule-notest is Molecule's own convention for this:
+  # automatically skipped during its converge, unaffected everywhere else.
+  tags: [molecule-notest]

@@ -1,0 +1,14 @@
+---
+- name: Prepare
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    # A freshly created container's apt cache dir looks recently touched
+    # (image-build time) even though it's actually empty — common's own
+    # cache_valid_time check can be fooled into skipping the real fetch.
+    # Force one unconditionally before converge runs.
+    - name: Force a real apt cache refresh
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 0

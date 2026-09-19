@@ -11,6 +11,15 @@ contrast (Debian, `apt`, `ufw`, `geerlingguy.security`, hyphenated role names).
 - Run: `ansible-playbook site.yml` (add `--check --diff` for a dry run). The vault password comes from 1Password automatically via `.vault_pass.sh` (`ansible.cfg`'s `vault_password_file`) — no `--ask-vault-pass` needed.
 - Install deps first: `ansible-galaxy collection install -r requirements.yml`.
 - Validate: `yamllint .`, `ansible-lint`, `ansible-playbook site.yml --syntax-check`.
+- Idempotency + deprecation-warning check (CI, and locally with Docker):
+  `molecule test`. Converges `common`, `notify_failure`, `disk_space`,
+  `ssh_authorized_keys`, `security` twice against a disposable openSUSE
+  Tumbleweed + systemd container (custom `molecule/default/Dockerfile.j2`)
+  and fails on any `changed` the second time or any ansible-core
+  deprecation warning. Deliberately excludes roles needing real mounted
+  drives, Podman-in-Docker, or a real firewalld backend (firewalld's
+  nftables integration doesn't work inside any container, host-independent)
+  — see `molecule/default/converge.yml`.
 
 ## Conventions (keep these when extending)
 
