@@ -96,12 +96,18 @@
 # No dedicated Ansible module applies a context to already-existing files
 # (that's what `restorecon` is for) — this is the one deliberate exception to
 # this repo's "built-in modules only" convention. Idempotent via
-# changed_when: restorecon -v only prints a line per file it actually
-# relabels, so empty output means nothing needed changing.
+# changed_when: a real relabel prints "Relabeled /path from X to Y" —
+# checking for empty stdout instead is wrong, since restorecon -v ALSO
+# prints a non-empty "not reset as customized by admin to X" line for
+# every file Podman has already labeled container_file_t for its own
+# bind-mount isolation (Immich's library, Paperless's inbox live under
+# samba_data_dir too) and deliberately leaves alone — that line means
+# nothing changed, but isn't empty, so it was tripping changed_when on
+# every single run.
 - name: Apply the SELinux file context to existing files
   ansible.builtin.command: "restorecon -Rv {{ samba_data_dir }}"
   register: samba_selinux_restorecon
-  changed_when: samba_selinux_restorecon.stdout != ''
+  changed_when: "'Relabeled ' in samba_selinux_restorecon.stdout"
   when: ansible_facts.selinux.status == "enabled"
 
 - name: Render the Samba configuration
