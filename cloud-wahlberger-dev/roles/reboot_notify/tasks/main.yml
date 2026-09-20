@@ -36,9 +36,12 @@
     group: root
     mode: "0755"
 
+# A template (not a static copy): bakes in the configured
+# security_autoupdate_reboot_time so the email can say roughly when the
+# reboot will actually happen, not just that one is pending.
 - name: Deploy the reboot notice email template
-  ansible.builtin.copy:
-    src: email-template.html
+  ansible.builtin.template:
+    src: email-template.html.j2
     dest: /etc/reboot-notify/email-template.html
     owner: root
     group: root

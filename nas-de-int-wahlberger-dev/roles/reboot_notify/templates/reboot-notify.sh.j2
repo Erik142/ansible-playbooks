@@ -1,10 +1,10 @@
 #!/bin/sh
 # Rendered by the reboot_notify role. Do NOT edit on the host — re-run
-# Ansible. Runs on every shutdown/reboot (see reboot-notify.service), but
-# only actually emails when zypper itself says a reboot is genuinely
-# needed — i.e. this specific reboot is (at least in part) rebootmgr's own
-# automatic one for a pending kernel/library update (see roles/security's
-# request-reboot-if-needed.sh), not an ordinary manual one.
+# Ansible. Called directly by security's request-reboot-if-needed.sh, right
+# after it requests a reboot via rebootmgrctl — not a shutdown-time systemd
+# hook (this role's design until 2026-09; confirmed unreliable in practice,
+# see README.md). Only actually emails when zypper itself says a reboot is
+# genuinely needed, matching the same check the caller already made.
 set -eu
 
 if OUTPUT="$(zypper needs-rebooting 2>&1)"; then
@@ -33,8 +33,8 @@ BODY="$(jq -n \
   '{
     from: $from,
     to: [$to],
-    subject: ("[" + $host + "] Rebooting for a software update"),
-    text: ($host + " is rebooting at " + $time + " because of a pending software update.\n\n" + $packages),
+    subject: ("[" + $host + "] Reboot needed for a pending update"),
+    text: ($host + " needs a reboot for a pending software update, detected at " + $time + ".\n\nA reboot has just been requested via rebootmgr (strategy: {{ security_autoupdate_reboot_strategy | default('best-effort') }}) and will happen automatically soon — not necessarily immediately. There is no further email when that actually happens; Uptime Kuma will show the resulting brief downtime independently, whenever that turns out to be.\n\n" + $packages),
     html: ($tmpl
       | gsub("@@HOST@@"; $host)
       | gsub("@@TIME@@"; $time)

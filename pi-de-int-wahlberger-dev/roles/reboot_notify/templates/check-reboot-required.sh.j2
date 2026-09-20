@@ -59,7 +59,7 @@ BODY="$(jq -n \
     from: $from,
     to: [$to],
     subject: ("[" + $host + "] Reboot needed for a pending update"),
-    text: ($host + " needs a reboot as of " + $time + " for a pending software update.\n\nPackages that require it:\n" + $packages),
+    text: ($host + " needs a reboot for a pending software update, detected at " + $time + ".\n\nThis is advance notice only — it has NOT rebooted yet. It will reboot automatically during its next scheduled maintenance window (usually around {{ security_autoupdate_reboot_time | default('03:00') }}). There is no further email when that actually happens; Uptime Kuma will show the resulting brief downtime independently, whenever that turns out to be.\n\nPackages that require it:\n" + $packages),
     html: ($tmpl
       | gsub("@@HOST@@"; $host)
       | gsub("@@TIME@@"; $time)

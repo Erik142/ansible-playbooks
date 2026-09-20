@@ -20,14 +20,15 @@ RC=$?
 # 102 = ZYPPER_EXIT_INF_REBOOT_NEEDED. Anything else (0 = not needed, or a
 # real zypper error) should not request a reboot.
 if [ "$RC" -eq 102 ]; then
+  rebootmgrctl reboot || echo "rebootmgrctl reboot failed" >&2
   # Only once per pending reboot (/var/run is tmpfs, so this naturally
   # resets on the actual reboot) — otherwise every weekly patch run while a
-  # reboot is still pending would email again.
+  # reboot is still pending would email again. Requested above first, so
+  # the email can truthfully say a reboot has already been requested.
   if [ ! -f /var/run/reboot-notify-sent ]; then
     /usr/local/bin/reboot-notify.sh || echo "reboot-notify.sh failed" >&2
     touch /var/run/reboot-notify-sent
   fi
-  rebootmgrctl reboot || echo "rebootmgrctl reboot failed" >&2
 fi
 
 exit 0
