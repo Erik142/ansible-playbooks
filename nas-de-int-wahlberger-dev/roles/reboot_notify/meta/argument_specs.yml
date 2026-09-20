@@ -1,9 +1,10 @@
 ---
 argument_specs:
   main:
-    short_description: Email a heads-up before a rebootmgr-triggered reboot.
+    short_description: Email a heads-up as soon as a rebootmgr-triggered reboot is needed.
     description:
-      - A systemd shutdown hook that emails, reusing notify_failure's
+      - A script, called directly by the security role's
+        request-reboot-if-needed.sh, that emails, reusing notify_failure's
         Resend credentials, only when `zypper needs-rebooting` reports
         exit code 102 — i.e. this reboot is actually because of a pending
         kernel/library update (rebootmgr, driven by the security role), not

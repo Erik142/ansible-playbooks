@@ -6,6 +6,12 @@
 # per its own configured strategy/window (/etc/rebootmgr.conf), not
 # immediately. Always exits 0: a failed reboot request here shouldn't mark
 # the patch job itself as failed — patching already succeeded by this point.
+#
+# Also emails reboot_notify's heads-up right here, synchronously — not via
+# a shutdown-time systemd hook (that role's old design). Confirmed
+# unreliable in practice (2026-09): a busy/contested shutdown transaction
+# (several Podman containers stopping at once) silently dropped it, and it
+# never ran at all. This script has no such race.
 set -u
 
 zypper needs-rebooting >/dev/null 2>&1
@@ -14,6 +20,13 @@ RC=$?
 # 102 = ZYPPER_EXIT_INF_REBOOT_NEEDED. Anything else (0 = not needed, or a
 # real zypper error) should not request a reboot.
 if [ "$RC" -eq 102 ]; then
+  # Only once per pending reboot (/var/run is tmpfs, so this naturally
+  # resets on the actual reboot) — otherwise every weekly patch run while a
+  # reboot is still pending would email again.
+  if [ ! -f /var/run/reboot-notify-sent ]; then
+    /usr/local/bin/reboot-notify.sh || echo "reboot-notify.sh failed" >&2
+    touch /var/run/reboot-notify-sent
+  fi
   rebootmgrctl reboot || echo "rebootmgrctl reboot failed" >&2
 fi
 

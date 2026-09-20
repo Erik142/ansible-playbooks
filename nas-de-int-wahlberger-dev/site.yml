@@ -26,9 +26,11 @@
     # Harden the host before anything else listens on the network.
     - role: security
       tags: [security]
-    # After notify_failure (reuses its Resend credentials) and security
-    # (enables security_autoupdate_reboot, the reboot this role emails
-    # about).
+    # After notify_failure (reuses its Resend credentials). security's own
+    # request-reboot-if-needed.sh calls this role's reboot-notify.sh
+    # directly (see roles/reboot_notify/README.md) — order between the two
+    # roles here doesn't matter beyond that, since both just need to exist
+    # by the time any real automated patch cycle actually runs.
     - role: reboot_notify
       tags: [reboot_notify]
     - role: firewall

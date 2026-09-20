@@ -23,17 +23,31 @@
     group: root
     mode: "0700"
 
-- name: Deploy the reboot-notify systemd shutdown hook
-  ansible.builtin.template:
-    src: reboot-notify.service.j2
-    dest: /etc/systemd/system/reboot-notify.service
-    owner: root
-    group: root
-    mode: "0644"
+# Superseded by security's request-reboot-if-needed.sh calling this script
+# directly, synchronously, right when it decides to request a reboot — a
+# shutdown-time systemd hook here turned out to be unreliable
+# (Before=shutdown.target is only a soft ordering hint; confirmed it
+# silently never ran under a busy shutdown transaction, 2026-09). Cleans up
+# any previously deployed instance.
+- name: Check whether the old reboot-notify shutdown-hook unit exists
+  ansible.builtin.stat:
+    path: /etc/systemd/system/reboot-notify.service
+  register: reboot_notify_old_unit_file
 
-- name: Enable and start the reboot-notify service
+- name: Stop and disable the old reboot-notify shutdown-hook service
   ansible.builtin.systemd:
     name: reboot-notify.service
-    enabled: true
-    state: started
+    enabled: false
+    state: stopped
+  when: reboot_notify_old_unit_file.stat.exists
+
+- name: Remove the old reboot-notify shutdown-hook unit file
+  ansible.builtin.file:
+    path: /etc/systemd/system/reboot-notify.service
+    state: absent
+  when: reboot_notify_old_unit_file.stat.exists
+
+- name: Reload systemd after removing the old shutdown-hook unit
+  ansible.builtin.systemd:
     daemon_reload: true
+  when: reboot_notify_old_unit_file.stat.exists

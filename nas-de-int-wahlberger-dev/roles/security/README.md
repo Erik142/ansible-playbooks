@@ -54,8 +54,11 @@ equivalent — see `roles/reboot_notify/README.md`) to do it, when
 1. `zypper-autopatch.service` gets an `ExecStartPost=` running
    `request-reboot-if-needed.sh` after every successful patch run.
 2. That script checks `zypper needs-rebooting` (exit code 102 = a reboot is
-   genuinely suggested — kernel, glibc, etc.) and, only then, calls
-   `rebootmgrctl reboot` to *request* one.
+   genuinely suggested — kernel, glibc, etc.) and, only then, emails a
+   heads-up (calling `reboot_notify`'s script directly — see
+   `roles/reboot_notify/README.md` for why it's called from here rather
+   than a shutdown-time hook) and calls `rebootmgrctl reboot` to *request*
+   one.
 3. `rebootmgrd` (its own long-running service, configured via
    `/etc/rebootmgr.conf`) decides *when* to actually carry it out, per
    `security_autoupdate_reboot_strategy`. The default, `best-effort`,
@@ -64,8 +67,5 @@ equivalent — see `roles/reboot_notify/README.md`) to do it, when
    already only requests a reboot once, right after Sunday 03:00 patching.
    Switch to `maint-window` if you want reboots strictly confined to
    `security_autoupdate_reboot_window_start`/`_window_duration` instead.
-
-Emailing a heads-up before this actually happens is a separate role, not
-this one — see `roles/reboot_notify/README.md`.
 
 Inspect on the host: `sudo rebootmgrctl status`, `zypper needs-rebooting`.

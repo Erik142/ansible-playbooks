@@ -51,7 +51,7 @@ contrast (Debian, `apt`, `ufw`, `geerlingguy.security`, hyphenated role names).
 | `notify_failure` | Emails via Resend when a monitored systemd unit's OnFailure= fires. Wired to `restic_backup`'s service |
 | `disk_space` | Periodic disk usage check (systemd timer), emailing via `notify_failure` on a new threshold crossing. |
 | `security` | SSH hardening, fail2ban, weekly `zypper patch` timer, automatic reboot via rebootmgr when needed (hand-rolled; no openSUSE geerlingguy.security) |
-| `reboot_notify` | Emails a heads-up (reusing `notify_failure`'s Resend credentials; its own notification class, not a failure alert) right before a rebootmgr-triggered reboot. |
+| `reboot_notify` | Emails a heads-up (reusing `notify_failure`'s Resend credentials; its own notification class, not a failure alert) as soon as a rebootmgr-triggered reboot is known to be needed. |
 | `firewall` | firewalld, default-deny inbound, allows ssh/samba/http/https + the beszel_agent port |
 | `storage` | Mounts the two existing btrfs subvolumes (`/mnt/containers`, `/mnt/data`) by UUID, persisted in `/etc/fstab`. Does NOT format/create them |
 | `snapper` | Btrfs snapshot configs for those same two subvolumes (hourly/daily/weekly/monthly/yearly retention), timeline + cleanup timers |
