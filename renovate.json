@@ -7,7 +7,7 @@
       "customType": "regex",
       "managerFilePatterns": ["/(^|/)roles/[^/]+/defaults/main\\.ya?ml$/"],
       "matchStrings": [
-        "(?:^|\\n)\\w+_image:\\s*\"?(?<depName>[a-z0-9./_-]+):(?<currentValue>[\\w.-]+)\"?\\s*(?=\\n|$)"
+        "(?:^|\\n)\\w+_image:\\s*\"?(?<depName>[a-z0-9./_-]+):(?<currentValue>[\\w.-]+)\"?[ \\t]*"
       ],
       "datasourceTemplate": "docker"
     },
@@ -15,7 +15,7 @@
       "description": "Beszel agent binary version (downloaded from GitHub releases, not a container)",
       "customType": "regex",
       "managerFilePatterns": ["/(^|/)roles/beszel_agent/defaults/main\\.ya?ml$/"],
-      "matchStrings": ["(?:^|\\n)beszel_agent_version:\\s*\"?(?<currentValue>[\\d.]+)\"?\\s*(?=\\n|$)"],
+      "matchStrings": ["(?:^|\\n)beszel_agent_version:\\s*\"?(?<currentValue>[\\d.]+)\"?[ \\t]*"],
       "depNameTemplate": "henrygd/beszel",
       "datasourceTemplate": "github-releases"
     },
@@ -23,7 +23,7 @@
       "description": "immich_version is shared by the server and ML images, which are templated",
       "customType": "regex",
       "managerFilePatterns": ["/(^|/)roles/immich/defaults/main\\.ya?ml$/"],
-      "matchStrings": ["(?:^|\\n)immich_version:\\s*\"?(?<currentValue>v[\\w.-]+)\"?\\s*(?=\\n|$)"],
+      "matchStrings": ["(?:^|\\n)immich_version:\\s*\"?(?<currentValue>v[\\w.-]+)\"?[ \\t]*"],
       "depNameTemplate": "ghcr.io/immich-app/immich-server",
       "datasourceTemplate": "docker"
     }
