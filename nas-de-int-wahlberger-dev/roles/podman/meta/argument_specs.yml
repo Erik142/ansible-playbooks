@@ -20,3 +20,15 @@ argument_specs:
         type: bool
         required: false
         description: Whether to enable and start podman.socket.
+      podman_image_prune_enabled:
+        type: bool
+        required: false
+        description: Whether to install and enable the periodic image-prune timer.
+      podman_image_prune_on_calendar:
+        type: str
+        required: false
+        description: systemd OnCalendar expression for the image-prune timer.
+      podman_image_prune_min_age:
+        type: str
+        required: false
+        description: Only prune images older than this (podman `until` filter, e.g. 168h).

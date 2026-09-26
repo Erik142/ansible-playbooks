@@ -38,3 +38,34 @@
     enabled: true
     state: started
   when: podman_enable_socket | bool
+
+- name: Deploy the image-prune systemd units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - podman-image-prune.service
+    - podman-image-prune.timer
+  when: podman_image_prune_enabled | bool
+  notify: Reload systemd
+
+- name: Apply systemd unit changes before enabling the timer
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start the image-prune timer
+  ansible.builtin.systemd:
+    name: podman-image-prune.timer
+    enabled: true
+    state: started
+  when: podman_image_prune_enabled | bool
+
+- name: Disable the image-prune timer
+  ansible.builtin.systemd:
+    name: podman-image-prune.timer
+    enabled: false
+    state: stopped
+  failed_when: false
+  when: not (podman_image_prune_enabled | bool)

@@ -15,3 +15,12 @@ podman_quadlet_dir: /etc/containers/systemd
 # Enable podman.socket so tools that speak the Docker-compatible API work
 # (for example a Traefik Podman provider).
 podman_enable_socket: true
+
+# Periodically prune images no container uses, so replaced image versions
+# (e.g. after a Renovate bump) don't fill the disk.
+podman_image_prune_enabled: true
+# systemd OnCalendar expression for the prune timer.
+podman_image_prune_on_calendar: weekly
+# Only prune images created more than this long ago (podman `until` filter),
+# leaving a rollback window for the previous version.
+podman_image_prune_min_age: 168h

@@ -1,0 +1,10 @@
+[Unit]
+Description=Prune unused Podman images older than {{ podman_image_prune_min_age }}
+Documentation=man:podman-image-prune(1)
+
+[Service]
+Type=oneshot
+# -a: also drop tagged images no container uses (e.g. the previous version after
+# an image bump), not only dangling ones. Images referenced by any container,
+# running or stopped, are never removed. --filter until keeps a rollback window.
+ExecStart=/usr/bin/podman image prune --all --force --filter until={{ podman_image_prune_min_age }}
