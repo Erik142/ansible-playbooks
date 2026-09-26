@@ -3,7 +3,7 @@
 
 # Server and machine-learning images MUST use matching versions — a mismatch
 # between them is a common (and confusing) Immich misconfiguration.
-immich_version: v3.1.0
+immich_version: v3.2.2
 immich_server_image: "ghcr.io/immich-app/immich-server:{{ immich_version }}"
 # The "-openvino" tag variant is required for GPU-accelerated ML inference;
 # see immich_hwaccel_enabled.

@@ -1,7 +1,7 @@
 ---
 # Default variables for the `beszel_hub` role.
 
-beszel_hub_image: "docker.io/henrygd/beszel:0.19.0"
+beszel_hub_image: "docker.io/henrygd/beszel:0.20.0"
 
 beszel_hub_data_dir: /opt/podman/beszel-hub
 
