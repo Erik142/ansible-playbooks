@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
 
@@ -108,7 +108,7 @@ jobs:
           [ -f "${{ matrix.dir }}/molecule/default/molecule.yml" ] && present=true
           echo "present=$present" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         if: steps.has_molecule.outputs.present == 'true'
         with:
           python-version: "3.14"
