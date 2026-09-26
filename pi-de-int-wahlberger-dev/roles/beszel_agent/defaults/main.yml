@@ -3,7 +3,7 @@
 
 # Server and machine-learning-style version pinning doesn't apply here (this
 # is a single static binary) — just pin the one version.
-beszel_agent_version: "0.19.0"
+beszel_agent_version: "0.20.0"
 
 # Beszel's release assets use Go's arch names, not uname's — map the one
 # fact to the other so this role needs no per-host override.
