@@ -18,7 +18,7 @@ jobs:
     outputs:
       dirs: ${{ steps.find.outputs.dirs }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: find
         run: |
           dirs=$(find . -maxdepth 1 -mindepth 1 -type d \
@@ -34,7 +34,7 @@ jobs:
       matrix:
         dir: ${{ fromJson(needs.discover.outputs.dirs) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
@@ -100,7 +100,7 @@ jobs:
       matrix:
         dir: ${{ fromJson(needs.discover.outputs.dirs) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - id: has_molecule
         run: |
@@ -154,7 +154,7 @@ jobs:
   vault-encrypted:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Ensure every vault.yml is Ansible-Vault encrypted
         run: |
           status=0
