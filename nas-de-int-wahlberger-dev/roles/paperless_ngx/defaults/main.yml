@@ -1,7 +1,7 @@
 ---
 # Default variables for the `paperless_ngx` role.
 
-paperless_ngx_image: ghcr.io/paperless-ngx/paperless-ngx:2.20.15
+paperless_ngx_image: ghcr.io/paperless-ngx/paperless-ngx:3.2.1
 paperless_ngx_redis_image: docker.io/library/redis:8
 paperless_ngx_db_image: docker.io/library/postgres:18
 
