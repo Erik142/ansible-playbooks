@@ -1,7 +1,7 @@
 ---
 # Default variables for the `semaphore` role.
 
-semaphore_image: docker.io/semaphoreui/semaphore:v2.19.12
+semaphore_image: docker.io/semaphoreui/semaphore:v2.19.14
 
 # Derived from podman_data_dir (the storage role's mounted external drive on
 # this host), not hardcoded, so it always lands on the same disk as every
