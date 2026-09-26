@@ -25,3 +25,9 @@ podman_image_prune_on_calendar: weekly
 # Only prune images created more than this long ago (podman `until` filter),
 # leaving a rollback window for the previous version.
 podman_image_prune_min_age: 168h
+
+# containers.conf `base_hosts_file`: what seeds each container's /etc/hosts.
+# "" = copy the host's (Podman's default; breaks containers that resolve the
+# host's own FQDN whenever the host maps it to 127.0.1.1), "image" = the
+# image's own, "none" = empty.
+podman_base_hosts_file: image

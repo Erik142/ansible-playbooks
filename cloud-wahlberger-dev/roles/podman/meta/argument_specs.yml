@@ -32,3 +32,10 @@ argument_specs:
         type: str
         required: false
         description: Only prune images older than this (podman `until` filter, e.g. 168h).
+      podman_base_hosts_file:
+        type: str
+        required: false
+        choices: ["", image, none]
+        description: >-
+          containers.conf base_hosts_file. "image" stops containers inheriting
+          the host's /etc/hosts.

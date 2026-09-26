@@ -44,3 +44,13 @@ sets it at runtime, so a package upgrade re-applying sysctl defaults turns it
 off and routed connections to published ports (e.g. Caddy's 80/443) hang while
 the containers still show "Up". The role persists it in
 `/etc/sysctl.d/99-podman-ip-forward.conf`.
+
+## Container /etc/hosts
+
+`podman_base_hosts_file` (default `image`) sets containers.conf's
+`base_hosts_file`, so containers no longer inherit the host's `/etc/hosts`.
+Otherwise a host that maps its own FQDN to `127.0.1.1` (cloud-init's
+`manage_etc_hosts` does this on the Pi at every boot) makes any container that
+resolves that name connect to its own loopback — e.g. Semaphore SSHing to its
+own host. Applies to containers created after the change; restart the Quadlet
+service to recreate one.

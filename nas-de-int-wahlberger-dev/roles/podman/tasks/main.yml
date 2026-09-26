@@ -39,6 +39,32 @@
     state: started
   when: podman_enable_socket | bool
 
+# By default Podman copies the HOST's /etc/hosts into every container. On
+# hosts where something rewrites it to `127.0.1.1 <fqdn>` (cloud-init's
+# manage_etc_hosts on the Pi, after a reboot), a container resolving the
+# host's own FQDN then gets its own loopback and can't reach the host
+# (broke Semaphore SSHing to its own host). Use the image's /etc/hosts as the
+# base instead; the FQDN then resolves via DNS. Applies to containers created
+# after this is in place (a Quadlet service restart recreates them).
+- name: Ensure the containers.conf drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/containers/containers.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Stop containers inheriting the host's /etc/hosts
+  ansible.builtin.copy:
+    dest: /etc/containers/containers.conf.d/50-base-hosts-file.conf
+    content: |
+      # Managed by Ansible (podman role).
+      [containers]
+      base_hosts_file = "{{ podman_base_hosts_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+
 # Rootful Podman published ports (DNAT to the container bridge) need IPv4
 # forwarding. netavark only flips it on at runtime when containers start, so a
 # package upgrade that re-applies sysctl defaults silently turns it off again
