@@ -28,3 +28,11 @@ stopped) are never removed, and named volumes are untouched, so this only
 reclaims space from replaced image versions. Check with
 `systemctl list-timers podman-image-prune.timer` and
 `journalctl -u podman-image-prune.service`.
+
+## IPv4 forwarding
+
+Published ports on rootful Podman need `net.ipv4.ip_forward=1`. netavark only
+sets it at runtime, so a package upgrade re-applying sysctl defaults turns it
+off and routed connections to published ports (e.g. Caddy's 80/443) hang while
+the containers still show "Up". The role persists it in
+`/etc/sysctl.d/99-podman-ip-forward.conf`.

@@ -27,6 +27,19 @@
     state: started
   when: podman_enable_socket | bool
 
+# Rootful Podman published ports (DNAT to the container bridge) need IPv4
+# forwarding. netavark only flips it on at runtime when containers start, so a
+# package upgrade that re-applies sysctl defaults silently turns it off again
+# and every routed connection to a published port hangs. Persist it.
+- name: Persist IPv4 forwarding for published container ports
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    sysctl_file: /etc/sysctl.d/99-podman-ip-forward.conf
+    sysctl_set: true
+    state: present
+    reload: true
+
 - name: Deploy the image-prune systemd units
   ansible.builtin.template:
     src: "{{ item }}.j2"

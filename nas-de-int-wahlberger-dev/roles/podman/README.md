@@ -36,3 +36,11 @@ Samba data and container data across two different storage media — see the
 top-level README). The role asserts it's an actual mountpoint before creating
 anything under it, so a missing mount fails loudly instead of silently writing
 container data onto the root filesystem.
+
+## IPv4 forwarding
+
+Published ports on rootful Podman need `net.ipv4.ip_forward=1`. netavark only
+sets it at runtime, so a package upgrade re-applying sysctl defaults turns it
+off and routed connections to published ports (e.g. Caddy's 80/443) hang while
+the containers still show "Up". The role persists it in
+`/etc/sysctl.d/99-podman-ip-forward.conf`.
