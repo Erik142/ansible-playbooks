@@ -2,7 +2,7 @@
 # Default variables for the `pocket_id` role.
 
 # Pocket ID image, pinned to a specific release for reproducibility.
-pocket_id_image: ghcr.io/pocket-id/pocket-id:v2.8.0
+pocket_id_image: ghcr.io/pocket-id/pocket-id:v2.16.0
 
 # Named Podman volume for persistent data — holds the SQLite DB AND the
 # encryption key (/app/data). Back this up. Podman creates it automatically.

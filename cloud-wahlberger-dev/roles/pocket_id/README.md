@@ -10,7 +10,7 @@ context).
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `pocket_id_image` | `ghcr.io/pocket-id/pocket-id:v2.8.0` | Image (pinned). |
+| `pocket_id_image` | `ghcr.io/pocket-id/pocket-id:v2.16.0` | Image (pinned). |
 | `pocket_id_volume` | `pocket-id` | Named volume at `/app/data` (DB + key). |
 | `pocket_id_app_url` | _(required)_ | Public `https://` URL; set in `group_vars`. |
 | `pocket_id_trust_proxy` | `true` | Trust `X-Forwarded-*` from the proxy. |

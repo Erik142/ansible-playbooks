@@ -1,0 +1,59 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "customManagers": [
+    {
+      "description": "Container images pinned in role defaults (<name>_image: registry/repo:tag)",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)roles/[^/]+/defaults/main\\.ya?ml$/"],
+      "matchStrings": [
+        "^\\w+_image:\\s*\"?(?<depName>[a-z0-9./_-]+):(?<currentValue>[\\w.-]+)\"?\\s*$"
+      ],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "description": "immich_version is shared by the server and ML images, which are templated",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)roles/immich/defaults/main\\.ya?ml$/"],
+      "matchStrings": ["^immich_version:\\s*\"?(?<currentValue>v[\\w.-]+)\"?\\s*$"],
+      "depNameTemplate": "ghcr.io/immich-app/immich-server",
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Minor/patch image bumps: grouped, auto-merged once CI passes",
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "container patch/minor",
+      "automerge": true
+    },
+    {
+      "description": "Never auto-bump major versions (opens a PR only)",
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    },
+    {
+      "description": "Postgres: minor/patch only, no major upgrades (needs a dump/restore)",
+      "matchPackageNames": ["docker.io/library/postgres"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
+      "description": "Immich's DB image is pinned to a matching vectorchord/pgvectors combo",
+      "matchPackageNames": ["ghcr.io/immich-app/postgres"],
+      "enabled": false
+    },
+    {
+      "description": "Pocket ID (auth provider): upgrade manually after reading release notes",
+      "matchPackageNames": ["ghcr.io/pocket-id/pocket-id"],
+      "enabled": false
+    },
+    {
+      "description": "Caddy upgrades skipped for now (incl. the locally built caddy-cloudflare image)",
+      "matchPackageNames": ["docker.io/library/caddy", "localhost/caddy-cloudflare"],
+      "enabled": false
+    }
+  ]
+}

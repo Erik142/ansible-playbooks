@@ -1,7 +1,7 @@
 ---
 # Default variables for the `mealie` role.
 
-mealie_image: ghcr.io/mealie-recipes/mealie:latest
+mealie_image: ghcr.io/mealie-recipes/mealie:v3.28.0
 mealie_data_dir: /mnt/containers/mealie
 mealie_timezone: Europe/Berlin
 
