@@ -20,17 +20,17 @@
         ping: "{{ homepage_beszel_url }}"
 
 - NAS (nas.de.int.wahlberger.dev):
-    - Mealie:
-        href: "{{ mealie_url }}"
+    - Tandoor:
+        href: "{{ tandoor_url }}"
         description: Recipe manager
-        # Not {{ mealie_url }}: that public hostname resolves (via public DNS)
-        # to this same NAS's own LAN IP, and Homepage pinging its own host's
-        # external address to reach a sibling container is a classic NAT
-        # hairpin that Podman's default bridge networking doesn't handle —
-        # fails even though the exact same URL works fine from an actual
-        # external client. Homepage and mealie share caddy.network, so the
+        # Not {{ tandoor_url }}: that public hostname resolves (via public
+        # DNS) to this same NAS's own LAN IP, and Homepage pinging its own
+        # host's external address to reach a sibling container is a classic
+        # NAT hairpin that Podman's default bridge networking doesn't handle
+        # — fails even though the exact same URL works fine from an actual
+        # external client. Homepage and tandoor share caddy.network, so the
         # container name resolves directly via Podman's network-scoped DNS.
-        ping: "http://mealie:9000"
+        ping: "http://tandoor:80"
     - Paperless-ngx:
         href: "{{ paperless_ngx_url }}"
         description: Document management
