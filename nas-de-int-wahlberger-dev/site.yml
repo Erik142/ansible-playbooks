@@ -52,14 +52,20 @@
     # Ensure this host's public DNS records exist before Caddy needs them.
     - role: cloudflare_dns
       tags: [cloudflare_dns]
-    # Reverse proxy (creates the shared network) for mealie/paperless-ngx/immich.
+    # Reverse proxy (creates the shared network) for tandoor/paperless-ngx/immich.
     - role: caddy
       tags: [caddy]
     # Native Samba file server (not a container) with guest access.
     - role: samba
       tags: [samba]
-    - role: mealie
-      tags: [mealie]
+    # Idempotent teardown of the old Mealie unit/container, superseded by
+    # tandoor below. Order vs. tandoor doesn't matter — neither publishes a
+    # host port, so there's no clash either way. See
+    # roles/mealie_decommission/README.md.
+    - role: mealie_decommission
+      tags: [mealie_decommission]
+    - role: tandoor
+      tags: [tandoor]
     # After samba: its inbox directory lives inside the Samba share.
     - role: paperless_ngx
       tags: [paperless_ngx]

@@ -19,8 +19,17 @@ vault_paperless_ngx_db_password: "REPLACE-with-a-generated-password"
 # it belongs to the Pocket ID client registration, not to this host.
 vault_paperless_ngx_oidc_client_secret: "REPLACE-with-pocket-id-client-secret"
 
-# Mealie OIDC client secret, issued by Pocket ID. Same migration note as above.
-vault_mealie_oidc_client_secret: "REPLACE-with-pocket-id-client-secret"
+# Tandoor's PostgreSQL role password (tandoor + tandoor-db) and Django
+# SECRET_KEY. Freshly generated — no migration/reuse concern.
+#     openssl rand -hex 24
+vault_tandoor_db_password: "REPLACE-with-a-generated-password"
+vault_tandoor_secret_key: "REPLACE-with-a-generated-secret-key"
+
+# Tandoor OIDC client secret, issued by Pocket ID when you manually register
+# a NEW Tandoor client (do NOT reuse Mealie's old client — see
+# roles/tandoor/README.md). Leave "" until then; the role's FR-12 assert
+# fails cleanly until this is filled in.
+vault_tandoor_oidc_client_secret: ""
 
 # PostgreSQL password for Immich's database.
 #     openssl rand -hex 24

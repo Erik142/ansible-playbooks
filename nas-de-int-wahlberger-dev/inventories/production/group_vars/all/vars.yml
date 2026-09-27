@@ -57,7 +57,10 @@ firewall_allowed_ports:
 caddy_acme_email: "ewahlberger@gmail.com"
 caddy_sites:
   - host: recipes.de.int.wahlberger.dev
-    upstream: "mealie:9000"
+    upstream: "tandoor:80"
+    extra: |
+      @setup path /setup/*
+      respond @setup 404
   - host: docs.de.int.wahlberger.dev
     upstream: "paperless-ngx:8000"
   - host: photos.de.int.wahlberger.dev
@@ -67,7 +70,7 @@ caddy_sites:
 
 # --- Identity provider (Pocket ID) -------------------------------------------
 # Public issuer URL of the Pocket ID instance (served by cloud-wahlberger-dev)
-# that mealie and paperless-ngx authenticate against. The OIDC discovery
+# that tandoor and paperless-ngx authenticate against. The OIDC discovery
 # document is derived from it as "{{ pocket_id_app_url }}/.well-known/openid-configuration".
 pocket_id_app_url: "https://id.wahlberger.dev"
 
@@ -89,19 +92,18 @@ paperless_ngx_disable_local_login: true
 # Login page redirects straight to Pocket ID instead of showing the local form.
 paperless_ngx_oidc_redirect_login: true
 
-# --- Mealie -------------------------------------------------------------------
-# Same continuity note as paperless-ngx above: reuses the existing Pocket ID
-# OIDC client for https://recipes.de.int.wahlberger.dev/login.
-mealie_url: "https://recipes.de.int.wahlberger.dev"
-mealie_oidc_provider_name: "Pocket ID"
-mealie_oidc_client_id: "93041358-e45e-4e44-b838-3c758cfe4681"
-# Account creation from OIDC. false = map to existing users only.
-mealie_oidc_signup_enabled: false
-# Skip Mealie's own login page and go straight to Pocket ID.
-mealie_oidc_auto_redirect: true
-mealie_oidc_user_claim: "email"
-mealie_oidc_admin_group: ""
-mealie_oidc_user_group: ""
+# --- Tandoor ------------------------------------------------------------------
+# Replaces Mealie at the SAME hostname. Deliberately does NOT reuse Mealie's
+# Pocket ID OIDC client (id 93041358-e45e-4e44-b838-3c758cfe4681) — a NEW
+# client must be registered for Tandoor (Q4 decision). tandoor_oidc_client_id
+# and vault_tandoor_oidc_client_secret are left blank below: the operator
+# fills them in after manually registering that client in Pocket ID (primary
+# flow step 1, roles/tandoor/README.md). Until then, the role's FR-12 assert
+# fails loudly and on purpose.
+tandoor_url: "https://recipes.de.int.wahlberger.dev"
+tandoor_oidc_provider_name: "Pocket ID"
+tandoor_oidc_provider_id: "pocket-id"
+tandoor_oidc_client_id: ""
 
 # --- Immich -------------------------------------------------------------------
 # New service — registered as its own Pocket ID app (see roles/immich/README.md
@@ -150,7 +152,14 @@ paperless_ngx_db_password: "{{ vault_paperless_ngx_db_password | default('') }}"
 # OIDC client secrets from Pocket ID. Migrating from rpi-karlsruhe? Reuse the
 # EXISTING values — they belong to the client_ids above, not to this host.
 paperless_ngx_oidc_client_secret: "{{ vault_paperless_ngx_oidc_client_secret | default('') }}"
-mealie_oidc_client_secret: "{{ vault_mealie_oidc_client_secret | default('') }}"
+
+# Tandoor's Postgres password and Django SECRET_KEY (48 hex chars each,
+# generated fresh — no migration/reuse concern). Its OIDC client secret is
+# blank until the operator registers the new Pocket ID client (see the
+# --- Tandoor --- section above).
+tandoor_db_password: "{{ vault_tandoor_db_password }}"
+tandoor_secret_key: "{{ vault_tandoor_secret_key }}"
+tandoor_oidc_client_secret: "{{ vault_tandoor_oidc_client_secret | default('') }}"
 
 # Immich's Postgres password and OIDC client secret.
 immich_db_password: "{{ vault_immich_db_password | default('') }}"
