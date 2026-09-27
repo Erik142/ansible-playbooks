@@ -20,13 +20,22 @@ Environment=POSTGRES_DB=tandoor
 Environment=POSTGRES_USER=tandoor
 Environment=TZ={{ tandoor_timezone }}
 # Non-secret base config only, set directly since it carries no secret value
-# (FR-24). The secrets this container needs to actually start -- SECRET_KEY
-# and the POSTGRES_PASSWORD matching tandoor-db.env -- plus every OIDC
-# setting, are wired in by a later task via a root-only env file (the same
-# EnvironmentFile= pattern as
-# roles/paperless_ngx/templates/paperless-ngx.container.j2). Until then this
-# container will not run to a working state.
+# (FR-24).
 Environment=CSRF_TRUSTED_ORIGINS={{ tandoor_url }}
+# --- Auth hardening (FR-21) --------------------------------------------
+# Closes local password registration. Confirmed against upstream during the
+# T-01 spike (2026-09-27): does not block auto-provisioning of new accounts
+# via Pocket ID sign-in (A-11, FR-19).
+Environment=ENABLE_SIGNUP=0
+# Disables local username/password authentication at the allauth level
+# entirely -- a stronger closure than only hiding the login form. The
+# `manage.py createsuperuser` recovery path (FR-56) still works regardless
+# of this setting.
+Environment=SOCIALACCOUNT_ONLY=1
+# SECRET_KEY, the POSTGRES_PASSWORD matching tandoor-db.env, and every OIDC
+# setting are wired in via a root-only env file (the same EnvironmentFile=
+# pattern as roles/paperless_ngx/templates/paperless-ngx.container.j2).
+EnvironmentFile={{ tandoor_data_dir }}/tandoor.env
 
 [Service]
 Restart=always

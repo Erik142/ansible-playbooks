@@ -1,7 +1,7 @@
 ---
 argument_specs:
   main:
-    short_description: Tandoor Recipes recipe manager behind Caddy (base deployment; OIDC login added separately).
+    short_description: Tandoor Recipes recipe manager behind Caddy, with Pocket ID OIDC login.
     options:
       tandoor_image:
         type: str
@@ -29,13 +29,39 @@ argument_specs:
         description: IANA timezone passed to the container.
       tandoor_url:
         type: str
-        required: false
-        description: >-
-          Public https:// URL Tandoor is served on. Becomes required: true
-          once the OIDC validation task is added (see roles/tandoor/README.md).
+        required: true
+        description: Public https:// URL Tandoor is served on.
       tandoor_db_password:
         type: str
         required: false
         description: >-
           PostgreSQL role password shared by tandoor and tandoor-db. From
-          vault_tandoor_db_password once secrets are wired in.
+          vault_tandoor_db_password. Not marked required: true (a secret,
+          validated non-empty by the role's FR-12 assert task instead).
+      tandoor_secret_key:
+        type: str
+        required: false
+        description: >-
+          Django SECRET_KEY, signs Tandoor's session cookies. From
+          vault_tandoor_secret_key. Not marked required: true (a secret,
+          validated non-empty by the role's FR-12 assert task instead).
+      tandoor_oidc_provider_id:
+        type: str
+        required: false
+        description: allauth provider slug, part of the OIDC callback URL.
+      tandoor_oidc_provider_name:
+        type: str
+        required: false
+        description: Label shown on the Tandoor login button.
+      tandoor_oidc_client_id:
+        type: str
+        required: true
+        description: OAuth2 client ID issued by Pocket ID for the Tandoor client.
+      tandoor_oidc_client_secret:
+        type: str
+        required: false
+        description: >-
+          OAuth2 client secret issued by Pocket ID. From
+          vault_tandoor_oidc_client_secret. Not marked required: true (a
+          secret, validated non-empty by the role's FR-12 assert task
+          instead).

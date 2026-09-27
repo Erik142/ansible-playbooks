@@ -1,11 +1,5 @@
 ---
 # Default variables for the `tandoor` role.
-#
-# This is the base skeleton only: Tandoor's OIDC login (tandoor_oidc_*,
-# tandoor_secret_key, the app's own root-only env file) is wired in by a
-# later task. Until then this role deploys tandoor.service/tandoor-db.service
-# but the tandoor container has no Django SECRET_KEY and cannot reach its
-# database yet — see roles/tandoor/README.md once that task lands.
 
 # Confirmed against upstream during the T-01 spike (2026-09-27): the official
 # image tag, an internal HTTP port of 80 (not 8080, the REQS.md default
@@ -20,14 +14,35 @@ tandoor_db_data_dir: "{{ tandoor_db_data_dir_root }}/pgdata"
 tandoor_timezone: Europe/Berlin
 
 # REQUIRED: public https:// URL Tandoor is served on (set in group_vars).
-# Must match the caddy_sites host entry and, once OIDC is wired in, Tandoor's
-# redirect URI registered in Pocket ID. Not yet validated by an assert task
-# in this skeleton (see roles/tandoor/README.md once that task lands).
+# Must match the caddy_sites host entry and Tandoor's redirect URI registered
+# in Pocket ID (FR-17). Validated non-empty by the FR-12 assert task below.
 tandoor_url: ""
 
 # PostgreSQL role password for tandoor-db. NOT an OIDC secret -- it is
 # required by both containers (tandoor-db to initialise its cluster, tandoor
-# to connect to it once that wiring is added), so it lives here rather than
-# in the OIDC-era app env file. From vault_tandoor_db_password once secrets
-# are wired in; not yet validated by an assert task in this skeleton.
+# to connect to it), so it lives here rather than in the OIDC app env file.
+# From vault_tandoor_db_password. Validated non-empty by the FR-12 assert
+# task below.
 tandoor_db_password: ""
+
+# Django SECRET_KEY, signs Tandoor's session cookies (BR-05). From
+# vault_tandoor_secret_key. Validated non-empty by the FR-12 assert task
+# below.
+tandoor_secret_key: ""
+
+# --- OpenID Connect via Pocket ID (django-allauth) --------------------------
+
+# allauth provider slug. It appears in the OIDC callback URL you register in
+# Pocket ID: "{{ tandoor_url }}/accounts/oidc/{{ tandoor_oidc_provider_id }}/login/callback/"
+# (A-04, FR-17).
+tandoor_oidc_provider_id: "pocket-id"
+# Label shown on the Tandoor login button.
+tandoor_oidc_provider_name: "Pocket ID"
+# OAuth2 client ID issued by Pocket ID when you register the Tandoor client
+# (BR-09). Not secret (a UUID), so it lives in group_vars in plaintext.
+# REQUIRED.
+tandoor_oidc_client_id: ""
+# From vault_tandoor_oidc_client_secret. REQUIRED (validated by the FR-12
+# assert task below, not by argument_specs -- it is a secret, not a
+# structural input).
+tandoor_oidc_client_secret: ""

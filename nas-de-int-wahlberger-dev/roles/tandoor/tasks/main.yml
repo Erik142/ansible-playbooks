@@ -1,4 +1,22 @@
 ---
+- name: Validate Tandoor OIDC and secret inputs are present
+  ansible.builtin.assert:
+    that:
+      - tandoor_url | length > 0
+      - tandoor_oidc_client_id | length > 0
+      - tandoor_oidc_client_secret | length > 0
+      - tandoor_db_password | length > 0
+      - tandoor_secret_key | length > 0
+    fail_msg: >-
+      Tandoor is not fully configured. Empty inputs among tandoor_url,
+      tandoor_oidc_client_id, tandoor_oidc_client_secret, tandoor_db_password
+      and tandoor_secret_key. Set tandoor_url and tandoor_oidc_client_id in
+      group_vars and provide the Vault secrets
+      vault_tandoor_oidc_client_secret, vault_tandoor_db_password and
+      vault_tandoor_secret_key (run with --ask-vault-pass). See
+      roles/tandoor/README.md.
+    quiet: true
+
 # world-writable (0777): matches the other Podman data directories on this
 # host used by images that run as a non-root user with no UID/GID remap
 # option (the official postgres image below is a proven example — see
@@ -28,12 +46,12 @@
 # tandoor-db's own secret (POSTGRES_PASSWORD), rendered root-only so it never
 # appears in the world-readable Quadlet unit. A change restarts tandoor-db
 # below. This is NOT an OIDC secret -- OIDC wiring (tandoor_secret_key,
-# tandoor_oidc_*, and the app's own root-only env file) is added by a later
-# task. Rendered immediately before its own include_role call, not batched
-# upfront, for the same reason documented in
-# roles/paperless_ngx/tasks/main.yml: the container role's flush_handlers is
-# global, so an early render could get its restart flushed before any
-# Quadlet unit exists on disk for daemon-reload to find.
+# tandoor_oidc_*, and the app's own root-only env file) is handled by the
+# "Render the Tandoor environment file" task below. Rendered immediately
+# before its own include_role call, not batched upfront, for the same reason
+# documented in roles/paperless_ngx/tasks/main.yml: the container role's
+# flush_handlers is global, so an early render could get its restart flushed
+# before any Quadlet unit exists on disk for daemon-reload to find.
 - name: Render the Tandoor DB environment file
   ansible.builtin.template:
     src: tandoor-db.env.j2
@@ -49,6 +67,20 @@
   vars:
     container_name: tandoor-db
     container_quadlet_src: tandoor-db.container.j2
+
+# SECRET_KEY, the POSTGRES_PASSWORD tandoor uses to reach tandoor-db, and the
+# full OIDC config, rendered root-only so none of it ever appears in the
+# world-readable Quadlet unit. A change restarts tandoor below. Rendered
+# immediately before its own include_role call for the same first-run
+# daemon-reload ordering reason as the tandoor-db env file above.
+- name: Render the Tandoor environment file
+  ansible.builtin.template:
+    src: tandoor.env.j2
+    dest: "{{ tandoor_data_dir }}/tandoor.env"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart tandoor
 
 - name: Deploy the Tandoor container
   ansible.builtin.include_role:
