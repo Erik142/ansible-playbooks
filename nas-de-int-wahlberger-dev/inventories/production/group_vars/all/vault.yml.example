@@ -27,9 +27,9 @@ vault_tandoor_secret_key: "REPLACE-with-a-generated-secret-key"
 
 # Tandoor OIDC client secret, issued by Pocket ID when you manually register
 # a NEW Tandoor client (do NOT reuse Mealie's old client — see
-# roles/tandoor/README.md). Leave "" until then; the role's FR-12 assert
-# fails cleanly until this is filled in.
-vault_tandoor_oidc_client_secret: ""
+# roles/tandoor/README.md). Register that client first; the role's FR-12
+# assert fails cleanly until this is filled in.
+vault_tandoor_oidc_client_secret: "REPLACE-with-the-Pocket-ID-client-secret"
 
 # PostgreSQL password for Immich's database.
 #     openssl rand -hex 24

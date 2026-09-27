@@ -76,18 +76,24 @@ no config flag to close it. See the `caddy` role for that block.
 
 ## Rotating the DB password
 
-1. Set a new `vault_tandoor_db_password` value in Vault.
-2. Re-run this role. The Postgres container will still be running with the
-   *old* password baked into its data directory — the new value only takes
-   effect on the container's env, so authentication will start failing.
-3. Update the password inside Postgres itself to match, then restart the app
-   container:
+`POSTGRES_PASSWORD` only takes effect when the database cluster is first
+initialised, so the role password inside the running `tandoor-db` container
+must be changed *before* `vault_tandoor_db_password`, not after — updating
+Vault first (or re-running the role first) would restart `tandoor` with a
+password Postgres doesn't recognize yet (BR-04).
+
+1. Change the role password inside `tandoor-db` first:
 
    ```console
    $ podman exec -it tandoor-db psql -U tandoor -c \
        "ALTER USER tandoor WITH PASSWORD '<new password>';"
-   $ podman restart tandoor
    ```
+
+2. Update `vault_tandoor_db_password` in Vault to the same new password.
+3. Run `ansible-playbook site.yml --tags tandoor,restic_backup` — tagging
+   `restic_backup` too is required so `tandoor-pgpass.env` is re-rendered
+   with the new password before the next backup, not just the `tandoor` app
+   container.
 
 ## Changing the Django secret key
 
@@ -108,8 +114,10 @@ so this only comes up when deliberately choosing to upgrade.
 
 ## Retire Mealie
 
-Once satisfied that both existing recipes have been re-entered in Tandoor
-(i.e. Tandoor is a trusted replacement for Mealie), retire the old
+Only once BR-01 is met — (a) every acceptance scenario verifying a `[Must]`
+FR, plus AC-46, has passed on the production host (except AC-36, the
+deletion itself, and AC-47, the failure drill), and (b) the owner has
+confirmed both former Mealie recipes exist in Tandoor — retire the old
 deployment by hand — neither step is an Ansible task:
 
 1. Delete the old data on disk: `rm -rf /mnt/containers/mealie` on the host.
