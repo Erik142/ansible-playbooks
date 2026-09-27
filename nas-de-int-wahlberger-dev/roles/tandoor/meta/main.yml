@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: tandoor
+  author: Erik Wahlberger
+  description: Tandoor Recipes recipe manager, running as Podman Quadlets behind Caddy.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - tandoor
+    - podman
+
+dependencies: []

@@ -1,0 +1,31 @@
+[Unit]
+Description=PostgreSQL (Tandoor database)
+After=network-online.target
+Wants=network-online.target
+# Emails ewahlberger@gmail.com via Resend after 5 consecutive failures —
+# see the notify_failure role.
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=tandoor-db
+Image={{ tandoor_db_image }}
+Network=tandoor
+# PostgreSQL 16 (confirmed by the T-01 spike) uses the classic,
+# version-agnostic data layout -- /var/lib/postgresql/data directly, no
+# version-specific subdirectory. Unlike paperless_ngx's Postgres 18+, which
+# moved to mounting /var/lib/postgresql itself (see
+# docker-library/postgres#1259). Matches
+# roles/immich/templates/immich-postgres.container.j2's comment.
+Volume={{ tandoor_db_data_dir }}:/var/lib/postgresql/data:Z
+Environment=POSTGRES_DB=tandoor
+Environment=POSTGRES_USER=tandoor
+# POSTGRES_PASSWORD rendered to a root-only 0600 file by this role from
+# Ansible Vault (must match the DB password the tandoor container is given
+# once that wiring is added by a later task).
+EnvironmentFile={{ tandoor_db_data_dir_root }}/tandoor-db.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

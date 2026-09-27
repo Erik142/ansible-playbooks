@@ -1,0 +1,41 @@
+---
+argument_specs:
+  main:
+    short_description: Tandoor Recipes recipe manager behind Caddy (base deployment; OIDC login added separately).
+    options:
+      tandoor_image:
+        type: str
+        required: false
+        description: Tandoor container image.
+      tandoor_db_image:
+        type: str
+        required: false
+        description: PostgreSQL container image for tandoor-db.
+      tandoor_data_dir:
+        type: path
+        required: false
+        description: Host directory for Tandoor's persistent media (and, once wired, its env file).
+      tandoor_db_data_dir_root:
+        type: path
+        required: false
+        description: Host directory for the tandoor-db container's env file.
+      tandoor_db_data_dir:
+        type: path
+        required: false
+        description: Host directory mounted as the tandoor-db Postgres data volume.
+      tandoor_timezone:
+        type: str
+        required: false
+        description: IANA timezone passed to the container.
+      tandoor_url:
+        type: str
+        required: false
+        description: >-
+          Public https:// URL Tandoor is served on. Becomes required: true
+          once the OIDC validation task is added (see roles/tandoor/README.md).
+      tandoor_db_password:
+        type: str
+        required: false
+        description: >-
+          PostgreSQL role password shared by tandoor and tandoor-db. From
+          vault_tandoor_db_password once secrets are wired in.

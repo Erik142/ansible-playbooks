@@ -1,0 +1,35 @@
+[Unit]
+Description=Tandoor Recipes recipe manager
+After=network-online.target caddy-network.service tandoor-db.service
+Wants=network-online.target tandoor-db.service
+Requires=caddy-network.service
+# Emails ewahlberger@gmail.com via Resend after 5 consecutive failures —
+# see the notify_failure role.
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=tandoor
+Image={{ tandoor_image }}
+Network=caddy.network
+Network=tandoor
+Volume={{ tandoor_data_dir }}/mediafiles:/opt/recipes/mediafiles:Z
+Environment=DB_ENGINE=django.db.backends.postgresql
+Environment=POSTGRES_HOST=tandoor-db
+Environment=POSTGRES_PORT=5432
+Environment=POSTGRES_DB=tandoor
+Environment=POSTGRES_USER=tandoor
+Environment=TZ={{ tandoor_timezone }}
+# Non-secret base config only, set directly since it carries no secret value
+# (FR-24). The secrets this container needs to actually start -- SECRET_KEY
+# and the POSTGRES_PASSWORD matching tandoor-db.env -- plus every OIDC
+# setting, are wired in by a later task via a root-only env file (the same
+# EnvironmentFile= pattern as
+# roles/paperless_ngx/templates/paperless-ngx.container.j2). Until then this
+# container will not run to a working state.
+Environment=CSRF_TRUSTED_ORIGINS={{ tandoor_url }}
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

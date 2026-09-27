@@ -1,0 +1,33 @@
+---
+# Default variables for the `tandoor` role.
+#
+# This is the base skeleton only: Tandoor's OIDC login (tandoor_oidc_*,
+# tandoor_secret_key, the app's own root-only env file) is wired in by a
+# later task. Until then this role deploys tandoor.service/tandoor-db.service
+# but the tandoor container has no Django SECRET_KEY and cannot reach its
+# database yet — see roles/tandoor/README.md once that task lands.
+
+# Confirmed against upstream during the T-01 spike (2026-09-27): the official
+# image tag, an internal HTTP port of 80 (not 8080, the REQS.md default
+# assumption), and PostgreSQL 16 as a supported major version.
+tandoor_image: "docker.io/vabene1111/recipes:2.6.15"
+tandoor_db_image: "docker.io/library/postgres:16"
+
+tandoor_data_dir: /mnt/containers/tandoor
+tandoor_db_data_dir_root: /mnt/containers/tandoor-db
+tandoor_db_data_dir: "{{ tandoor_db_data_dir_root }}/pgdata"
+
+tandoor_timezone: Europe/Berlin
+
+# REQUIRED: public https:// URL Tandoor is served on (set in group_vars).
+# Must match the caddy_sites host entry and, once OIDC is wired in, Tandoor's
+# redirect URI registered in Pocket ID. Not yet validated by an assert task
+# in this skeleton (see roles/tandoor/README.md once that task lands).
+tandoor_url: ""
+
+# PostgreSQL role password for tandoor-db. NOT an OIDC secret -- it is
+# required by both containers (tandoor-db to initialise its cluster, tandoor
+# to connect to it once that wiring is added), so it lives here rather than
+# in the OIDC-era app env file. From vault_tandoor_db_password once secrets
+# are wired in; not yet validated by an assert task in this skeleton.
+tandoor_db_password: ""

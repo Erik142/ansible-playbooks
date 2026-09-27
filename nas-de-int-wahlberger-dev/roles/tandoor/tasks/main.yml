@@ -1,0 +1,58 @@
+---
+# world-writable (0777): matches the other Podman data directories on this
+# host used by images that run as a non-root user with no UID/GID remap
+# option (the official postgres image below is a proven example — see
+# roles/paperless_ngx/tasks/main.yml for the detailed per-image rationale).
+# Kept uniform rather than special-casing the Tandoor app directory, whose
+# exact user model has not been confirmed upstream yet.
+- name: Create the Tandoor media directory
+  ansible.builtin.file:
+    path: "{{ tandoor_data_dir }}/mediafiles"
+    state: directory
+    owner: root
+    group: root
+    mode: "0777"
+
+- name: Create the Tandoor Postgres data directory
+  ansible.builtin.file:
+    path: "{{ tandoor_db_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0777"
+
+- name: Create the Tandoor Podman network
+  containers.podman.podman_network:
+    name: tandoor
+
+# tandoor-db's own secret (POSTGRES_PASSWORD), rendered root-only so it never
+# appears in the world-readable Quadlet unit. A change restarts tandoor-db
+# below. This is NOT an OIDC secret -- OIDC wiring (tandoor_secret_key,
+# tandoor_oidc_*, and the app's own root-only env file) is added by a later
+# task. Rendered immediately before its own include_role call, not batched
+# upfront, for the same reason documented in
+# roles/paperless_ngx/tasks/main.yml: the container role's flush_handlers is
+# global, so an early render could get its restart flushed before any
+# Quadlet unit exists on disk for daemon-reload to find.
+- name: Render the Tandoor DB environment file
+  ansible.builtin.template:
+    src: tandoor-db.env.j2
+    dest: "{{ tandoor_db_data_dir_root }}/tandoor-db.env"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart tandoor-db
+
+- name: Deploy the Tandoor DB container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: tandoor-db
+    container_quadlet_src: tandoor-db.container.j2
+
+- name: Deploy the Tandoor container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: tandoor
+    container_quadlet_src: tandoor.container.j2
