@@ -7,7 +7,7 @@
 # executes). Without a reload, systemd doesn't know the unit exists yet
 # (Podman Quadlet units are generated on daemon-reload), so the restart fails
 # with "Could not find the requested service". Making these handlers
-# self-sufficient avoids depending on ordering. See also roles/mealie's.
+# self-sufficient avoids depending on ordering. See also roles/tandoor's.
 - name: Restart paperless-db
   ansible.builtin.systemd:
     name: paperless-db.service

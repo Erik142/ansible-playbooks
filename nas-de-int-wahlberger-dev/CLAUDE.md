@@ -60,7 +60,7 @@ contrast (Debian, `apt`, `ufw`, `geerlingguy.security`, hyphenated role names).
 | `cloudflare_dns` | Ensures this host's A record + a CNAME per `caddy_sites` entry exist in Cloudflare |
 | `caddy` | Caddy reverse proxy, **custom-built image** (Cloudflare DNS module baked in via xcaddy, see `roles/caddy/files/Containerfile`); auto HTTPS via **DNS-01** (this host has no public inbound port for HTTP-01); creates the shared `caddy.network` |
 | `samba` | **Native** Samba (`smbd`/`nmbd`), guest-only share at `/mnt/data/samba` (the `samba/` subdirectory of the `/mnt/data` mount) — deliberately NOT a Podman container, unlike rpi-karlsruhe's `dockurr/samba` image |
-| `mealie` | Mealie recipe manager. Pocket ID OIDC login |
+| `tandoor` | Tandoor recipe manager (Postgres + app, image pinned). Pocket ID OIDC login |
 | `paperless_ngx` | Paperless-ngx (Redis + PostgreSQL + app, image pinned). Pocket ID OIDC login; inbox inside the Samba share |
 | `immich` | Immich photo/video backup (Valkey + PostgreSQL/vectorchord + machine learning + app). Pocket ID OIDC login via a config file (not env vars); QuickSync/OpenVINO hardware acceleration on the host's iGPU |
 | `homepage` | Homepage dashboard behind Caddy — static grouped links + ping status, no API keys, no Podman socket exposed. Links cloud-wahlberger-dev's services too (Pocket ID, FreshRSS); rpi-karlsruhe excluded (legacy) |
@@ -74,13 +74,16 @@ the router, so this host doesn't need its own client.
 
 This playbook **replaces** rpi-karlsruhe's `mealie` and `paperless-ngx` roles
 at the **same hostnames** (`recipes.de.int.wahlberger.dev`,
-`docs.de.int.wahlberger.dev`) and the **same Pocket ID OIDC client
-registrations** — `vars.yml` hardcodes the same `client_id` values on
-purpose. When migrating:
+`docs.de.int.wahlberger.dev`). Paperless-ngx kept the **same Pocket ID OIDC
+client registration** — `vars.yml` hardcodes the same `client_id` on purpose.
+The recipe manager at `recipes.de.int.wahlberger.dev` has since moved from
+Mealie to Tandoor (see `roles/tandoor/README.md`), which deliberately
+registers a **new** Pocket ID client rather than reusing Mealie's. When
+migrating Paperless-ngx:
 
 - Reuse rpi-karlsruhe's `vault_paperless_ngx_db_password`,
-  `vault_paperless_ngx_oidc_client_secret`, `vault_mealie_oidc_client_secret`,
-  and `vault_cloudflare_dns_api_token` values verbatim — new ones won't
+  `vault_paperless_ngx_oidc_client_secret`, and
+  `vault_cloudflare_dns_api_token` values verbatim — new ones won't
   authenticate against a restored DB dump, the existing Pocket ID client, or
   the existing Cloudflare zone token's scope.
 - Cut DNS over only after this playbook has run successfully and you've
@@ -99,9 +102,9 @@ purpose. When migrating:
   by the `snapper` role.
 - Secrets: encrypted `inventories/production/group_vars/all/vault.yml`,
   exposed via `{{ vault_* }}` indirection in `vars.yml`. Never commit
-  plaintext secrets. Six secrets exist here — two DB passwords, three OIDC
-  client secrets, and the Cloudflare DNS API token — Samba itself needs none,
-  being guest-only.
+  plaintext secrets. Eight secrets exist here — three DB passwords, three
+  OIDC client secrets, Tandoor's Django secret key, and the Cloudflare DNS
+  API token — Samba itself needs none, being guest-only.
 
 ## Adding a containerized service
 

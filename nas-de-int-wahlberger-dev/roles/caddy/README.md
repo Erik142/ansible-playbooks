@@ -6,7 +6,7 @@ ZeroTier/LAN, not a public VM like cloud-wahlberger-dev), so Let's Encrypt
 can't reach it on port 80 to validate a certificate. DNS-01 only needs
 outbound access to Cloudflare's API and Let's Encrypt, which the host already
 has. It also creates the shared `caddy.network` Podman network that backend
-services (`mealie`, `paperless_ngx`) attach to.
+services (`tandoor`, `paperless_ngx`) attach to.
 
 ## Why a custom-built image
 
@@ -42,7 +42,7 @@ Add an entry to `caddy_sites` (in `group_vars`) and re-run — no host edits:
 ```yaml
 caddy_sites:
   - host: recipes.de.int.wahlberger.dev
-    upstream: "mealie:9000"
+    upstream: "tandoor:80"
 ```
 
 Each `host` needs a DNS **A/AAAA record** pointing at wherever clients

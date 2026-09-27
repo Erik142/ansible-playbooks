@@ -44,7 +44,7 @@ Then set `immich_oidc_client_id` in group_vars and
 
 ## Why OIDC config lives in a JSON file, not env vars
 
-Unlike mealie/paperless_ngx, Immich doesn't expose OAuth settings as plain
+Unlike tandoor/paperless_ngx, Immich doesn't expose OAuth settings as plain
 environment variables — they're either set through the Administration
 Settings web UI, or declaratively via a config file
 (`IMMICH_CONFIG_FILE`, see [docs](https://docs.immich.app/install/config-file)).
@@ -84,7 +84,7 @@ once rather than assuming.
 
 ## No persistent volume for Valkey
 
-Unlike mealie's/paperless_ngx's Redis, `immich-redis` gets no `Volume=` —
+Unlike paperless_ngx's Redis, `immich-redis` gets no `Volume=` —
 matching Immich's own `docker-compose.yml`, which doesn't persist it either.
 It only holds transient job-queue/cache state, not anything Immich needs to
 survive a restart.

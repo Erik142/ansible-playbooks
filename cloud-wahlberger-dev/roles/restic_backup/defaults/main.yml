@@ -6,7 +6,8 @@
 # role, nothing here needs a pre-backup pg_dump: none of this host's
 # services use a separate Postgres container, just embedded SQLite (Pocket
 # ID, FreshRSS) or PocketBase's own SQLite (Beszel) — a live filesystem
-# copy of those is fine, same reasoning as nas's Mealie note.
+# copy of those is fine; only a separate Postgres container needs a
+# pre-backup pg_dump (see nas-de-int-wahlberger-dev's equivalent role).
 restic_backup_paths:
   - /opt/podman
 

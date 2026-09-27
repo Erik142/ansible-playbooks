@@ -16,7 +16,7 @@ masquerading for Podman's published container ports.
 
 Rootful Podman publishes container ports via DNAT, which crosses firewalld's
 **FORWARD**/NAT path, not a plain INPUT filter. `masquerade` must stay enabled
-on the configured zone or Caddy's published 80/443 stop working. mealie and
+on the configured zone or Caddy's published 80/443 stop working. tandoor and
 paperless-ngx are **not** published to the host at all — they're reached only
 through Caddy on the shared `caddy.network` — so they need no firewall rule of
 their own.

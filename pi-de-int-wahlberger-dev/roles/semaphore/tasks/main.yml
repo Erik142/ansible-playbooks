@@ -17,7 +17,7 @@
 
 # world-writable (0777): matches this repo's established pattern for Podman
 # data directories where the exact in-container UID isn't pinned down — see
-# nas-de-int-wahlberger-dev's mealie/paperless_ngx roles for the history of
+# nas-de-int-wahlberger-dev's tandoor/paperless_ngx roles for the history of
 # why this is the safer default over guessing at a tighter mode. (config.json
 # itself, rendered below, needs the same treatment for the same reason.)
 - name: Create the Semaphore data directory

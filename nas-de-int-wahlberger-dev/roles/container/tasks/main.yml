@@ -1,7 +1,7 @@
 ---
 # `container_quadlet_src` is just the template's filename. We resolve it against
 # the *calling* role's templates/ dir via ansible_parent_role_paths[0] (the role
-# that included us, e.g. `mealie`). We can't let the service role pass a
+# that included us, e.g. `tandoor`). We can't let the service role pass a
 # `{{ role_path }}`-based path: include_role vars are templated lazily, at the
 # moment this task reads them, so `role_path` would resolve to *this* role
 # (`container`) and look for the template under roles/container/templates/.

@@ -17,27 +17,27 @@ includes it once per container.
 
 ## Adding a new service (the pattern)
 
-1. Create a service role, e.g. `roles/mealie/`.
-2. Put the Quadlet **template** at `roles/mealie/templates/mealie.container.j2`
+1. Create a service role, e.g. `roles/tandoor/`.
+2. Put the Quadlet **template** at `roles/tandoor/templates/tandoor.container.j2`
    — it's rendered with your role's variables (image tag, env, volumes, …).
-3. In `roles/mealie/tasks/main.yml`, deploy any config/data first, then call
+3. In `roles/tandoor/tasks/main.yml`, deploy any config/data first, then call
    this helper:
 
    ```yaml
-   - name: Create the Mealie data directory
+   - name: Create the Tandoor data directory
      ansible.builtin.file:
-       path: "{{ mealie_data_dir }}"
+       path: "{{ tandoor_data_dir }}"
        state: directory
        owner: root
        group: root
        mode: "0750"
 
-   - name: Deploy the Mealie container
+   - name: Deploy the Tandoor container
      ansible.builtin.include_role:
        name: container
      vars:
-       container_name: mealie
-       container_quadlet_src: mealie.container.j2
+       container_name: tandoor
+       container_quadlet_src: tandoor.container.j2
    ```
 
    Pass just the template's **filename** — this role resolves it against your
@@ -45,7 +45,7 @@ includes it once per container.
    a `{{ role_path }}`-based path: `include_role` vars are templated lazily, so
    `role_path` would resolve to the `container` role, not yours.
 
-4. Add `- role: mealie` to `site.yml`.
+4. Add `- role: tandoor` to `site.yml`.
 
 ## Why `flush_handlers` instead of a plain handler?
 

@@ -3,7 +3,7 @@
 Ansible playbook for **`nas.de.int.wahlberger.dev`**, Erik's primary NAS in
 Germany, running **openSUSE Tumbleweed**. Serves files over **native Samba**
 (guest access, no container), and runs a **Podman Quadlet** container stack
-for **Mealie** and **Paperless-ngx** behind a **Caddy** reverse proxy with
+for **Tandoor** and **Paperless-ngx** behind a **Caddy** reverse proxy with
 Pocket ID single sign-on. ZeroTier is configured transparently for the whole
 LAN at the router, so this host has no ZeroTier client of its own.
 
@@ -16,8 +16,8 @@ instead of `geerlingguy.security`, which doesn't target openSUSE).
 
 ## Why this isn't just added to rpi-karlsruhe
 
-This NAS runs the **same two application containers** (Mealie, Paperless-ngx)
-that `rpi-karlsruhe` already serves, at the **same hostnames** — it's meant to
+This NAS originally replaced `rpi-karlsruhe`'s **same two application
+containers** (Mealie, Paperless-ngx) at the **same hostnames** — it's meant to
 replace those instances, not sit alongside them as a second copy under
 different names. Rather than bolt a second, architecturally different host
 (different OS, different container tech conventions, native Samba instead of
@@ -48,7 +48,7 @@ nas-de-int-wahlberger-dev/
     ├── podman/                  # Podman + Quadlet runtime
     ├── caddy/                   # reverse proxy + automatic HTTPS (shared network)
     ├── samba/                   # NATIVE Samba file server (not a container), guest access
-    ├── mealie/                  # Mealie recipe manager, Pocket ID OIDC login
+    ├── tandoor/                 # Tandoor recipe manager, Pocket ID OIDC login
     ├── paperless_ngx/           # Paperless-ngx (Redis + PostgreSQL + app), Pocket ID OIDC login
     ├── homepage/                # dashboard linking this NAS's + cloud-wahlberger-dev's services
     └── container/                # generic Quadlet (.container) deployer (helper)
@@ -99,8 +99,8 @@ instead of silently landing on the root filesystem:
 - `/mnt/data` is the mountpoint; only its `samba/` subdirectory
   (`/mnt/data/samba/`) is shared as the guest Samba share root. Also holds
   Paperless's scan-to-folder inbox at `.../samba/paperless-inbox/`.
-- `/mnt/containers/<service>/` — container data (Caddy certs, Mealie data,
-  Paperless data/media/export/db/redis).
+- `/mnt/containers/<service>/` — container data (Caddy certs, Tandoor
+  data/db, Paperless data/media/export/db/redis).
 
 ## Hardening
 
@@ -124,7 +124,7 @@ See [`roles/security/README.md`](roles/security/README.md) for the
 |---------|-----|-------|
 | Samba | Native openSUSE service (`smbd`/`nmbd`) | Guest-only share, no user accounts — anyone on the network can read/write. See [`roles/samba/README.md`](roles/samba/README.md). |
 | Caddy | Podman Quadlet, custom-built image | Automatic HTTPS via **DNS-01** (Cloudflare) — this host has no public inbound port, so HTTP-01 won't work; creates the shared `caddy.network`. See [`roles/caddy/README.md`](roles/caddy/README.md). |
-| Mealie | Podman Quadlet, behind Caddy | Pocket ID OIDC login. |
+| Tandoor | Podman Quadlets (app + PostgreSQL), behind Caddy | Pocket ID OIDC login. |
 | Paperless-ngx | Podman Quadlets (app + Redis + PostgreSQL), behind Caddy | Pocket ID OIDC login; inbox lives inside the Samba share. |
 | Homepage | Podman Quadlet, behind Caddy | Dashboard linking this NAS's and cloud-wahlberger-dev's services. `rpi-karlsruhe` excluded (legacy). See [`roles/homepage/README.md`](roles/homepage/README.md). |
 
@@ -169,10 +169,13 @@ ansible-playbook site.yml --ask-vault-pass
 
 **Migrating secrets from rpi-karlsruhe?** Reuse the *existing* values for
 `vault_paperless_ngx_db_password`, `vault_paperless_ngx_oidc_client_secret`,
-`vault_mealie_oidc_client_secret`, and `vault_cloudflare_dns_api_token` —
-these hostnames, their OIDC client registrations in Pocket ID, and the
-Cloudflare zone are all unchanged, and a restored Paperless database dump
-won't authenticate against a newly generated DB password.
+and `vault_cloudflare_dns_api_token` — that hostname, its OIDC client
+registration in Pocket ID, and the Cloudflare zone are all unchanged, and a
+restored Paperless database dump won't authenticate against a newly
+generated DB password. Tandoor (which replaced Mealie at
+`recipes.de.int.wahlberger.dev`, see `roles/tandoor/README.md`) deliberately
+does **not** reuse Mealie's old Pocket ID client — register a new one and set
+`vault_tandoor_oidc_client_secret` instead.
 
 ## Linting & validation
 

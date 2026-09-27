@@ -31,8 +31,6 @@ actually get backed up — each authenticated via its own `*-pgpass.env` file
 (different DB passwords), all excluded from the backup themselves the same
 way `restic-backup.env` is. A failed `pg_dump` aborts the whole script before
 `restic backup` ever runs (`set -eu`, same as every other command here).
-Mealie needs no equivalent treatment — it uses an embedded SQLite database,
-not a separate Postgres container.
 
 `.snapshots` (Snapper's own Btrfs snapshot history, wherever it appears
 under a backed-up path) is also excluded. Backing it up would mean restic

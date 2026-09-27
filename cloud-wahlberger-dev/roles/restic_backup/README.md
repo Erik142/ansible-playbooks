@@ -12,8 +12,10 @@ Modeled directly on `nas-de-int-wahlberger-dev`'s role of the same name, but
 simpler: this host has no separate Postgres container for anything (Pocket
 ID and FreshRSS use embedded SQLite; Beszel's hub uses PocketBase's own
 SQLite), so there's no `pg_dump` step and nothing needs excluding from
-`restic_backup_paths` — a live filesystem copy of `/opt/podman` is fine, the
-same reasoning nas's role already applies to Mealie's SQLite database.
+`restic_backup_paths` — a live filesystem copy of `/opt/podman` is fine for
+embedded SQLite: unlike a separate Postgres container (which needs a
+`pg_dump` step, see `nas-de-int-wahlberger-dev`'s role of the same name), a
+live copy of an SQLite file is restorable as-is.
 
 ## `Environment=HOME=/root` — why it's needed
 

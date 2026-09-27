@@ -18,7 +18,7 @@ default) are `semaphore_url` and `semaphore_oidc_client_id` — set them in
 
 Confirmed working against Semaphore's own documented Pocket ID integration
 (https://pocket-id.org/docs/client-examples/semaphore-ui), but two things
-are **not** as seamless as Mealie/Paperless-ngx's Pocket ID integration:
+are **not** as seamless as Tandoor/Paperless-ngx's Pocket ID integration:
 
 1. **No auto-provisioning of permissions.** Semaphore auto-creates a user
    record on first OIDC login, but that user gets **zero project access** by

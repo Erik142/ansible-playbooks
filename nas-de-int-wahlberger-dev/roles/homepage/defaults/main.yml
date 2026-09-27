@@ -14,7 +14,7 @@ homepage_url: ""
 
 # Cross-playbook links to cloud-wahlberger-dev's services. rpi-karlsruhe is
 # intentionally excluded — it's being retired, see the top-level README.
-# Reuses pocket_id_app_url (already defined for mealie/paperless_ngx's OIDC)
+# Reuses pocket_id_app_url (already defined for tandoor/paperless_ngx's OIDC)
 # rather than duplicating the URL under a new name.
 homepage_pocket_id_url: "{{ pocket_id_app_url }}"
 homepage_freshrss_url: "https://rss.wahlberger.dev"
