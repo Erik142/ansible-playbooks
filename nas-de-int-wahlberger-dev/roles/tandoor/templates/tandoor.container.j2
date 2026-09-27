@@ -20,18 +20,27 @@ Environment=POSTGRES_DB=tandoor
 Environment=POSTGRES_USER=tandoor
 Environment=TZ={{ tandoor_timezone }}
 # Non-secret base config only, set directly since it carries no secret value
-# (FR-24).
+# (FR-24). ALLOWED_HOSTS also lists the bare "tandoor" container-network
+# name so Homepage's internal ping (http://tandoor:80, Host: tandoor) isn't
+# rejected the same way the public hostname would be without this.
 Environment=CSRF_TRUSTED_ORIGINS={{ tandoor_url }}
+Environment=ALLOWED_HOSTS={{ tandoor_url | urlsplit('hostname') }},tandoor
 # --- Auth hardening (FR-21) --------------------------------------------
 # Closes local password registration. Confirmed against upstream during the
 # T-01 spike (2026-09-27): does not block auto-provisioning of new accounts
 # via Pocket ID sign-in (A-11, FR-19).
 Environment=ENABLE_SIGNUP=0
-# Disables local username/password authentication at the allauth level
-# entirely -- a stronger closure than only hiding the login form. The
-# `manage.py createsuperuser` recovery path (FR-56) still works regardless
-# of this setting.
-Environment=SOCIALACCOUNT_ONLY=1
+# Hides the local login form. SOCIALACCOUNT_ONLY was tried first (a
+# stronger closure) but this pinned Tandoor version's allauth.mfa app is
+# unconditionally installed with no env-var toggle, and SOCIALACCOUNT_ONLY's
+# own Django system check requires ACCOUNT_EMAIL_VERIFICATION='none', which
+# this version also has no env override for -- so SOCIALACCOUNT_ONLY fails
+# startup with SystemCheckError on this image (confirmed against the live
+# container 2026-09-27). No local accounts exist anyway since
+# ENABLE_SIGNUP=0 blocks creating them, so hiding the form is sufficient for
+# FR-21's actual requirement. The `manage.py createsuperuser` recovery path
+# (FR-56) still works regardless of this setting.
+Environment=HIDE_LOGIN_FORM=1
 # SECRET_KEY, the POSTGRES_PASSWORD matching tandoor-db.env, and every OIDC
 # setting are wired in via a root-only env file (the same EnvironmentFile=
 # pattern as roles/paperless_ngx/templates/paperless-ngx.container.j2).

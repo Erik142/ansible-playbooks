@@ -15,9 +15,16 @@ required ones (no usable default) are `tandoor_url` and
 `vault_tandoor_db_password` and `vault_tandoor_oidc_client_secret` in Ansible
 Vault.
 
-Tandoor's app container also sets `ENABLE_SIGNUP=0` and
-`SOCIALACCOUNT_ONLY=1`, closing local username/password account creation and
-sign-in — Pocket ID is the only way to sign in once the setup below is done.
+Tandoor's app container also sets `ENABLE_SIGNUP=0` (blocks local
+username/password account creation) and `HIDE_LOGIN_FORM=1` (hides the local
+login form) — Pocket ID is the only practical way to sign in once the setup
+below is done. `SOCIALACCOUNT_ONLY=1` would close local sign-in more
+strictly, but this pinned Tandoor version's `allauth.mfa` app is
+unconditionally installed with no env-var toggle, and `SOCIALACCOUNT_ONLY`'s
+own Django system check requires `ACCOUNT_EMAIL_VERIFICATION=none`, which
+this version has no env override for — so it fails startup with
+`SystemCheckError`. Since `ENABLE_SIGNUP=0` already prevents any local
+account from existing, hiding the form is sufficient in practice.
 
 ## Register the OIDC client in Pocket ID
 
@@ -65,7 +72,7 @@ management command, run inside the running app container:
 $ podman exec -it tandoor python manage.py createsuperuser
 ```
 
-This works regardless of `SOCIALACCOUNT_ONLY=1`, since it bypasses the web
+This works regardless of `HIDE_LOGIN_FORM=1`, since it bypasses the web
 login flow entirely and creates the account straight in the database. Use
 the resulting local account only to fix the space/user configuration, then
 go back to signing in via Pocket ID.
