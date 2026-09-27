@@ -69,7 +69,7 @@ space admin is available, create a local superuser directly via Django's
 management command, run inside the running app container:
 
 ```console
-$ podman exec -it tandoor python manage.py createsuperuser
+$ podman exec -it tandoor /opt/recipes/venv/bin/python manage.py createsuperuser
 ```
 
 This works regardless of `HIDE_LOGIN_FORM=1`, since it bypasses the web
