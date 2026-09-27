@@ -103,7 +103,7 @@ paperless_ngx_oidc_redirect_login: true
 tandoor_url: "https://recipes.de.int.wahlberger.dev"
 tandoor_oidc_provider_name: "Pocket ID"
 tandoor_oidc_provider_id: "pocket-id"
-tandoor_oidc_client_id: ""
+tandoor_oidc_client_id: "79e5970e-7c2e-45be-b667-58dfd9539fd8"
 
 # --- Immich -------------------------------------------------------------------
 # New service — registered as its own Pocket ID app (see roles/immich/README.md
