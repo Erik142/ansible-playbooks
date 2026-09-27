@@ -59,6 +59,7 @@
     owner: root
     group: root
     mode: "0600"
+  no_log: true
   notify: Restart tandoor-db
 
 - name: Deploy the Tandoor DB container
@@ -80,6 +81,7 @@
     owner: root
     group: root
     mode: "0600"
+  no_log: true
   notify: Restart tandoor
 
 - name: Deploy the Tandoor container

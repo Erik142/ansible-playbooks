@@ -59,7 +59,7 @@ caddy_sites:
   - host: recipes.de.int.wahlberger.dev
     upstream: "tandoor:80"
     extra: |
-      @setup path /setup/*
+      @setup path /setup /setup/*
       respond @setup 404
   - host: docs.de.int.wahlberger.dev
     upstream: "paperless-ngx:8000"
@@ -157,8 +157,8 @@ paperless_ngx_oidc_client_secret: "{{ vault_paperless_ngx_oidc_client_secret | d
 # generated fresh — no migration/reuse concern). Its OIDC client secret is
 # blank until the operator registers the new Pocket ID client (see the
 # --- Tandoor --- section above).
-tandoor_db_password: "{{ vault_tandoor_db_password }}"
-tandoor_secret_key: "{{ vault_tandoor_secret_key }}"
+tandoor_db_password: "{{ vault_tandoor_db_password | default('') }}"
+tandoor_secret_key: "{{ vault_tandoor_secret_key | default('') }}"
 tandoor_oidc_client_secret: "{{ vault_tandoor_oidc_client_secret | default('') }}"
 
 # Immich's Postgres password and OIDC client secret.
