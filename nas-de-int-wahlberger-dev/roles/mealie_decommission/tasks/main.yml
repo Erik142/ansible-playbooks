@@ -1,0 +1,39 @@
+---
+# Idempotent Mealie live-host teardown (FR-37, FR-38, FR-82). roles/mealie/
+# is deleted from the repo as part of this same cut-over, so this small
+# standalone role is what actually removes Mealie's unit and container from
+# a host that still has them — every task below is conditioned on the same
+# `stat` result, so a host that never had Mealie (or one already
+# decommissioned) reports `ok`/`skipped` only, never `changed` (FR-38).
+#
+# Deliberately never touches /mnt/containers/mealie or any path below it
+# (FR-46) — that directory's removal is a manual owner step, documented in
+# roles/tandoor/README.md, not Ansible.
+- name: Check whether the Mealie Quadlet unit file still exists
+  ansible.builtin.stat:
+    path: /etc/containers/systemd/mealie.container
+  register: mealie_decommission_unit_file
+
+- name: Stop and disable the Mealie systemd service
+  ansible.builtin.systemd:
+    name: mealie.service
+    state: stopped
+    enabled: false
+  when: mealie_decommission_unit_file.stat.exists
+
+- name: Remove the Mealie Podman container
+  containers.podman.podman_container:
+    name: mealie
+    state: absent
+  when: mealie_decommission_unit_file.stat.exists
+
+- name: Remove the Mealie Quadlet unit file
+  ansible.builtin.file:
+    path: /etc/containers/systemd/mealie.container
+    state: absent
+  when: mealie_decommission_unit_file.stat.exists
+
+- name: Reload systemd after removing the Mealie unit file
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: mealie_decommission_unit_file.stat.exists

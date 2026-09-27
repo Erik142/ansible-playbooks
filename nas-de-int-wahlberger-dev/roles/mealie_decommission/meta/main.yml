@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: mealie_decommission
+  author: Erik Wahlberger
+  description: Idempotently stops and removes a live Mealie unit/container left over from before the Tandoor cut-over.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - mealie
+    - podman
+    - cleanup
+
+dependencies: []

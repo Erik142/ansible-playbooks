@@ -1,0 +1,16 @@
+---
+argument_specs:
+  main:
+    short_description: Idempotently remove a live Mealie unit/container as part of the Tandoor cut-over.
+    description:
+      - roles/mealie/ is deleted from the repository as part of the same
+        cut-over that introduces Tandoor, so it can no longer own its own
+        teardown. This role is the standalone replacement for that
+        teardown logic (FR-37, FR-38, FR-82) — run once from site.yml, it
+        leaves any host that has /etc/containers/systemd/mealie.container
+        with no mealie.service unit and no mealie Podman container, and
+        reports no change on a host that never had Mealie or was already
+        decommissioned. It never touches /mnt/containers/mealie (FR-46);
+        deleting that data directory is a manual owner step documented in
+        roles/tandoor/README.md. No variables of its own; see README.md.
+    options: {}

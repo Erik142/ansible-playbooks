@@ -1,0 +1,7 @@
+---
+# Default variables for the `mealie_decommission` role.
+#
+# No variables of its own: the paths and names it acts on (the Mealie
+# Quadlet unit file, `mealie.service`, the `mealie` Podman container) are
+# fixed by what roles/mealie/ used to deploy, not configurable. See
+# README.md.
