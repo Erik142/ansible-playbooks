@@ -41,6 +41,14 @@
     group: root
     mode: "0600"
 
+- name: Render the Tandoor Postgres auth file for pg_dump
+  ansible.builtin.template:
+    src: tandoor-pgpass.env.j2
+    dest: "{{ restic_backup_staging_dir }}/tandoor-pgpass.env"
+    owner: root
+    group: root
+    mode: "0600"
+
 - name: Render the restic environment file
   ansible.builtin.template:
     src: restic-backup.env.j2

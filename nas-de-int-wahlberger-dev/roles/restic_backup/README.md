@@ -20,14 +20,17 @@ service runs as root (no `User=` set), so `HOME=/root` is correct here.
 ## What's backed up, and what isn't
 
 `restic_backup_paths` covers the whole Samba share (`samba_mount_path`) and
-`/mnt/containers` (every service's data) — but the raw Paperless-ngx and
-Immich Postgres data directories are both excluded (`restic_backup_exclude`).
-A live filesystem copy of a Postgres data directory mid-write isn't
-guaranteed restorable. Instead, the backup script runs `pg_dump` for each
-into `restic_backup_staging_dir` first, and those consistent dump files
-(`paperless.sql`, `immich.sql`) are what actually get backed up — each
-authenticated via its own `*-pgpass.env` file (different DB passwords), both
-excluded from the backup themselves the same way `restic-backup.env` is.
+`/mnt/containers` (every service's data, including Tandoor's media
+directory — `tandoor_data_dir`, no separate path entry needed) — but the raw
+Paperless-ngx, Immich and Tandoor Postgres data directories are all excluded
+(`restic_backup_exclude`). A live filesystem copy of a Postgres data
+directory mid-write isn't guaranteed restorable. Instead, the backup script
+runs `pg_dump` for each into `restic_backup_staging_dir` first, and those
+consistent dump files (`paperless.sql`, `immich.sql`, `tandoor.sql`) are what
+actually get backed up — each authenticated via its own `*-pgpass.env` file
+(different DB passwords), all excluded from the backup themselves the same
+way `restic-backup.env` is. A failed `pg_dump` aborts the whole script before
+`restic backup` ever runs (`set -eu`, same as every other command here).
 Mealie needs no equivalent treatment — it uses an embedded SQLite database,
 not a separate Postgres container.
 
@@ -115,10 +118,11 @@ restic snapshots
 restic restore latest --target /tmp/restore
 ```
 
-Paperless-ngx's data comes back as `paperless.sql` inside the restored
-tree — restore it with `psql` (or `podman exec -i paperless-db psql -U
-paperless paperless < paperless.sql` after stopping the app container),
-not by copying files into the live Postgres data directory.
+Paperless-ngx's, Immich's and Tandoor's data come back as `paperless.sql`,
+`immich.sql` and `tandoor.sql` inside the restored tree — restore each with
+`psql` (or `podman exec -i <db-container> psql -U <user> <db> < <dump>.sql`
+after stopping the app container), not by copying files into the live
+Postgres data directory.
 
 **Expect an `xattr.LRemove ... security.selinux: permission denied` error on
 one or two top-level directories, even as root.** This host runs SELinux,
