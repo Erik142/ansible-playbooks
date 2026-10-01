@@ -8,6 +8,23 @@
     # (image-build time) even though it's actually empty — common's own
     # cache_valid_time check can be fooled into skipping the real fetch.
     # Force one unconditionally before converge runs.
+    #
+    # Molecule's own image-wrapper Dockerfile ends with `rm -rf
+    # /var/lib/apt/lists/*`, which also deletes apt's `lock` file (and
+    # `partial/`). On trixie the apt module then fails with "Could not open
+    # lock file ... No such file or directory" instead of recreating it, so
+    # restore the skeleton first.
+    - name: Restore apt lists skeleton removed by the image build
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: "{{ item.state }}"
+        mode: "{{ item.mode }}"
+        modification_time: preserve
+        access_time: preserve
+      loop:
+        - {path: /var/lib/apt/lists/partial, state: directory, mode: "0700"}
+        - {path: /var/lib/apt/lists/lock, state: touch, mode: "0640"}
+
     - name: Force a real apt cache refresh
       ansible.builtin.apt:
         update_cache: true
