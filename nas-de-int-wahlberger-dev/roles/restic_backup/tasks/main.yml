@@ -12,9 +12,13 @@
       vault_restic_server_htpasswd_password exactly. See README.md.
     quiet: true
 
-- name: Install restic
+# restic for the backup itself; sqlite3 (the CLI) for Forgejo's consistent
+# SQLite copy — the Forgejo image ships no sqlite3 binary to exec into.
+- name: Install restic and sqlite3
   community.general.zypper:
-    name: restic
+    name:
+      - restic
+      - sqlite3
     state: present
 
 - name: Create the backup staging directory

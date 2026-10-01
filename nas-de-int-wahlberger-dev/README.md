@@ -50,6 +50,7 @@ nas-de-int-wahlberger-dev/
     ├── samba/                   # NATIVE Samba file server (not a container), guest access
     ├── tandoor/                 # Tandoor recipe manager, Pocket ID OIDC login
     ├── paperless_ngx/           # Paperless-ngx (Redis + PostgreSQL + app), Pocket ID OIDC login
+    ├── forgejo/                 # Forgejo git forge + OCI registry (SQLite), Pocket ID OIDC login
     ├── homepage/                # dashboard linking this NAS's + cloud-wahlberger-dev's services
     └── container/                # generic Quadlet (.container) deployer (helper)
 ```
@@ -126,10 +127,11 @@ See [`roles/security/README.md`](roles/security/README.md) for the
 | Caddy | Podman Quadlet, custom-built image | Automatic HTTPS via **DNS-01** (Cloudflare) — this host has no public inbound port, so HTTP-01 won't work; creates the shared `caddy.network`. See [`roles/caddy/README.md`](roles/caddy/README.md). |
 | Tandoor | Podman Quadlets (app + PostgreSQL), behind Caddy | Pocket ID OIDC login. |
 | Paperless-ngx | Podman Quadlets (app + Redis + PostgreSQL), behind Caddy | Pocket ID OIDC login; inbox lives inside the Samba share. |
+| Forgejo | Podman Quadlet (rootless, SQLite), behind Caddy | Git forge + built-in container registry at `git.de.int.wahlberger.dev`, Pocket ID OIDC login, git over SSH on port 2222, LAN/VPN only. Registry login uses personal access tokens. See [`roles/forgejo/README.md`](roles/forgejo/README.md). |
 | Homepage | Podman Quadlet, behind Caddy | Dashboard linking this NAS's and cloud-wahlberger-dev's services. `rpi-karlsruhe` excluded (legacy). See [`roles/homepage/README.md`](roles/homepage/README.md). |
 
 **Before the first run:** point `recipes.de.int.wahlberger.dev`,
-`docs.de.int.wahlberger.dev`, and `www.de.int.wahlberger.dev` at wherever
+`docs.de.int.wahlberger.dev`, `git.de.int.wahlberger.dev`, and `www.de.int.wahlberger.dev` at wherever
 clients actually reach this host (its LAN IP — reachable transparently over
 ZeroTier too, via the router) — DNS-01 doesn't need a public IP, unlike
 HTTP-01. If migrating the first two hostnames from `rpi-karlsruhe`, do the DNS

@@ -49,6 +49,10 @@ disk_space_paths:
 # over the ZeroTier-routed home LAN — must match beszel_agent_port.
 firewall_allowed_ports:
   - "45876/tcp"
+  # Forgejo's git-over-SSH (forgejo_ssh_port); the host's own sshd stays on
+  # 22. This host has no public inbound port, so this is reachable from the
+  # LAN/ZeroTier only. Must match forgejo_ssh_port.
+  - "2222/tcp"
 
 # --- Reverse proxy (caddy role) ----------------------------------------------
 # DNS-01 via Cloudflare (not HTTP-01): this host has no public inbound port,
@@ -65,6 +69,11 @@ caddy_sites:
     upstream: "paperless-ngx:8000"
   - host: photos.de.int.wahlberger.dev
     upstream: "immich-server:2283"
+  # Forgejo web UI + OCI registry (/v2/) on one vhost. Caddy applies no
+  # request-body size limit and no upstream timeouts by default, so large
+  # image layer uploads pass through unchanged.
+  - host: git.de.int.wahlberger.dev
+    upstream: "forgejo:3000"
   - host: www.de.int.wahlberger.dev
     upstream: "homepage:3000"
 
@@ -111,6 +120,17 @@ tandoor_oidc_client_id: "79e5970e-7c2e-45be-b667-58dfd9539fd8"
 immich_url: "https://photos.de.int.wahlberger.dev"
 immich_oidc_provider_name: "Pocket ID"
 immich_oidc_client_id: "90017f0a-235c-4314-9728-9e2e2dc057b5"
+
+# --- Forgejo ------------------------------------------------------------------
+# Git forge + container registry, LAN/VPN only. forgejo_oidc_client_id is
+# blank until the operator registers a Forgejo client in Pocket ID (redirect
+# URI https://git.de.int.wahlberger.dev/user/oauth2/pocket-id/callback, see
+# roles/forgejo/README.md); the role's assert fails loudly until then, as for
+# tandoor originally. Fill in the real UUID here.
+forgejo_url: "https://git.de.int.wahlberger.dev"
+forgejo_ssh_port: 2222
+forgejo_oidc_provider_name: "pocket-id"
+forgejo_oidc_client_id: "e49c8dc5-2a21-4735-bf3b-cc3c8dadbf2e"
 
 # --- Beszel agent ---------------------------------------------------------------
 # REQUIRED, but can't be set until roles/beszel_hub has booted once and
@@ -164,6 +184,15 @@ tandoor_oidc_client_secret: "{{ vault_tandoor_oidc_client_secret | default('') }
 # Immich's Postgres password and OIDC client secret.
 immich_db_password: "{{ vault_immich_db_password | default('') }}"
 immich_oidc_client_secret: "{{ vault_immich_oidc_client_secret | default('') }}"
+
+# Forgejo secrets (generate as described in vault.yml.example) and the Pocket
+# ID client secret for the client registered above.
+forgejo_secret_key: "{{ vault_forgejo_secret_key | default('') }}"
+forgejo_internal_token: "{{ vault_forgejo_internal_token | default('') }}"
+forgejo_oauth2_jwt_secret: "{{ vault_forgejo_oauth2_jwt_secret | default('') }}"
+forgejo_lfs_jwt_secret: "{{ vault_forgejo_lfs_jwt_secret | default('') }}"
+forgejo_admin_password: "{{ vault_forgejo_admin_password | default('') }}"
+forgejo_oidc_client_secret: "{{ vault_forgejo_oidc_client_secret | default('') }}"
 
 # Cloudflare DNS API token for Caddy's DNS-01 challenge (Zone:DNS:Edit on
 # wahlberger.dev). Same token rpi-karlsruhe's Traefik already uses for the

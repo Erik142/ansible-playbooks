@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: forgejo
+  author: Erik Wahlberger
+  description: Forgejo git forge with built-in OCI container registry, running as a Podman Quadlet behind Caddy, with Pocket ID OIDC login.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - forgejo
+    - podman
+
+dependencies: []

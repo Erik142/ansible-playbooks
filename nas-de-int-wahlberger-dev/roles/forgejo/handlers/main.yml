@@ -1,0 +1,10 @@
+---
+# daemon_reload: true for the same reason as tandoor's handlers — on a
+# first-ever run this can execute before the container role's own restart
+# handler, and Quadlet units only exist for systemd after a daemon-reload.
+# See roles/tandoor/handlers/main.yml for the full explanation.
+- name: Restart forgejo
+  ansible.builtin.systemd:
+    name: forgejo.service
+    state: restarted
+    daemon_reload: true

@@ -39,6 +39,29 @@ vault_immich_db_password: "REPLACE-with-a-generated-password"
 # see roles/immich/README.md for the exact redirect URIs to use.
 vault_immich_oidc_client_secret: "REPLACE-with-pocket-id-client-secret"
 
+# Forgejo secrets. Generate the four keys with Forgejo itself (no state is
+# touched, the container is discarded):
+#     podman run --rm codeberg.org/forgejo/forgejo:15-rootless forgejo generate secret SECRET_KEY
+#     podman run --rm codeberg.org/forgejo/forgejo:15-rootless forgejo generate secret INTERNAL_TOKEN
+#     podman run --rm codeberg.org/forgejo/forgejo:15-rootless forgejo generate secret JWT_SECRET
+#     podman run --rm codeberg.org/forgejo/forgejo:15-rootless forgejo generate secret LFS_JWT_SECRET
+# Losing SECRET_KEY makes stored 2FA seeds/secrets undecryptable, so keep a
+# copy outside Vault too (the restic backup contains app.ini, but needs the
+# restic password, which itself lives here).
+vault_forgejo_secret_key: "REPLACE-with-generated-SECRET_KEY"
+vault_forgejo_internal_token: "REPLACE-with-generated-INTERNAL_TOKEN"
+vault_forgejo_oauth2_jwt_secret: "REPLACE-with-generated-JWT_SECRET"
+vault_forgejo_lfs_jwt_secret: "REPLACE-with-generated-LFS_JWT_SECRET"
+
+# Password of the local Forgejo admin account (break-glass; day-to-day login
+# is Pocket ID).
+#     openssl rand -hex 24
+vault_forgejo_admin_password: "REPLACE-with-a-generated-password"
+
+# Forgejo OIDC client secret, issued by Pocket ID when you register the
+# Forgejo client — see roles/forgejo/README.md for the redirect URI.
+vault_forgejo_oidc_client_secret: "REPLACE-with-pocket-id-client-secret"
+
 # Cloudflare DNS API token for Caddy's DNS-01 challenge — scoped to
 # Zone:DNS:Edit on the wahlberger.dev zone, nothing broader. Migrating from
 # rpi-karlsruhe? Its Traefik role already uses a token for the same zone —

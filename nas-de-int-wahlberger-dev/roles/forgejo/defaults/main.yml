@@ -1,0 +1,80 @@
+---
+# Default variables for the `forgejo` role.
+
+# Rootless image, pinned to the LTS major series (15.x) so Renovate only
+# proposes minor/patch bumps automatically (majors open a PR, see
+# renovate.json). Its data volume is /var/lib/gitea, app.ini lives in
+# /var/lib/gitea/custom/conf/ and the container runs as uid/gid 1000.
+forgejo_image: "codeberg.org/forgejo/forgejo:15-rootless"
+
+# Host layout under /mnt/containers:
+#   <forgejo_data_dir>/forgejo.env   root-only env file (all secrets)
+#   <forgejo_data_dir>/state/        root-only provisioning markers/env
+#   <forgejo_volume_dir>/            mounted at /var/lib/gitea (repos, SQLite
+#                                    DB, packages/registry blobs, app.ini,
+#                                    built-in SSH host keys)
+forgejo_data_dir: /mnt/containers/forgejo
+forgejo_volume_dir: "{{ forgejo_data_dir }}/volume"
+forgejo_state_dir: "{{ forgejo_data_dir }}/state"
+
+# uid/gid the rootless image runs as (fixed by the image). The volume
+# directory must be owned by it, since rootful Podman does no ID remapping.
+forgejo_uid: 1000
+forgejo_gid: 1000
+
+forgejo_timezone: Europe/Berlin
+
+# REQUIRED: public https:// URL Forgejo is served on (set in group_vars).
+# Must match the caddy_sites host entry. It is also the registry host for
+# `podman login`/`push`, and the base of the Pocket ID redirect URI.
+forgejo_url: ""
+
+# Host port published for git-over-SSH, handled by Forgejo's built-in SSH
+# server (container port 2222). Not 22: that is the host's own sshd. Must
+# match the "<port>/tcp" entry in firewall_allowed_ports (group_vars).
+forgejo_ssh_port: 2222
+
+forgejo_app_name: "Forgejo"
+forgejo_default_branch: main
+# CI is not used here; no runner exists. Flip to true if one is added later.
+forgejo_actions_enabled: false
+
+# --- Package / container registry -------------------------------------------
+# Built-in registry ([packages] ENABLED=true), served from the same vhost.
+# Unreferenced/orphaned package data (e.g. blobs of deleted versions, expired
+# upload sessions) older than this is purged by the nightly cleanup cron.
+# Per-owner "keep the newest N versions / remove versions older than X"
+# rules are NOT global config; set them in the UI (see README).
+forgejo_packages_cleanup_schedule: "@midnight"
+forgejo_packages_cleanup_older_than: "24h"
+
+# --- Secrets (all from Ansible Vault, validated by the assert task) ---------
+# See vault.yml.example for how to generate each one.
+forgejo_secret_key: ""
+forgejo_internal_token: ""
+forgejo_oauth2_jwt_secret: ""
+forgejo_lfs_jwt_secret: ""
+
+# --- Local admin ------------------------------------------------------------
+# "admin" itself is a reserved username in Forgejo. Created once on first run
+# via `forgejo admin user create`; later vault password changes are re-applied.
+forgejo_admin_username: "forgejo-admin"
+# Deliberately NOT your Pocket ID e-mail: that would collide with the
+# auto-registered OIDC account of the same address.
+forgejo_admin_email: "{{ forgejo_admin_username }}@{{ forgejo_url | urlsplit('hostname') }}"
+forgejo_admin_password: ""
+
+# --- OpenID Connect via Pocket ID -------------------------------------------
+# Name of the Forgejo authentication source. It is part of the callback URL
+# you register in Pocket ID: "{{ forgejo_url }}/user/oauth2/<name>/callback",
+# and is the label on the login button. Keep it URL-safe.
+forgejo_oidc_provider_name: "pocket-id"
+forgejo_oidc_discovery_url: "{{ pocket_id_app_url }}/.well-known/openid-configuration"
+forgejo_oidc_scopes:
+  - openid
+  - email
+  - profile
+# OAuth2 client ID issued by Pocket ID (a UUID, not secret). REQUIRED.
+forgejo_oidc_client_id: ""
+# From vault_forgejo_oidc_client_secret. REQUIRED.
+forgejo_oidc_client_secret: ""

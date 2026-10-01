@@ -1,0 +1,240 @@
+---
+- name: Validate Forgejo URL, OIDC and secret inputs are present
+  ansible.builtin.assert:
+    that:
+      - forgejo_url | length > 0
+      - forgejo_oidc_client_id | length > 0
+      - forgejo_oidc_client_secret | length > 0
+      - forgejo_secret_key | length > 0
+      - forgejo_internal_token | length > 0
+      - forgejo_oauth2_jwt_secret | length > 0
+      - forgejo_lfs_jwt_secret | length > 0
+      - forgejo_admin_password | length > 0
+    fail_msg: >-
+      Forgejo is not fully configured. Empty inputs among forgejo_url,
+      forgejo_oidc_client_id, forgejo_oidc_client_secret, forgejo_secret_key,
+      forgejo_internal_token, forgejo_oauth2_jwt_secret, forgejo_lfs_jwt_secret
+      and forgejo_admin_password. Set forgejo_url and forgejo_oidc_client_id in
+      group_vars and provide the matching vault_forgejo_* secrets in Ansible
+      Vault (see vault.yml.example). See roles/forgejo/README.md.
+    quiet: true
+
+- name: Create the Forgejo base directory
+  ansible.builtin.file:
+    path: "{{ forgejo_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# The rootless image runs as uid/gid 1000 and rootful Podman does no ID
+# remapping, so the volume must be owned by that uid on the host. 0750, not
+# the 0777 some other roles use: the owner model of this image is known.
+- name: Create the Forgejo data volume directory
+  ansible.builtin.file:
+    path: "{{ forgejo_volume_dir }}"
+    state: directory
+    owner: "{{ forgejo_uid }}"
+    group: "{{ forgejo_gid }}"
+    mode: "0750"
+
+- name: Create the Forgejo provisioning state directory
+  ansible.builtin.file:
+    path: "{{ forgejo_state_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+# SECRET_KEY, INTERNAL_TOKEN and both JWT secrets, rendered root-only so none
+# of them appears in the world-readable Quadlet unit. A change restarts
+# forgejo. Rendered immediately before the include_role call below for the
+# same first-run daemon-reload ordering reason documented in
+# roles/tandoor/tasks/main.yml.
+- name: Render the Forgejo environment file
+  ansible.builtin.template:
+    src: forgejo.env.j2
+    dest: "{{ forgejo_data_dir }}/forgejo.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Restart forgejo
+
+- name: Deploy the Forgejo container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: forgejo
+    container_quadlet_src: forgejo.container.j2
+
+# --- Provisioning: local admin + Pocket ID authentication source ------------
+# Both live in Forgejo's database, not app.ini, so they are managed through
+# its CLI inside the running container. The admin password and OIDC secret
+# are handed over via a root-only env file (`podman exec --env-file`), never
+# on a command line. Secret *changes* are detected with a marker file holding
+# a hash of the last-applied values, since Forgejo cannot read secrets back.
+- name: Render the Forgejo provisioning environment file
+  ansible.builtin.template:
+    src: forgejo-provision.env.j2
+    dest: "{{ forgejo_state_dir }}/provision.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+# The container may not exist yet in --check mode, so the CLI steps below are
+# skipped there (the command module would skip them anyway; the guard keeps
+# the dependent tasks from evaluating registered results that never ran).
+- name: Provision the Forgejo admin and Pocket ID authentication source
+  when: not ansible_check_mode
+  vars:
+    forgejo_admin_exists: >-
+      {{ forgejo_admin_list.stdout_lines
+      | select('match', '^\s*\d+\s+' ~ (forgejo_admin_username | regex_escape) ~ '\s')
+      | list | length > 0 }}
+    forgejo_oidc_source_lines: >-
+      {{ forgejo_auth_list.stdout_lines
+      | select('match', '^\s*\d+\s+' ~ (forgejo_oidc_provider_name | regex_escape) ~ '\s')
+      | list }}
+    forgejo_admin_marker: "{{ (forgejo_admin_username ~ ':' ~ forgejo_admin_password) | hash('sha256') }}"
+    forgejo_oidc_marker: >-
+      {{ ([forgejo_oidc_provider_name, forgejo_oidc_client_id, forgejo_oidc_client_secret,
+      forgejo_oidc_discovery_url, forgejo_oidc_scopes | join(',')] | join(':')) | hash('sha256') }}
+  block:
+    # Retried: right after a (re)start Forgejo is still running migrations.
+    - name: Wait for Forgejo to accept CLI commands, then list admin users
+      ansible.builtin.command:
+        argv:
+          - podman
+          - exec
+          - forgejo
+          - forgejo
+          - admin
+          - user
+          - list
+          - --admin
+      register: forgejo_admin_list
+      retries: 30
+      delay: 5
+      until: forgejo_admin_list.rc == 0
+      changed_when: false
+
+    - name: Read the admin password marker
+      ansible.builtin.stat:
+        path: "{{ forgejo_state_dir }}/admin.sha256"
+        get_checksum: true
+      register: forgejo_admin_marker_stat
+
+    - name: Create the local Forgejo admin
+      ansible.builtin.command:
+        argv:
+          - podman
+          - exec
+          - --env-file
+          - "{{ forgejo_state_dir }}/provision.env"
+          - forgejo
+          - sh
+          - -c
+          - >-
+            forgejo admin user create --admin --must-change-password=false
+            --username "$FORGEJO_ADMIN_USERNAME" --email "$FORGEJO_ADMIN_EMAIL"
+            --password "$FORGEJO_ADMIN_PASSWORD"
+      when: not forgejo_admin_exists
+      changed_when: true
+
+    - name: Re-apply the local Forgejo admin password after a vault change
+      ansible.builtin.command:
+        argv:
+          - podman
+          - exec
+          - --env-file
+          - "{{ forgejo_state_dir }}/provision.env"
+          - forgejo
+          - sh
+          - -c
+          - >-
+            forgejo admin user change-password --must-change-password=false
+            --username "$FORGEJO_ADMIN_USERNAME" --password "$FORGEJO_ADMIN_PASSWORD"
+      when:
+        - forgejo_admin_exists
+        - forgejo_admin_marker_stat.stat.checksum | default('') != forgejo_admin_marker | hash('sha1')
+      changed_when: true
+
+    - name: Record the applied admin password marker
+      ansible.builtin.copy:
+        content: "{{ forgejo_admin_marker }}"
+        dest: "{{ forgejo_state_dir }}/admin.sha256"
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+
+    - name: List Forgejo authentication sources
+      ansible.builtin.command:
+        argv:
+          - podman
+          - exec
+          - forgejo
+          - forgejo
+          - admin
+          - auth
+          - list
+      register: forgejo_auth_list
+      changed_when: false
+
+    - name: Read the OIDC source marker
+      ansible.builtin.stat:
+        path: "{{ forgejo_state_dir }}/oidc.sha256"
+        get_checksum: true
+      register: forgejo_oidc_marker_stat
+
+    - name: Add the Pocket ID authentication source
+      ansible.builtin.command:
+        argv:
+          - podman
+          - exec
+          - --env-file
+          - "{{ forgejo_state_dir }}/provision.env"
+          - forgejo
+          - sh
+          - -c
+          - >-
+            forgejo admin auth add-oauth --provider openidConnect
+            --name "$FORGEJO_OIDC_NAME" --key "$FORGEJO_OIDC_KEY"
+            --secret "$FORGEJO_OIDC_SECRET"
+            --auto-discover-url "$FORGEJO_OIDC_DISCOVERY_URL"
+            {% for scope in forgejo_oidc_scopes %}--scopes {{ scope }} {% endfor %}
+      when: forgejo_oidc_source_lines | length == 0
+      changed_when: true
+
+    - name: Update the Pocket ID authentication source after a change
+      ansible.builtin.command:
+        argv:
+          - podman
+          - exec
+          - --env-file
+          - "{{ forgejo_state_dir }}/provision.env"
+          - forgejo
+          - sh
+          - -c
+          - >-
+            forgejo admin auth update-oauth --id {{ forgejo_oidc_source_lines | first | trim | split | first }}
+            --provider openidConnect
+            --name "$FORGEJO_OIDC_NAME" --key "$FORGEJO_OIDC_KEY"
+            --secret "$FORGEJO_OIDC_SECRET"
+            --auto-discover-url "$FORGEJO_OIDC_DISCOVERY_URL"
+            {% for scope in forgejo_oidc_scopes %}--scopes {{ scope }} {% endfor %}
+      when:
+        - forgejo_oidc_source_lines | length > 0
+        - forgejo_oidc_marker_stat.stat.checksum | default('') != forgejo_oidc_marker | hash('sha1')
+      changed_when: true
+
+    - name: Record the applied OIDC source marker
+      ansible.builtin.copy:
+        content: "{{ forgejo_oidc_marker }}"
+        dest: "{{ forgejo_state_dir }}/oidc.sha256"
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true

@@ -6,7 +6,7 @@ set -eu
 
 STAGING_DIR="{{ restic_backup_staging_dir }}"
 
-# Dump Paperless-ngx's, Immich's and Tandoor's databases to consistent
+# Dump Paperless-ngx's, Immich's, Tandoor's (and, below, Forgejo's) databases to consistent
 # snapshot files first — their raw Postgres data directories
 # (restic_backup_exclude) are excluded from the backup below, since a live
 # filesystem copy of any of them isn't guaranteed restorable.
@@ -21,6 +21,15 @@ podman exec --env-file "$STAGING_DIR/immich-pgpass.env" {{ restic_backup_immich_
 podman exec --env-file "$STAGING_DIR/tandoor-pgpass.env" {{ restic_backup_tandoor_db_container }} \
   pg_dump -U {{ restic_backup_tandoor_db_user }} {{ restic_backup_tandoor_db_name }} \
   > "$STAGING_DIR/tandoor.sql"
+
+# Forgejo's SQLite database: the online-backup API takes a consistent
+# snapshot of the live file (a plain cp of a DB mid-write is not restorable).
+# -readonly + Forgejo's rollback-journal mode means this never creates
+# root-owned -wal/-shm files beside the live DB. Written under a temp name
+# and renamed so a failure never leaves a truncated forgejo.db behind.
+sqlite3 -readonly -cmd ".timeout 30000" "{{ restic_backup_forgejo_db_path }}" \
+  ".backup '$STAGING_DIR/forgejo.db.tmp'"
+mv "$STAGING_DIR/forgejo.db.tmp" "$STAGING_DIR/forgejo.db"
 
 # Bootstrap the repository on first run; a no-op every run after.
 restic snapshots --latest 1 >/dev/null 2>&1 || restic init

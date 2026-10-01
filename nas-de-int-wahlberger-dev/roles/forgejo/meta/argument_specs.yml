@@ -1,0 +1,122 @@
+---
+argument_specs:
+  main:
+    short_description: Forgejo git forge + OCI registry behind Caddy, with Pocket ID OIDC login.
+    options:
+      forgejo_image:
+        type: str
+        required: false
+        description: Forgejo rootless container image.
+      forgejo_data_dir:
+        type: path
+        required: false
+        description: Host directory for Forgejo's env file, provisioning state and data volume.
+      forgejo_volume_dir:
+        type: path
+        required: false
+        description: Host directory mounted at /var/lib/gitea (repos, SQLite DB, packages).
+      forgejo_state_dir:
+        type: path
+        required: false
+        description: Root-only directory for provisioning markers and the provisioning env file.
+      forgejo_uid:
+        type: int
+        required: false
+        description: uid the rootless image runs as; owner of forgejo_volume_dir.
+      forgejo_gid:
+        type: int
+        required: false
+        description: gid the rootless image runs as; group of forgejo_volume_dir.
+      forgejo_timezone:
+        type: str
+        required: false
+        description: IANA timezone passed to the container.
+      forgejo_url:
+        type: str
+        required: true
+        description: Public https:// URL Forgejo (and its container registry) is served on.
+      forgejo_ssh_port:
+        type: int
+        required: false
+        description: Host port published for git-over-SSH (must be allowed in firewall_allowed_ports).
+      forgejo_app_name:
+        type: str
+        required: false
+        description: Instance name shown in the UI.
+      forgejo_default_branch:
+        type: str
+        required: false
+        description: Default branch name for new repositories.
+      forgejo_actions_enabled:
+        type: bool
+        required: false
+        description: Whether Forgejo Actions is enabled.
+      forgejo_packages_cleanup_schedule:
+        type: str
+        required: false
+        description: Cron schedule of the package data cleanup job.
+      forgejo_packages_cleanup_older_than:
+        type: str
+        required: false
+        description: Only package data unreferenced for longer than this is purged.
+      forgejo_secret_key:
+        type: str
+        required: false
+        description: >-
+          [security] SECRET_KEY. From vault_forgejo_secret_key. Validated
+          non-empty by the role's assert task, not marked required here.
+      forgejo_internal_token:
+        type: str
+        required: false
+        description: >-
+          [security] INTERNAL_TOKEN. From vault_forgejo_internal_token.
+          Validated by the assert task.
+      forgejo_oauth2_jwt_secret:
+        type: str
+        required: false
+        description: >-
+          [oauth2] JWT_SECRET. From vault_forgejo_oauth2_jwt_secret.
+          Validated by the assert task.
+      forgejo_lfs_jwt_secret:
+        type: str
+        required: false
+        description: >-
+          [server] LFS_JWT_SECRET. From vault_forgejo_lfs_jwt_secret.
+          Validated by the assert task.
+      forgejo_admin_username:
+        type: str
+        required: false
+        description: Username of the local admin account ("admin" is reserved by Forgejo).
+      forgejo_admin_email:
+        type: str
+        required: false
+        description: E-mail of the local admin account.
+      forgejo_admin_password:
+        type: str
+        required: false
+        description: >-
+          Local admin password. From vault_forgejo_admin_password. Validated
+          by the assert task.
+      forgejo_oidc_provider_name:
+        type: str
+        required: false
+        description: Name of the OIDC authentication source (part of the callback URL; login button label).
+      forgejo_oidc_discovery_url:
+        type: str
+        required: false
+        description: OIDC discovery document URL (derived from pocket_id_app_url).
+      forgejo_oidc_scopes:
+        type: list
+        elements: str
+        required: false
+        description: OIDC scopes requested.
+      forgejo_oidc_client_id:
+        type: str
+        required: true
+        description: OAuth2 client ID issued by Pocket ID for the Forgejo client.
+      forgejo_oidc_client_secret:
+        type: str
+        required: false
+        description: >-
+          OAuth2 client secret issued by Pocket ID. From
+          vault_forgejo_oidc_client_secret. Validated by the assert task.

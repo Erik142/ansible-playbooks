@@ -1,0 +1,66 @@
+[Unit]
+Description=Forgejo git forge and container registry
+After=network-online.target caddy-network.service
+Wants=network-online.target
+Requires=caddy-network.service
+# Emails ewahlberger@gmail.com via Resend after 5 consecutive failures —
+# see the notify_failure role.
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=forgejo
+Image={{ forgejo_image }}
+Network=caddy.network
+# git-over-SSH via Forgejo's built-in SSH server (container port 2222).
+# HTTP(S) and the registry are NOT published: Caddy reaches forgejo:3000
+# over caddy.network.
+PublishPort={{ forgejo_ssh_port }}:2222
+Volume={{ forgejo_volume_dir }}:/var/lib/gitea:Z
+Environment=TZ={{ forgejo_timezone }}
+# Non-secret config, applied to app.ini by the image's environment-to-ini on
+# every start (FORGEJO__<section>__<KEY>; "." in a section name is _0x2E_).
+Environment=FORGEJO____APP_NAME={{ forgejo_app_name }}
+Environment=FORGEJO__server__DOMAIN={{ forgejo_url | urlsplit('hostname') }}
+Environment=FORGEJO__server__SSH_DOMAIN={{ forgejo_url | urlsplit('hostname') }}
+Environment=FORGEJO__server__ROOT_URL={{ forgejo_url }}/
+Environment=FORGEJO__server__HTTP_PORT=3000
+Environment=FORGEJO__server__DISABLE_SSH=false
+Environment=FORGEJO__server__START_SSH_SERVER=true
+Environment=FORGEJO__server__SSH_PORT={{ forgejo_ssh_port }}
+Environment=FORGEJO__server__SSH_LISTEN_PORT=2222
+Environment=FORGEJO__server__LFS_START_SERVER=true
+Environment=FORGEJO__database__DB_TYPE=sqlite3
+Environment=FORGEJO__database__PATH=/var/lib/gitea/data/forgejo.db
+# Rollback-journal mode (SQLite's default, set explicitly): the nightly
+# `sqlite3 -readonly .backup` from the host (roles/restic_backup) then never
+# creates root-owned -wal/-shm files next to the live DB.
+Environment=FORGEJO__database__SQLITE_JOURNAL_MODE=DELETE
+Environment=FORGEJO__security__INSTALL_LOCK=true
+Environment=FORGEJO__session__COOKIE_SECURE=true
+Environment=FORGEJO__repository__DEFAULT_BRANCH={{ forgejo_default_branch }}
+Environment=FORGEJO__actions__ENABLED={{ forgejo_actions_enabled | lower }}
+# --- Auth: Pocket ID only, no self-service accounts --------------------------
+# Local sign-up is closed, and everything, including the registry, requires
+# sign-in. DISABLE_REGISTRATION does not stop OAuth2 auto-registration (only
+# ALLOW_ONLY_INTERNAL_REGISTRATION does, see routers/web/auth/oauth.go), so
+# new Pocket ID users are still created on first login; the Pocket ID
+# client's allowed groups are the allow-list (same model as tandoor).
+Environment=FORGEJO__service__DISABLE_REGISTRATION=true
+Environment=FORGEJO__service__REQUIRE_SIGNIN_VIEW=true
+Environment=FORGEJO__oauth2_client__ENABLE_AUTO_REGISTRATION=true
+Environment=FORGEJO__oauth2_client__USERNAME=preferred_username
+# --- Packages / container registry --------------------------------------------
+Environment=FORGEJO__packages__ENABLED=true
+Environment=FORGEJO__cron_0x2E_cleanup_packages__ENABLED=true
+Environment=FORGEJO__cron_0x2E_cleanup_packages__RUN_AT_START=false
+Environment=FORGEJO__cron_0x2E_cleanup_packages__SCHEDULE={{ forgejo_packages_cleanup_schedule }}
+Environment=FORGEJO__cron_0x2E_cleanup_packages__OLDER_THAN={{ forgejo_packages_cleanup_older_than }}
+# SECRET_KEY, INTERNAL_TOKEN, JWT secrets: root-only env file, same
+# EnvironmentFile= pattern as roles/tandoor.
+EnvironmentFile={{ forgejo_data_dir }}/forgejo.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

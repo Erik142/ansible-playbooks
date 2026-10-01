@@ -19,7 +19,8 @@ Rootful Podman publishes container ports via DNAT, which crosses firewalld's
 on the configured zone or Caddy's published 80/443 stop working. tandoor and
 paperless-ngx are **not** published to the host at all — they're reached only
 through Caddy on the shared `caddy.network` — so they need no firewall rule of
-their own.
+their own. Forgejo's git-over-SSH is the exception: it publishes host port
+2222, allowed via `firewall_allowed_ports` in `group_vars`.
 
 ## Inspect on the host
 

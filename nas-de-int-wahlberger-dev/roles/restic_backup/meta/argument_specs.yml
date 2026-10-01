@@ -53,6 +53,10 @@ argument_specs:
         type: str
         required: false
         description: Tandoor's Postgres database user.
+      restic_backup_forgejo_db_path:
+        type: path
+        required: false
+        description: Host path of Forgejo's SQLite database, backed up via sqlite3 .backup.
       restic_backup_repo_password:
         type: str
         required: true

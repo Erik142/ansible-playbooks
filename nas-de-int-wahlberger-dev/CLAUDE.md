@@ -63,6 +63,7 @@ contrast (Debian, `apt`, `ufw`, `geerlingguy.security`, hyphenated role names).
 | `tandoor` | Tandoor recipe manager (Postgres + app, image pinned). Pocket ID OIDC login |
 | `paperless_ngx` | Paperless-ngx (Redis + PostgreSQL + app, image pinned). Pocket ID OIDC login; inbox inside the Samba share |
 | `immich` | Immich photo/video backup (Valkey + PostgreSQL/vectorchord + machine learning + app). Pocket ID OIDC login via a config file (not env vars); QuickSync/OpenVINO hardware acceleration on the host's iGPU |
+| `forgejo` | Forgejo git forge + built-in OCI registry (rootless image, SQLite, image pinned). Pocket ID OIDC login; git SSH on published port 2222; DB backed up via host `sqlite3 .backup` in `restic_backup` |
 | `homepage` | Homepage dashboard behind Caddy — static grouped links + ping status, no API keys, no Podman socket exposed. Links cloud-wahlberger-dev's services too (Pocket ID, FreshRSS); rpi-karlsruhe excluded (legacy) |
 | `restic_backup` | Nightly restic backup of the Samba share and container data to pi-de-int-wahlberger-dev's `restic_server`, via a systemd timer, plus a `restic check` (rotating 10%/night data subset) every run |
 | `container` | Generic helper: renders one `.container` Quadlet template and restarts on change. Included by service roles, not listed in `site.yml`. |
@@ -102,9 +103,9 @@ migrating Paperless-ngx:
   by the `snapper` role.
 - Secrets: encrypted `inventories/production/group_vars/all/vault.yml`,
   exposed via `{{ vault_* }}` indirection in `vars.yml`. Never commit
-  plaintext secrets. Eight secrets exist here — three DB passwords, three
-  OIDC client secrets, Tandoor's Django secret key, and the Cloudflare DNS
-  API token — Samba itself needs none, being guest-only.
+  plaintext secrets. Secrets here: DB passwords, OIDC client secrets,
+  Tandoor's Django secret key, Forgejo's four generated keys and admin
+  password, and the Cloudflare DNS API token — Samba itself needs none, being guest-only.
 
 ## Adding a containerized service
 

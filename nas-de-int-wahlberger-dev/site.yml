@@ -52,7 +52,7 @@
     # Ensure this host's public DNS records exist before Caddy needs them.
     - role: cloudflare_dns
       tags: [cloudflare_dns]
-    # Reverse proxy (creates the shared network) for tandoor/paperless-ngx/immich.
+    # Reverse proxy (creates the shared network) for tandoor/paperless-ngx/immich/forgejo.
     - role: caddy
       tags: [caddy]
     # Native Samba file server (not a container) with guest access.
@@ -73,6 +73,10 @@
     # inside the Samba share.
     - role: immich
       tags: [immich]
+    # Git forge + OCI registry (SQLite). After caddy (shared network) and
+    # before restic_backup, which dumps its database.
+    - role: forgejo
+      tags: [forgejo]
     # Dashboard linking this NAS's and cloud-wahlberger-dev's services.
     - role: homepage
       tags: [homepage]

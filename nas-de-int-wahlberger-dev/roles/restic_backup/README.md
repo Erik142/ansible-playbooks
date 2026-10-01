@@ -32,6 +32,13 @@ actually get backed up — each authenticated via its own `*-pgpass.env` file
 way `restic-backup.env` is. A failed `pg_dump` aborts the whole script before
 `restic backup` ever runs (`set -eu`, same as every other command here).
 
+Forgejo's SQLite database is handled the same way: its live file
+(`forgejo.db*`) is excluded and the script writes a consistent
+`sqlite3 -readonly .backup` copy to `restic_backup_staging_dir/forgejo.db`
+first (the Forgejo image has no `sqlite3`, so the host's is used; the role
+installs it). Repos and package blobs are plain files covered by
+`/mnt/containers`. Restore: see `roles/forgejo/README.md`.
+
 `.snapshots` (Snapper's own Btrfs snapshot history, wherever it appears
 under a backed-up path) is also excluded. Backing it up would mean restic
 redundantly versioning Snapper's own historical versions on top of its own

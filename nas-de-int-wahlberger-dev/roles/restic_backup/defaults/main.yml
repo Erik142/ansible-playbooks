@@ -13,6 +13,11 @@ restic_backup_exclude:
   - "{{ paperless_ngx_db_data_dir_root }}"
   - "{{ immich_db_data_dir }}"
   - "{{ tandoor_db_data_dir_root }}"
+  # Forgejo's live SQLite DB (and any journal file next to it): replaced by a
+  # consistent `sqlite3 .backup` copy in the staging dir, like the Postgres
+  # dumps. The rest of forgejo_volume_dir (repos, packages) is plain files
+  # and covered by /mnt/containers.
+  - "{{ forgejo_volume_dir }}/data/forgejo.db*"
   # immich_library_export_dir is a BIND MOUNT of immich_library_root/library
   # (see roles/immich/README.md) — same underlying files, reachable at two
   # paths. Both are under samba_mount_path above, so without this exclude
@@ -56,6 +61,11 @@ restic_backup_immich_db_user: immich
 restic_backup_tandoor_db_container: tandoor-db
 restic_backup_tandoor_db_name: tandoor
 restic_backup_tandoor_db_user: tandoor
+
+# Forgejo's SQLite database file on the host (bind-mounted volume), copied
+# with the host's sqlite3 into restic_backup_staging_dir/forgejo.db. Must
+# match forgejo's [database] PATH (/var/lib/gitea/data/forgejo.db).
+restic_backup_forgejo_db_path: "{{ forgejo_volume_dir }}/data/forgejo.db"
 
 # REQUIRED: repository encryption password. Set
 # vault_restic_backup_repo_password in Ansible Vault. Losing this makes
