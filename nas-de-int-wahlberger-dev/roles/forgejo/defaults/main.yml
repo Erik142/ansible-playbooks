@@ -5,7 +5,7 @@
 # proposes minor/patch bumps automatically (majors open a PR, see
 # renovate.json). Its data volume is /var/lib/gitea, app.ini lives in
 # /var/lib/gitea/custom/conf/ and the container runs as uid/gid 1000.
-forgejo_image: "codeberg.org/forgejo/forgejo:15-rootless"
+forgejo_image: "codeberg.org/forgejo/forgejo:16-rootless"
 
 # Host layout under /mnt/containers:
 #   <forgejo_data_dir>/forgejo.env   root-only env file (all secrets)
