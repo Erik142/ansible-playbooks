@@ -1,5 +1,5 @@
 ## Feature: Local backup disk, btrbk, and NAS-hosted restic REST server (overview)
-status:            draft
+status:            ready
 priority:          must
 version:           3.0
 quality-pillars:   4,5,4,4,5,5,4,5
@@ -115,7 +115,7 @@ Decisions (taken by this spec unless marked as owner decisions; the owner can ov
   - Ansible-time checks read the live mount table;
   - units declare `RequiresMountsFor=`.
 
-  `btrbk.service` depends on the backup disk. `restic-server.service` and `restic-server-maintenance.service` depend only on `/mnt/data`. A unit blocked by a failed mount does not trigger `OnFailure=` (BD-A-19), so the health check raises the alert (BD-D-09).
+  `btrbk.service` depends on the backup disk. `restic-server.service` and `restic-server-maintenance.service` depend only on `/mnt/data`. A unit whose start job fails on a missing mount ends with result `dependency` and does trigger `OnFailure=` (BD-A-19, corrected after the VM run), so btrbk mails once per attempt; the health check raises the standing alert (BD-D-09).
 - BD-D-06: The `firewall` role gains `firewall_rich_rules`. Production holds one rule per `restic_server_allowed_sources` entry (10.10.0.0/16 and 10.243.0.0/16). The port is not added to `firewall_allowed_ports`, which allows every source. The rules are not gated by a cut-over flag and apply from the feature commit. This is harmless, because nothing listens on port 8000 until step 5.
 - BD-D-07: cloud gains `restic_backup_forget_enabled` (role default `true`), which is set to `false` at step 7, because append-only rejects forget and prune. cloud keeps its nightly `restic check`.
 - BD-D-08: Repository location (owner directive 2026-10-09; the path is chosen by this spec, and the owner can override `restic_server_data_dir`). The backup disk holds only `@btrbk`. Restic repositories live at `/mnt/data/restic-repos`, a plain directory inside `@data`.
@@ -129,7 +129,7 @@ Decisions (taken by this spec unless marked as owner decisions; the owner can ov
   - a non-zero btrfs device error counter;
   - a stale btrbk target or cloud repository (no new entry within 26 h).
 - BD-D-10: btrbk runs at 01:30, before the NAS rebootmgr window (03:00-04:00).
-- BD-D-11: Maintenance runs at 06:00 (accepted by the owner).
+- BD-D-11: Maintenance runs at 06:00 (accepted by the owner), plus `RandomizedDelaySec=5min`.
 - BD-D-12: cloud runs at 04:30 (owner Q3).
 - BD-D-13: Cut-over flags: `backup_disk_enabled` (step 3) and `restic_backup_decommission_enabled` (step 5) on the NAS, and the two step-7 variables on cloud. With them, the feature commit can be merged and applied before the cut-over.
 - BD-D-14: Maintenance run identity:
@@ -159,10 +159,11 @@ Contract changes to existing behaviour:
 
 Assumptions (each names the scenario that detects a wrong assumption):
 - BD-A-01: Tumbleweed OSS has no `btrbk`, and OBS `filesystems/openSUSE_Tumbleweed` has `btrbk-0.32.6` (repository index checked 2026-10-09). BD-AC-29 and BD-AC-80 re-check.
-- BD-A-02: Tumbleweed OSS ships `btrfsmaintenance` 0.5.2, `smartmontools` 7.5, `hdparm`, `restic` 0.19.1 and `python313-passlib`/`python314-passlib`. The passlib package must match Ansible's interpreter. BD-AC-40 detects a mismatch.
+- BD-A-02: Tumbleweed OSS ships `btrfsmaintenance` 0.5.2, `smartmontools` 7.5, `hdparm`, `restic` 0.19.1 and `python313-passlib`/`python314-passlib` (htpasswd bcrypt also needs the matching `python313-bcrypt`/`python314-bcrypt`, installed by the restic_server role). Both packages must match Ansible's interpreter. BD-AC-40 detects a mismatch.
 - BD-A-03: `--append-only` rejects every DELETE except on `locks/`. BD-AC-46 and BD-AC-81 detect a difference.
 - BD-A-04: Verified by the owner on 2026-10-09: cloud reaches the NAS only through ZeroTier, from 10.243.0.0/16, and home-LAN clients come from 10.10.0.0/16. BD-AC-81 confirms both in production.
 - BD-A-05: It is not verified that firewalld zone rules filter traffic to a Podman-published port, because DNAT traffic can bypass them. BD-FR-111 must hold either way; if a bypass is found, `restic-server` switches to host networking. BD-AC-45 detects a bypass.
+- BD-A-23: Accepted risk (owner decision 2026-10-09): netavark adds every Podman network's subnet to the firewalld `trusted` zone, so containers on the NAS can reach rest-server regardless of `restic_server_allowed_sources`. They still need htpasswd credentials and the server is append-only. External sources are filtered correctly (VM run, BD-AC-45).
 - BD-A-06: The rest-server 0.14.0 entrypoint runs under a non-root `User=` that owns `/data` and the htpasswd file. BD-AC-39 detects a failure.
 - BD-A-07: btrbk can keep its snapshot directory inside each mounted source subvolume (`<source>/.btrbk`) without the top level being mounted. Otherwise the implementation adds that mount without changing `storage_mounts`. BD-AC-07 and BD-AC-30 detect a problem.
 - BD-A-08: `db_dump` reuses the container, database and user names of today's `restic_backup` defaults.
@@ -188,9 +189,11 @@ Assumptions (each names the scenario that detects a wrong assumption):
 - BD-A-16: Verified by the owner on 2026-10-09: `lsblk -bdno SIZE /dev/sdc` prints `6001175126016`, the default `backup_disk_expected_size_bytes`. That the first and last 1 MiB read as zeros is still checked in runbook step 1.
 - BD-A-17: The `filesystems` signing key has fingerprint `B1FB53748720472205FA601998C97FE7324E6311` ("filesystems OBS Project <filesystems@build.opensuse.org>") and expires 2027-05-07. It was fetched over HTTPS from download.opensuse.org on 2026-10-09.
   - It is cross-checked with `osc signkey filesystems` in runbook step 4 (DOC-N7).
-  - On expiry, `zypper refresh` of that repository fails; renewal follows DOC-O11. There is no automatic alert.
+  - On expiry, `zypper refresh` of that repository fails (and with it the weekly unattended `zypper patch`).
+  - `btrbk-key-refresh.timer` (BD-FR-162 to BD-FR-167) renews the key weekly and alerts by email when it is within `btrbk_key_warn_days` of expiry, or when its fingerprint changes. Manual renewal follows DOC-O11.
+  - Not verifiable before 2027-05-07: that OBS extends the key under the same fingerprint, and that `rpm --import` of the extended key replaces the installed one. If either does not hold, the alert keeps firing and DOC-O11 applies.
 - BD-A-18: Closed by the owner on 2026-10-09: the 100 GiB `--max-size` is sufficient for cloud.
-- BD-A-19: A start job that fails because a `RequiresMountsFor=` mount cannot be mounted ends with result `dependency` and does not trigger `OnFailure=`. BD-AC-28 confirms.
+- BD-A-19: A start job that fails because a `RequiresMountsFor=` mount cannot be mounted ends with result `dependency`. Corrected after the VM run (BD-AC-28, systemd 261): it DOES trigger `OnFailure=` (the journal logs `Triggering OnFailure= dependencies`), so the alert for the unit is raised in addition to the health check. Nothing is written below the mount path either way.
 - BD-A-20: btrfs reports file birth time (`stat -c %W` non-zero). BD-AC-55 detects a problem.
 - BD-A-21: A restic client can set any snapshot time (`restic backup --time`). This is the threat behind BD-BR-07; BD-AC-47 uses it.
 - BD-A-22: The 01:30 btrbk snapshot of `@data` captures the cloud repository crash-consistently.
@@ -241,7 +244,7 @@ Cross-cutting requirements. Area requirements are in the four area files.
 | `btrbk.service` | `OnFailure` | `notify-failure-immediate@%n.service` |
 | `db-dump.service` | `OnFailure` | `notify-failure-immediate@%n.service` |
 | `restic-server.service` | `OnFailure` / `Restart` / `WantedBy` | `notify-failure@%n.service` / `always` / `default.target` |
-| `restic-server-maintenance.timer` | `OnCalendar` / `Persistent` | `restic_server_maintenance_on_calendar` (default `*-*-* 06:00:00`) / `true` |
+| `restic-server-maintenance.timer` | `OnCalendar` / `Persistent` / `RandomizedDelaySec` | `restic_server_maintenance_on_calendar` (default `*-*-* 06:00:00`) / `true` / `5min` |
 | `restic-server-maintenance.service` | `OnFailure` / `User` / `Group` | `notify-failure-immediate@%n.service` / `restic_server_user` / its primary group |
 | `backup-disk-health.timer` | `OnCalendar` / `Persistent` | `backup_disk_health_on_calendar` (default `*-*-* 09:00:00`) / `true` |
 | `backup-disk-health.service` | `OnFailure` | `notify-failure-immediate@%n.service` |
@@ -262,7 +265,7 @@ The cross-cutting FRs have no inputs of their own. Inputs are listed in each are
 | Condition | Expected behaviour |
 |---|---|
 | A BD-BR-04 path is not mounted at Ansible time | The role fails before any change, naming the path (BD-FR-25) |
-| A BD-BR-04 path is not mounted when its unit starts | The unit does not start (result `dependency`), and nothing is written below a backup mount path (BD-FR-28). The health check raises the alert (BD-A-19, BD-D-09) |
+| A BD-BR-04 path is not mounted when its unit starts | The unit does not start (result `dependency`), and nothing is written below a backup mount path (BD-FR-28). The unit's `OnFailure=` and the health check raise alerts (BD-A-19, BD-D-09) |
 | Second normal run without input changes | `changed=0` (BD-NFR-01) |
 
 Area-specific error cases are in each area file.
@@ -413,7 +416,7 @@ Area requirements are verified in each area file's Verification section.
 
 ### Open Questions
 
-None. The status stays `draft` until a human approves.
+None. Approved by the user (Gate A); status `ready`.
 
 Decision log:
 - Owner decisions supplied with the request (2026-10-09) are recorded in BD-C-04 and BD-BR-13.

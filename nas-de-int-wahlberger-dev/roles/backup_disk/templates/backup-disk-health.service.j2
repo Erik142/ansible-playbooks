@@ -1,0 +1,12 @@
+# Managed by Ansible (role backup_disk). Do NOT edit on the host.
+[Unit]
+Description=Check the health of the backup disk
+# Deliberately no RequiresMountsFor= for the backup mount: the check must run
+# and fail when the disk is gone (BD-D-09, BD-BR-04).
+OnFailure=notify-failure-immediate@%n.service
+
+[Service]
+Type=oneshot
+NoNewPrivileges=true
+PrivateTmp=true
+ExecStart={{ backup_disk_health_script_path }}

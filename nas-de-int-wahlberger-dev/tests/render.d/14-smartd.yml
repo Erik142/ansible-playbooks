@@ -1,0 +1,34 @@
+---
+# smartd role (SM-FR-1 to SM-FR-4): rendered device lines and the mail hook.
+render_items:
+  - role: smartd
+    src: smartd-line.j2
+    dest: smartd-line-main-hdd
+    kind: text
+    vars:
+      smartd_device:
+        device: /dev/disk/by-id/ata-TOSHIBA_MG04ACA600EY_57I9K068FTTB
+    asserts:
+      - '\A/dev/disk/by-id/ata-TOSHIBA_MG04ACA600EY_57I9K068FTTB -a -s '
+      - ' -s \(S/\.\./\.\./7/01\|L/\.\./01/\./10\) -m root -M exec /usr/local/bin/smartd-notify\.sh\n?\Z'
+  - role: smartd
+    src: smartd-line.j2
+    dest: smartd-line-standby
+    kind: text
+    vars:
+      smartd_device:
+        device: /dev/disk/by-id/example
+        schedule: "(S/../../1/02)"
+        standby: true
+    asserts:
+      - '^/dev/disk/by-id/example -a -s \(S/\.\./\.\./1/02\) -n standby -m root -M exec /usr/local/bin/smartd-notify\.sh\n?$'
+  - role: smartd
+    src: smartd-notify.sh.j2
+    dest: smartd-notify.sh
+    kind: text
+    asserts:
+      - '^ENV_FILE=/etc/notify-failure/notify-failure\.env$'
+      - 'SMARTD_DEVICE'
+      - 'SMARTD_FULLMESSAGE'
+      - 'api\.resend\.com/emails'
+      - 'subject: .*smartd warning for'

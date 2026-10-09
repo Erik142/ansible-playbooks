@@ -1,5 +1,5 @@
 ## Feature: Local backup disk, btrbk, and NAS-hosted restic REST server (btrbk replication and database dumps)
-status:            draft
+status:            ready
 priority:          must
 version:           3.0
 quality:           feature-level scores in [backup-overview.md](backup-overview.md)
@@ -39,6 +39,15 @@ See [backup-overview.md](backup-overview.md#actors). Main actors here: btrbk, th
 - BD-FR-64 [Must]: The `snapper` role and the files `/etc/snapper/configs/data` and `/etc/snapper/configs/containers` shall be unchanged by this feature.
 - BD-FR-161 [Must]: Each received `data` snapshot shall contain `restic_server_data_dir` as it was at snapshot time. No btrbk configuration excludes it (BD-D-08).
 
+#### F. Repository signing-key renewal and expiry alert (role `btrbk`)
+- BD-FR-162 [Must]: `btrbk-key-refresh.timer` shall start `btrbk-key-refresh.service` on `btrbk_key_refresh_on_calendar` (default `weekly`, `Persistent=true`). The service has `OnFailure=notify-failure-immediate@%n.service`, no `RequiresMountsFor=`, and its start waits up to 300 s for a running zypper.
+- BD-FR-163 [Must]: `btrbk-key-refresh.service` shall fetch the key from `btrbk_zypper_repo_key_url` over HTTPS only, with a timeout. If the fetch fails, then the service shall fail (exit 3) with a message naming the URL.
+- BD-FR-164 [Must]: If the fetched file does not hold exactly one primary key (one `pub` record), or its primary fingerprint differs from `btrbk_zypper_repo_gpg_fingerprint`, then the service shall fail (exit 2) without importing anything, and its message shall name both fingerprints and `osc signkey filesystems` (a possible rotation or tampering needs a human; BD-FR-49 uses the same rule).
+- BD-FR-165 [Must]: If the fingerprint matches, then the service shall run `rpm --import` on the verified file and `zypper --non-interactive refresh <btrbk_zypper_repo_alias>`. It shall not use `--gpg-auto-import-keys` or any option that disables a signature check. A failure of either command fails the service (exit 1) with the command's output.
+- BD-FR-166 [Must]: If the fetched key expires in fewer than `btrbk_key_warn_days` (default `60`) days, then the service shall fail (exit 1) with a message naming the days left, after having tried the import and the refresh of BD-FR-165. A key with no expiry date passes.
+- BD-FR-167 [Must]: If OBS re-issues the same key (same fingerprint) with a later expiry, then the next run of `btrbk-key-refresh.service` shall exit 0 and send no alert. The role's install step (BD-FR-49) imports the key only when it is absent; the timer is what refreshes an installed key.
+- BD-FR-168 [Should]: `btrbk_key_refresh_on_calendar` and `btrbk_key_warn_days` shall be declared in `meta/argument_specs.yml` with the defaults above.
+
 #### E. Database dumps (role `db_dump`)
 - BD-FR-65 [Must]: When `btrbk.service` starts, the dump step shall write one `pg_dump` file per `db_dump_postgres` entry into `db_dump_dir`, before btrbk creates the snapshot of `/mnt/containers`.
 - BD-FR-66 [Must]: When `btrbk.service` starts, the dump step shall write an `sqlite3 .backup` copy of `db_dump_forgejo_db_path` into `db_dump_dir`, before btrbk creates the snapshot of `/mnt/containers`.
@@ -71,6 +80,7 @@ See [backup-overview.md](backup-overview.md#actors). Main actors here: btrbk, th
 | `btrbk_zypper_repo_url` | URL | no | Default `https://download.opensuse.org/repositories/filesystems/openSUSE_Tumbleweed/` |
 | `btrbk_zypper_repo_priority` | int | no | Default `150` |
 | `btrbk_zypper_repo_gpg_fingerprint` | str (40 hex) | no | Default `B1FB53748720472205FA601998C97FE7324E6311` (BD-A-17) |
+| `btrbk_key_refresh_on_calendar` / `btrbk_key_warn_days` | str / int | no | Defaults `weekly` / `60` (BD-FR-162, BD-FR-166) |
 | `db_dump_dir` | path | no | Default `/mnt/containers/db-dumps` |
 | `db_dump_credentials_dir` | path | no | Default `/var/lib/db-dump` |
 | `db_dump_postgres` | list of `{name, container, database, user, password}` | no | Default entries `paperless`, `immich` and `tandoor`, carrying today's names (BD-A-08) |
@@ -113,7 +123,7 @@ Scenario Outline BD-AC-29 [V]: btrbk comes from the pinned repository only (BD-F
 
 | Row | `<state>` | `<expectation>` |
 |---|---|---|
-| 1 | defaults | `zypper se -s -i btrbk` shows the `filesystems` repository; `zypper lr -d` shows GPG check on and priority 150; `zypper se -i -r <alias>` lists only btrbk; with only OSS enabled, `zypper se btrbk` finds nothing |
+| 1 | defaults | `zypper se -s -i btrbk` shows the `filesystems` repository; `zypper lr -d` shows GPG check on and priority 150; `zypper se -i -r <alias>` lists only btrbk; searching only the OSS repositories (`zypper se -r oss -r non-oss -r update btrbk`) finds nothing (a plain search still lists the installed package) |
 | 2 | `btrbk_zypper_repo_gpg_fingerprint` = 40 zeros, repository not yet added | the play fails before `zypper lr` shows the repository, and the message names the fingerprint (BD-FR-49) |
 
 Scenario BD-AC-30 [V]: The first btrbk run replicates both sources, the repository and fresh dumps (BD-FR-51 to BD-FR-54, BD-FR-56, BD-FR-65, BD-FR-66, BD-FR-161)
@@ -128,8 +138,8 @@ Scenario BD-AC-30 [V]: The first btrbk run replicates both sources, the reposito
 
 Scenario BD-AC-31 [V]: The second run is incremental (BD-FR-55, BD-FR-59)
 - Given BD-AC-30 has passed
-- When the operator starts `btrbk.service` again
-- Then btrbk's transaction log records, for each source, a send-receive entry with a non-empty parent (BD-FR-55)
+- When the operator moves the VM clock one day on (`date -s '+1 day'`; `target_preserve` keeps only the first snapshot of each day, so a second run on the same day creates a source snapshot but sends nothing) and starts `btrbk.service` again
+- Then btrbk's summary in the journal (no `transaction_log` is configured) shows, for each source, a `>>>` incremental receive entry (BD-FR-55)
 - And each `<source>/.btrbk` still holds the snapshot named as that parent, and the new snapshot (BD-FR-59)
 
 Scenario BD-AC-32 [V]: A btrbk failure fails the unit and raises an alert (BD-FR-60, BD-BR-05)
@@ -156,7 +166,7 @@ Scenario Outline BD-AC-35 [V]: Dump files and credentials (BD-FR-67, BD-FR-68, B
 |---|---|---|
 | 1 | `stat -c '%a %U:%G' /mnt/containers/db-dumps` | `700 root:root` (BD-FR-68) |
 | 2 | `stat -c '%a %U:%G' /mnt/containers/db-dumps/*` | every line `600 root:root` (BD-FR-70) |
-| 3 | `df --output=target` and `stat` on each credentials file the dump step reads | target `/`, mode `600 root:root` (BD-FR-71, BD-FR-72) |
+| 3 | `df --output=target` and `stat` on each credentials file the dump step reads | target `/` or `/var` (the root filesystem; `/var` is a separate subvolume mount on Tumbleweed, never `/mnt/data` or `/mnt/containers`), mode `600 root:root` (BD-FR-71, BD-FR-72) |
 | 4 | `site.yml --tags db_dump -e db_dump_dir=/var/tmp/db-dumps` | fails before any change, naming `db_dump_dir` (BD-FR-67) |
 
 Scenario BD-AC-36 [V]: A failed dump keeps the previous file and does not stop btrbk (BD-FR-69, BD-FR-74 to BD-FR-76, BD-BR-11)
@@ -172,6 +182,37 @@ Scenario BD-AC-37 [V]: A hanging dump is stopped by the timeout (BD-FR-73)
 - When the operator starts `btrbk.service`
 - Then `db-dump.service` ends `failed` within 120 s, and its journal reports the timeout
 - And `btrbk.service` ends with `Result=success`
+
+Scenario BD-AC-88 [S]: The key refresh units and script are well-formed (BD-FR-162, BD-FR-163, BD-FR-165, BD-FR-168)
+- When the operator runs `tests/render-check.sh` and `pytest tests/unit/test_btrbk_key_refresh.py`
+- Then `systemd-analyze verify` reports nothing for `btrbk-key-refresh.service` and `.timer`, and the script compiles
+- And the service has `OnFailure=notify-failure-immediate@%n.service` and no `RequiresMountsFor=`, and the timer has `OnCalendar=weekly` and `Persistent=true`
+- And the script contains no `--gpg-auto-import-keys`, `--no-gpg-checks` or insecure curl option, and fetches with `--proto =https`
+- And `meta/argument_specs.yml` declares `btrbk_key_refresh_on_calendar` and `btrbk_key_warn_days`
+
+Scenario BD-AC-89 [V]: A matching key far from expiry renews silently (BD-FR-164, BD-FR-165, BD-FR-166, BD-FR-167)
+- Given the VM after `site.yml --tags btrbk`
+- When the operator runs `systemctl start btrbk-key-refresh.service`
+- Then the unit's `Result=success` and no failure email is sent
+- And its journal reports the key as verified, imported and the repository refreshed, with the days left
+
+Scenario BD-AC-90 [V]: A key with another fingerprint is never imported (BD-FR-164)
+- Given the VM, and `btrbk_zypper_repo_key_url` pointing (via a test web server over HTTPS) at a different valid key
+- When the operator runs `systemctl start btrbk-key-refresh.service`
+- Then the unit ends `failed` with exit status 2 and a failure email is sent
+- And the journal names both fingerprints
+- And `rpm -qa gpg-pubkey` is unchanged
+
+Scenario BD-AC-91 [V]: A key near expiry alerts after the renewal attempt (BD-FR-166)
+- Given the VM, and `btrbk_key_warn_days` set above the days left until the key's expiry (2027-05-07), e.g. `3650`
+- When the operator runs `systemctl start btrbk-key-refresh.service`
+- Then the unit ends `failed` with exit status 1, the journal names the days left, and it shows that `rpm --import` and `zypper refresh` ran first
+- And a failure email is sent
+
+Scenario BD-AC-92 [V]: An unreachable key URL fails the unit (BD-FR-163)
+- Given the VM, and `btrbk_zypper_repo_key_url` pointing at a closed port
+- When the operator runs `systemctl start btrbk-key-refresh.service`
+- Then the unit ends `failed` with exit status 3 and the journal names the URL
 
 Scenario BD-AC-83 [H]: Restoring one file from the btrbk target (BD-FR-149 row DOC-O1)
 - Given a file `<f>` under `/mnt/data/samba/` that has not changed since the newest received `data` snapshot
@@ -197,6 +238,9 @@ The [H] smoke rows for this area (BD-AC-80 rows 2-5, 12, 14) are in [backup-over
 | BD-FR-69, BD-FR-74 to BD-FR-76, BD-BR-11 | test [V] | BD-AC-36 |
 | BD-FR-73 | test [V] | BD-AC-37 |
 | BD-FR-161 | test [V], smoke [H] | BD-AC-30, BD-AC-80 row 14 |
+| BD-FR-162, BD-FR-163, BD-FR-165, BD-FR-168 | inspection [S], test [V] | BD-AC-88, BD-AC-89, BD-AC-92 |
+| BD-FR-164 | inspection [S] (unit tests), test [V] | BD-AC-88, BD-AC-90 |
+| BD-FR-166, BD-FR-167 | inspection [S] (unit tests), test [V]; analysis (that OBS re-extends before expiry and that `rpm --import` replaces an installed key cannot be tested before 2027-05-07, BD-A-17) | BD-AC-89, BD-AC-91 |
 
 ### Non-Functional Requirements
 

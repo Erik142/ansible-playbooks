@@ -1,0 +1,9 @@
+---
+# daemon_reload: true because on a first-ever run this can execute before the
+# container role has written the Quadlet and reloaded systemd; Quadlet units
+# only exist for systemd after a daemon-reload (same as roles/forgejo).
+- name: Restart restic-server
+  ansible.builtin.systemd:
+    name: restic-server.service
+    state: restarted
+    daemon_reload: true

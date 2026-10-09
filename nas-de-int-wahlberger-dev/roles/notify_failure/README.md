@@ -31,7 +31,7 @@ This role deploys five things:
    systemd, confirmed empirically, so a unit-level override only works when
    the shared file doesn't also define the key. For units with **no
    `Restart=`** at all — a
-   `Type=oneshot` job like `restic-backup.service`, or a native service like
+   `Type=oneshot` job like `btrbk.service` or `db-dump.service`, or a native service like
    Samba's `smb`/`nmb` with no auto-restart configured — there's no
    repeating flap to deduplicate in the first place, and for a job that only
    runs once a night, the default 5-in-10-minutes window would realistically
@@ -53,7 +53,7 @@ This role only deploys the *mechanism*. It does not add `OnFailure=` to any
 service itself — that's a one-line addition in the monitored service's own
 role/template. Currently wired up for every container Quadlet across all
 three playbooks (deduped) plus `nas-de-int-wahlberger-dev`'s
-`restic-backup.service` and `smb`/`nmb`, and all three playbooks'
+`btrbk.service`, `db-dump.service` and `smb`/`nmb`, and all three playbooks'
 `disk-space-check.service` (immediate).
 
 ## What the email includes

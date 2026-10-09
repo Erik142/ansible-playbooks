@@ -1,0 +1,60 @@
+---
+# Optional standby timeout (BD-FR-43). `hdparm -S` sets a drive parameter, not
+# data on the disk (BD-FR-03). With 0 the unit does not exist (neither file nor
+# enablement); the smartd `-n standby` part lives in smartd.yml.
+
+- name: Precondition, backup_disk_hdparm_spindown must be 0 to 251
+  ansible.builtin.assert:
+    that: backup_disk_hdparm_spindown | int >= 0 and backup_disk_hdparm_spindown | int <= 251
+    fail_msg: backup_disk_hdparm_spindown must be between 0 and 251 (hdparm -S values).
+    quiet: true
+
+- name: Install hdparm and set the standby timeout at every boot
+  when: backup_disk_hdparm_spindown | int > 0
+  block:
+    - name: Install hdparm
+      ansible.builtin.package:
+        name: hdparm
+        state: present
+
+    - name: Install the hdparm boot unit (BD-FR-43)
+      ansible.builtin.template:
+        src: backup-disk-hdparm.service.j2
+        dest: /etc/systemd/system/backup-disk-hdparm.service
+        owner: root
+        group: root
+        mode: "0644"
+      register: backup_disk_hdparm_unit
+
+    - name: Enable the hdparm unit and apply it now
+      ansible.builtin.systemd:
+        name: backup-disk-hdparm.service
+        enabled: true
+        daemon_reload: "{{ backup_disk_hdparm_unit is changed }}"
+        state: "{{ 'restarted' if backup_disk_hdparm_unit is changed else 'started' }}"
+      when: not ansible_check_mode
+
+- name: Remove the hdparm unit again when the spindown is off
+  when: backup_disk_hdparm_spindown | int == 0
+  block:
+    - name: Look for the hdparm unit
+      ansible.builtin.stat:
+        path: /etc/systemd/system/backup-disk-hdparm.service
+      register: backup_disk_hdparm_stat
+
+    - name: Disable the hdparm unit
+      ansible.builtin.systemd:
+        name: backup-disk-hdparm.service
+        enabled: false
+      when: backup_disk_hdparm_stat.stat.exists and not ansible_check_mode
+
+    - name: Remove the hdparm unit file
+      ansible.builtin.file:
+        path: /etc/systemd/system/backup-disk-hdparm.service
+        state: absent
+      register: backup_disk_hdparm_removed
+
+    - name: Reload systemd after removing the unit
+      ansible.builtin.systemd:
+        daemon_reload: true
+      when: backup_disk_hdparm_removed is changed and not ansible_check_mode

@@ -1,5 +1,5 @@
 ## Feature: Local backup disk, btrbk, and NAS-hosted restic REST server (restic REST server, firewall, maintenance)
-status:            draft
+status:            ready
 priority:          must
 version:           3.0
 quality:           feature-level scores in [backup-overview.md](backup-overview.md)
@@ -47,15 +47,15 @@ See [backup-overview.md](backup-overview.md#actors). Main actors here: rest-serv
 - BD-FR-108 [Must]: The `firewall` role shall apply each `firewall_rich_rules` entry (default `[]`) as a firewalld rich rule in `firewall_zone`, both permanent and immediate.
 - BD-FR-109 [Must]: For each `restic_server_allowed_sources` entry (production: `10.10.0.0/16` home LAN, `10.243.0.0/16` ZeroTier), the production `firewall_rich_rules` shall contain `rule family="ipv4" source address="<CIDR>" port port="<restic_server_port>" protocol="tcp" accept`.
 - BD-FR-110 [Must]: `8000/tcp` shall appear neither in `firewall_zone`'s ports nor in any of its services.
-- BD-FR-111 [Must]: rest-server shall not accept a TCP connection to `restic_server_port` from a source address outside every `restic_server_allowed_sources` CIDR (BD-A-05).
+- BD-FR-111 [Must]: rest-server shall not accept a TCP connection to `restic_server_port` from a source address outside every `restic_server_allowed_sources` CIDR, except from container networks on the NAS itself, which netavark places in the firewalld `trusted` zone; those still require htpasswd authentication and are append-only (BD-A-05, BD-A-23).
 
 #### I. Cloud repository maintenance on the NAS
 - BD-FR-112 [Must]: Every file and directory that a maintenance run creates in the repository shall be owned by `restic_server_user` (BD-D-14).
 - BD-FR-113 [Must]: The maintenance run shall receive the repository password only from a file with mode `0600` and owner `root:root`, read by systemd through `EnvironmentFile=` (BD-D-14).
-- BD-FR-114 [Must]: If any snapshot's recorded time differs from the modification time of its file in `<repository>/snapshots/` by more than `restic_server_maintenance_max_time_skew_hours` (default 6), then the maintenance run shall run neither forget nor prune (BD-BR-07).
+- BD-FR-114 [Must]: If any snapshot's recorded time is later than the modification time of its file in `<repository>/snapshots/` by more than `restic_server_maintenance_max_time_skew_hours` (default 6), or earlier by more than the past allowance (script option `--max-past-hours`, default 48; restic records the backup start, the file time is the upload end), then the maintenance run shall run neither forget nor prune (BD-BR-07).
 - BD-FR-115 [Must]: When the maintenance run stops under BD-FR-114, `restic-server-maintenance.service` shall end in the `failed` state.
 - BD-FR-116 [Must]: When the maintenance run stops under BD-FR-114, its journal shall list the ID of every offending snapshot.
-- BD-FR-117 [Must]: When BD-FR-114 does not stop it, the maintenance run shall run `restic forget --prune` on `<restic_server_data_dir>/<restic_server_maintenance_repo>` with `--keep-daily 7 --keep-weekly 4 --keep-monthly 6`. These are the defaults of `restic_server_maintenance_keep_daily`, `_keep_weekly` and `_keep_monthly`.
+- BD-FR-117 [Must]: When BD-FR-114 does not stop it, the maintenance run shall evaluate `restic forget --dry-run --json` on `<restic_server_data_dir>/<restic_server_maintenance_repo>` with `--keep-daily 7 --keep-weekly 4 --keep-monthly 6`, abort without deleting if the removal set holds a snapshot ID the BD-FR-114 check did not see or the snapshot list changed meanwhile, then run `restic forget` on exactly those IDs and `restic prune`. These are the defaults of `restic_server_maintenance_keep_daily`, `_keep_weekly` and `_keep_monthly`.
 - BD-FR-118 [Must]: After forget and prune exit 0, the maintenance run shall run `restic check --read-data-subset=<restic_server_maintenance_check_read_data_subset>` (default `10%`) on the same repository.
 - BD-FR-119 [Must]: If forget, prune or check exits non-zero, then `restic-server-maintenance.service` shall end in the `failed` state.
 - BD-FR-120 [Must]: If the repository is locked by another restic process, then the maintenance run shall wait up to `restic_server_maintenance_retry_lock` (default `30m`) for the lock before failing.
@@ -70,7 +70,7 @@ See [backup-overview.md](backup-overview.md#actors). Main actors here: rest-serv
 - BD-BR-06: Append-only applies to every client of the NAS rest-server. Data leaves a repository there only through the NAS-local maintenance run or the owner's hand.
 - BD-BR-07: Prune trust rule.
   - The threat: an append-only client cannot delete data, but it can write snapshots with any recorded time (BD-A-21). `restic forget` chooses which snapshots to keep by recorded time. Forged snapshots can therefore take the keep slots, and the next NAS-side prune would delete the real snapshots they displaced.
-  - The rule: the maintenance run trusts recorded times only within 6 h of the NAS-observed file modification time (BD-FR-114). A client cannot set that time. A forged snapshot whose time is within 6 h can only displace the snapshot of its own day.
+  - The rule: the maintenance run trusts recorded times only from 6 h after to 48 h before the NAS-observed file modification time (BD-FR-114; the asymmetry allows long backups). A client cannot set that time. A forged snapshot whose time is inside that window can only displace the snapshot of its own day.
   - Recovery from a prune that has already deleted data uses either of two copies, via the DOC-O7 procedure:
     - snapshots of the existing snapper `data` config, which contain `/mnt/data/restic-repos` (daily 7, weekly 4, monthly 12, yearly 2);
     - the btrbk copies of `@data` on the backup disk (14d 8w 12m 3y).
@@ -121,7 +121,7 @@ See [backup-overview.md](backup-overview.md#actors). Main actors here: rest-serv
 | Wrong client password; access to another user's repository path | HTTP 401; HTTP 401 or 403 (BD-FR-89) |
 | A client sends DELETE or `forget` | HTTP 403, nothing deleted (BD-FR-90) |
 | A client exceeds `--max-size` | rest-server rejects the upload; cloud's run fails and cloud alerts (BD-FR-91) |
-| A connection arrives from outside both allowed CIDRs | Not accepted (BD-FR-111) |
+| A connection arrives from outside both allowed CIDRs | Not accepted (BD-FR-111); local container networks are exempt (BD-A-23) |
 | `/mnt/data` not mounted | rest-server and the maintenance run do not start (BD-BR-04). The host itself is degraded, because `/mnt/data` is a required boot mount |
 | The backup disk is absent | No effect on rest-server or the maintenance run; only btrbk and the health check are affected (BD-BR-12) |
 | A client writes snapshots with forged times | The maintenance run prunes nothing, fails, lists the IDs and raises an alert (BD-FR-114 to BD-FR-116). The owner removes the forged snapshots by hand (DOC-O8) |
@@ -181,7 +181,8 @@ Scenario BD-AC-45 [V]: Firewall rules admit both allowed source ranges and nothi
 - And `curl -s -m 5 -o /dev/null -w '%{http_code}' http://<VM IP>:8000/` prints `401` in both allowed cases:
   - from a client on the VM network;
   - from `podman run --rm --network ac45-allowed docker.io/curlimages/curl:<pinned tag> ...`.
-- And the same request from `podman run --rm --network podman ...` (default network, outside both CIDRs) prints `000`
+- And the same request from `podman run --rm --network podman ...` (default network, trusted zone, BD-A-23) prints `401`, not `200`: authentication still applies
+- And the request from an external source after its rich rule is removed prints `000`
 
 Scenario BD-AC-46 [V]: Append-only blocks deletion by the client (BD-FR-90, BD-BR-06, BD-A-03)
 - When the client runs `restic backup /etc/hostname` (snapshot X), then `restic forget X`
@@ -200,7 +201,7 @@ Scenario BD-AC-48 [V]: A maintenance run applies retention and checks the reposi
 - Given genuine client snapshots only
 - When the operator starts `restic-server-maintenance.service`
 - Then `Result=success`, and `rpm -q restic` succeeds
-- And the journal shows restic's policy line for 7 daily, 4 weekly and 6 monthly snapshots, prune output, and `no errors were found`
+- And the journal shows the script's line `retention policy: keep 7 daily, 4 weekly, 6 monthly snapshots; forgetting N verified snapshot(s)`, prune output, and `no errors were found`
 - And `find /mnt/data/restic-repos/cloud ! -user restic-server` prints nothing
 - And the next client `restic backup` exits 0
 

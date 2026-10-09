@@ -1,0 +1,309 @@
+---
+# Entry point `init`: partition and format the backup disk ONCE. Run only via
+# backup_disk_init.yml, never from site.yml (BD-FR-02). This is the only file
+# in the repository that may write to a block device (BD-FR-03, BD-AC-04).
+#
+# Flow: (1) evaluate the refusal conditions R-01 to R-10 with read-only
+# commands, which also run under --check; (2) fail once, naming every R-ID
+# that holds, before any write; (3) write only when no condition holds, the
+# disk is not yet initialised and this is not a --check run; (4) print the UUID.
+# No task passes a force option to any tool (BD-FR-11): a tool that finds an
+# existing signature must refuse, not overwrite it.
+
+- name: Pre-flight, all tools used below are installed
+  ansible.builtin.shell: |
+    missing=""
+    for t in lsblk wipefs blockdev realpath mount umount btrfs mkfs.btrfs parted udevadm blkid cmp tail awk mktemp; do
+      command -v "$t" >/dev/null 2>&1 || missing="$missing $t"
+    done
+    printf '%s' "$missing"
+  args:
+    executable: /bin/bash
+  register: backup_disk_init_tools
+  changed_when: false
+  check_mode: false
+
+- name: Pre-flight, fail when a tool is missing
+  ansible.builtin.fail:
+    msg: "Required tool(s) missing on {{ inventory_hostname }}:{{ backup_disk_init_tools.stdout }}. Install util-linux, parted, btrfsprogs."
+  when: backup_disk_init_tools.stdout | length > 0
+
+- name: "R-01: confirm must be defined and exactly equal to backup_disk_device"
+  ansible.builtin.set_fact:
+    backup_disk_init_r01: "{{ backup_disk_init_confirm is not defined or (backup_disk_init_confirm | string) != backup_disk_device }}"
+
+- name: "R-02: the play must target exactly one host"
+  ansible.builtin.set_fact:
+    backup_disk_init_r02: "{{ ansible_play_hosts_all | length != 1 }}"
+
+- name: "R-03: backup_disk_device must be a by-id path"
+  ansible.builtin.set_fact:
+    backup_disk_init_r03: "{{ backup_disk_device is not regex('^/dev/disk/by-id/[^/.][^/]*$') }}"
+
+- name: Locate the device node
+  ansible.builtin.stat:
+    path: "{{ backup_disk_device }}"
+    follow: true
+    get_checksum: false
+    get_mime: false
+    get_attributes: false
+  register: backup_disk_init_stat
+  check_mode: false
+
+- name: Fail when the device does not exist, naming the R-IDs known so far
+  ansible.builtin.fail:
+    msg: >-
+      {{ backup_disk_device }} is not a block device on {{ inventory_hostname }}; nothing was written.
+      Conditions already holding: {{ ((['R-01'] if backup_disk_init_r01 else []) + (['R-02'] if backup_disk_init_r02 else [])
+      + (['R-03'] if backup_disk_init_r03 else [])) | join(', ') | default('none', true) }}.
+  when: not (backup_disk_init_stat.stat.isblk | default(false))
+
+- name: Resolve the device to its kernel node
+  ansible.builtin.command: realpath -- {{ backup_disk_device | quote }}
+  register: backup_disk_init_real
+  changed_when: false
+  check_mode: false
+
+- name: Read type, size, partition table type and children of the device
+  ansible.builtin.command: "{{ item.cmd }}"
+  loop:
+    - { key: type, cmd: "lsblk -dnro TYPE -- {{ backup_disk_init_real.stdout | quote }}" }
+    - { key: size, cmd: "blockdev --getsize64 {{ backup_disk_init_real.stdout | quote }}" }
+    - { key: pttype, cmd: "lsblk -dnro PTTYPE -- {{ backup_disk_init_real.stdout | quote }}" }
+    - { key: tree, cmd: "lsblk -nrpo NAME,TYPE -- {{ backup_disk_init_real.stdout | quote }}" }
+    - { key: mounts, cmd: "lsblk -nro MOUNTPOINTS -- {{ backup_disk_init_real.stdout | quote }}" }
+  loop_control:
+    label: "{{ item.key }}"
+  register: backup_disk_init_probe
+  changed_when: false
+  check_mode: false
+
+- name: Collect the probe results
+  ansible.builtin.set_fact:
+    backup_disk_init_info: >-
+      {{ dict(backup_disk_init_probe.results | map(attribute='item.key')
+         | zip(backup_disk_init_probe.results | map(attribute='stdout'))) }}
+    backup_disk_init_partitions: >-
+      {{ backup_disk_init_probe.results | selectattr('item.key', 'eq', 'tree') | map(attribute='stdout') | first
+         | regex_findall('(?m)^(\S+) part$') }}
+
+- name: "R-04: backup_disk_device must be a whole disk (lsblk TYPE disk)"
+  ansible.builtin.set_fact:
+    backup_disk_init_r04: "{{ backup_disk_init_info.type != 'disk' }}"
+
+- name: "R-05: the size must match backup_disk_expected_size_bytes within the tolerance"
+  ansible.builtin.set_fact:
+    backup_disk_init_r05: >-
+      {{ ((backup_disk_init_info.size | int - backup_disk_expected_size_bytes | int) | abs) * 100
+         > backup_disk_expected_size_bytes | int * backup_disk_size_tolerance_percent | int }}
+
+- name: "R-06: neither the device nor a partition or holder may be mounted"
+  ansible.builtin.set_fact:
+    backup_disk_init_r06: "{{ backup_disk_init_info.mounts.split('\n') | reject('in', ['', '[SWAP]']) | list | length > 0 }}"
+
+- name: "R-07: neither the device nor a partition or holder may be active swap"
+  ansible.builtin.set_fact:
+    backup_disk_init_r07: "{{ '[SWAP]' in backup_disk_init_info.mounts.split('\n') }}"
+
+- name: "R-08: neither the device nor a partition may have a holder (LVM, MD, dm-crypt)"
+  ansible.builtin.shell: |
+    n=$(basename {{ backup_disk_init_real.stdout | quote }})
+    for h in /sys/class/block/"$n"/holders/* /sys/class/block/"$n"/"$n"*/holders/*; do
+      [ -e "$h" ] && printf '%s\n' "$h"
+    done
+    exit 0
+  args:
+    executable: /bin/bash
+  register: backup_disk_init_holders
+  changed_when: false
+  check_mode: false
+
+- name: "R-08: evaluate"
+  ansible.builtin.set_fact:
+    backup_disk_init_r08: "{{ backup_disk_init_holders.stdout | length > 0 }}"
+
+# Initialised state (BD-BR-02): GPT, exactly one partition, btrfs labelled
+# backup_disk_label, subvolume @btrbk directly below the top level. The
+# subvolume list needs a mount; it is read-only and skips log replay, so the
+# probe writes nothing to the disk. Skipped while anything is mounted (R-06).
+- name: Probe whether the disk is in the initialised state
+  ansible.builtin.shell: |
+    set -o pipefail
+    dev={{ backup_disk_init_real.stdout | quote }}
+    label={{ backup_disk_label | quote }}
+    [ "$(lsblk -dnro PTTYPE -- "$dev")" = gpt ] || { echo no; exit 0; }
+    set -- {{ backup_disk_init_partitions | map('quote') | join(' ') }}
+    [ $# -eq 1 ] || { echo no; exit 0; }
+    part=$1
+    [ "$(blkid -p -s TYPE -o value "$part")" = btrfs ] || { echo no; exit 0; }
+    [ "$(blkid -p -s LABEL -o value "$part")" = "$label" ] || { echo no; exit 0; }
+    mnt=$(mktemp -d)
+    trap 'umount "$mnt" 2>/dev/null; rmdir "$mnt"' EXIT
+    mount -t btrfs -o ro,subvolid=5,rescue=nologreplay "$part" "$mnt" || { echo no; exit 0; }
+    subvols=$(btrfs subvolume list "$mnt")
+    if grep -Eq ' top level 5 path @btrbk$' <<<"$subvols"; then echo yes; else echo no; fi
+  args:
+    executable: /bin/bash
+  register: backup_disk_init_state
+  changed_when: false
+  check_mode: false
+  when: not (backup_disk_init_r04 or backup_disk_init_r06 or backup_disk_init_r08)
+
+- name: Record the initialised state
+  ansible.builtin.set_fact:
+    backup_disk_init_done: "{{ (backup_disk_init_state.stdout | default('no')) == 'yes' }}"
+
+- name: "R-09: list the signatures (type and offset) on the device and its partitions"
+  ansible.builtin.shell: |
+    set -eu -o pipefail
+    # -e: a failing wipefs on ANY device aborts the task (a refusal), not only the last.
+    for p in {{ ([backup_disk_init_real.stdout] + backup_disk_init_partitions) | map('quote') | join(' ') }}; do
+      wipefs --no-act --parsable -O OFFSET,TYPE "$p" | awk -F, -v p="$p" '!/^#/ && NF >= 2 {print p ": type " $NF " at offset " $1}'
+    done
+  args:
+    executable: /bin/bash
+  register: backup_disk_init_signatures
+  changed_when: false
+  check_mode: false
+  when: not backup_disk_init_done
+
+- name: "R-09: evaluate"
+  ansible.builtin.set_fact:
+    backup_disk_init_r09: "{{ not backup_disk_init_done and (backup_disk_init_signatures.stdout | length > 0) }}"
+
+- name: "R-10: the first and last 1 MiB must be zero"
+  ansible.builtin.shell: |
+    set -o pipefail
+    dev={{ backup_disk_init_real.stdout | quote }}
+    cmp -s -n 1048576 "$dev" /dev/zero || echo "first MiB is not zero"
+    tail -c 1048576 "$dev" | cmp -s -n 1048576 - /dev/zero || echo "last MiB is not zero"
+    exit 0
+  args:
+    executable: /bin/bash
+  register: backup_disk_init_dirty
+  changed_when: false
+  check_mode: false
+  when: not backup_disk_init_done
+
+- name: "R-10: evaluate"
+  ansible.builtin.set_fact:
+    backup_disk_init_r10: "{{ not backup_disk_init_done and (backup_disk_init_dirty.stdout | length > 0) }}"
+
+- name: Refuse before any write, naming every refusal condition that holds
+  ansible.builtin.fail:
+    msg: |-
+      Refusing to initialise {{ backup_disk_device }} on {{ inventory_hostname }}; nothing was written.
+      Refusal conditions that hold: {{ backup_disk_init_holding | join(', ') }}
+      {% for id in backup_disk_init_holding %}
+      {{ id }}: {{ backup_disk_init_texts[id] }}
+      {% endfor %}
+      {% if 'R-09' in backup_disk_init_holding %}
+      Signatures found:
+      {{ backup_disk_init_signatures.stdout }}
+      {% endif %}
+      {% if 'R-10' in backup_disk_init_holding %}
+      {{ backup_disk_init_dirty.stdout }}
+      {% endif %}
+      See roles/backup_disk/README.md (refusal table and partial-init recovery).
+  when: backup_disk_init_holding | length > 0
+  vars:
+    backup_disk_init_flags:
+      R-01: "{{ backup_disk_init_r01 | bool }}"
+      R-02: "{{ backup_disk_init_r02 | bool }}"
+      R-03: "{{ backup_disk_init_r03 | bool }}"
+      R-04: "{{ backup_disk_init_r04 | bool }}"
+      R-05: "{{ backup_disk_init_r05 | bool }}"
+      R-06: "{{ backup_disk_init_r06 | bool }}"
+      R-07: "{{ backup_disk_init_r07 | bool }}"
+      R-08: "{{ backup_disk_init_r08 | bool }}"
+      R-09: "{{ backup_disk_init_r09 | bool }}"
+      R-10: "{{ backup_disk_init_r10 | bool }}"
+    backup_disk_init_holding: "{{ backup_disk_init_flags | dict2items | selectattr('value', 'eq', true) | map(attribute='key') | sort | list }}"
+    backup_disk_init_texts:
+      R-01: backup_disk_init_confirm is undefined or not exactly equal to backup_disk_device (pass it with -e).
+      R-02: the play targets more than one host.
+      R-03: backup_disk_device is not a path directly below /dev/disk/by-id/.
+      R-04: 'backup_disk_device is not a whole disk (lsblk TYPE is not disk: partition, loop, md, dm, ...).'
+      R-05: the disk size differs from backup_disk_expected_size_bytes by more than backup_disk_size_tolerance_percent.
+      R-06: the device or one of its partitions is mounted.
+      R-07: the device or one of its partitions is active swap.
+      R-08: the device or one of its partitions has a holder (LVM, MD RAID, dm-crypt).
+      R-09: the disk is not initialised and carries signatures.
+      R-10: the disk is not initialised and its first or last 1 MiB is not zero.
+
+- name: Report that the disk is already initialised
+  ansible.builtin.debug:
+    msg: "{{ backup_disk_device }} is already initialised (GPT, one partition, btrfs {{ backup_disk_label }}, @btrbk); nothing to do."
+  when: backup_disk_init_done
+
+- name: Report what would be written (check mode)
+  ansible.builtin.debug:
+    msg: "All refusal checks passed. A real run would create GPT, one partition, btrfs {{ backup_disk_label }} and @btrbk on {{ backup_disk_device }}."
+  when: ansible_check_mode and not backup_disk_init_done
+
+# ---- Writes. Reached only when no refusal condition holds. -------------------
+
+- name: Create the GPT partition table and one partition from 1 MiB to the end
+  ansible.builtin.command:
+    argv:
+      - parted
+      - --script
+      - --align
+      - none
+      - --
+      - "{{ backup_disk_init_real.stdout }}"
+      - mklabel
+      - gpt
+      - mkpart
+      - "{{ backup_disk_label }}"
+      - 1MiB
+      - 100%
+  changed_when: true
+  when: not ansible_check_mode and not backup_disk_init_done
+
+- name: Wait for the kernel and udev to create the partition's by-id link
+  ansible.builtin.command: udevadm settle --timeout=30
+  changed_when: false
+  when: not ansible_check_mode and not backup_disk_init_done
+
+- name: Wait for the partition node
+  ansible.builtin.wait_for:
+    path: "{{ backup_disk_device }}-part1"
+    timeout: 30
+  when: not ansible_check_mode and not backup_disk_init_done
+
+- name: Create the btrfs filesystem (no force option, so an existing signature makes mkfs refuse)
+  ansible.builtin.command:
+    argv:
+      - mkfs.btrfs
+      - -L
+      - "{{ backup_disk_label }}"
+      - "{{ backup_disk_device }}-part1"
+  changed_when: true
+  when: not ansible_check_mode and not backup_disk_init_done
+
+- name: Create the only subvolume, @btrbk, directly below the top level
+  ansible.builtin.shell: |
+    set -eu
+    mnt=$(mktemp -d)
+    trap 'umount "$mnt" 2>/dev/null; rmdir "$mnt"' EXIT
+    mount -t btrfs -o subvolid=5 {{ (backup_disk_device ~ '-part1') | quote }} "$mnt"
+    btrfs subvolume create "$mnt/@btrbk"
+  args:
+    executable: /bin/bash
+  changed_when: true
+  when: not ansible_check_mode and not backup_disk_init_done
+
+# ---- Report ---------------------------------------------------------------------
+
+- name: Read the UUID of the backup filesystem
+  ansible.builtin.command: blkid -p -s UUID -o value {{ (backup_disk_init_partitions[0] if backup_disk_init_done else backup_disk_device ~ '-part1') | quote }}
+  register: backup_disk_init_uuid
+  changed_when: false
+  check_mode: false
+  when: backup_disk_init_done or not ansible_check_mode
+
+- name: Print the UUID (set backup_disk_uuid to this value, runbook step 3)
+  ansible.builtin.debug:
+    msg: "Backup filesystem UUID: {{ backup_disk_init_uuid.stdout }}"
+  when: backup_disk_init_uuid.stdout is defined

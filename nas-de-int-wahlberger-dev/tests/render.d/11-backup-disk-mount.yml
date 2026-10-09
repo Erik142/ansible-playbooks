@@ -1,0 +1,21 @@
+---
+# backup_disk role (T-08): the fstab option string the mount task passes to
+# ansible.posix.mount (BD-FR-23), for the default and an overridden timeout.
+render_items:
+  - role: backup_disk
+    src: fstab-options.j2
+    dest: backup-disk-fstab-options
+    kind: text
+    vars:
+      backup_disk_mount_item: {path: /mnt/backup/btrbk, subvol: /@btrbk}
+    asserts:
+      - '\Asubvol=/@btrbk,compress=zstd:1,noatime,nofail,x-systemd\.device-timeout=30s\n?\Z'
+  - role: backup_disk
+    src: fstab-options.j2
+    dest: backup-disk-fstab-options-timeout
+    kind: text
+    vars:
+      backup_disk_mount_item: {path: /mnt/backup/other, subvol: /@other}
+      backup_disk_device_timeout: 45s
+    asserts:
+      - '\Asubvol=/@other,compress=zstd:1,noatime,nofail,x-systemd\.device-timeout=45s\n?\Z'

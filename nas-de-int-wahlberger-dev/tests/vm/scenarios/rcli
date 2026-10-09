@@ -1,0 +1,5 @@
+#!/bin/sh
+# Fixture restic client (the VM is its own restic client); installed as /usr/bin/rcli.
+export RESTIC_REPOSITORY="${RCLI_REPO:-rest:http://cloud:${RCLI_PW:-fixture-restic-htpasswd-not-a-secret}@127.0.0.1:8000/cloud/}"
+export RESTIC_PASSWORD=fixture-restic-repo-not-a-secret
+exec restic "$@"

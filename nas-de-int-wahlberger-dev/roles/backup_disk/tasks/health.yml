@@ -1,0 +1,30 @@
+---
+# Daily health check (BD-D-09, BD-FR-34 to BD-FR-36, BD-FR-159). The script only
+# reads (BD-FR-28); failure alerts through OnFailure= (notify_failure role,
+# which must be applied first).
+
+- name: Install the health check script
+  ansible.builtin.template:
+    src: backup-disk-health.py.j2
+    dest: "{{ backup_disk_health_script_path }}"
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Install the health check service and timer
+  ansible.builtin.template:
+    src: "backup-disk-health.{{ item }}.j2"
+    dest: "/etc/systemd/system/backup-disk-health.{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: [service, timer]
+  register: backup_disk_health_units
+
+- name: Enable the health check timer
+  ansible.builtin.systemd:
+    name: backup-disk-health.timer
+    enabled: true
+    state: started
+    daemon_reload: "{{ backup_disk_health_units is changed }}"
+  when: not ansible_check_mode

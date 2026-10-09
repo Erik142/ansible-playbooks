@@ -1,5 +1,5 @@
 ## Feature: Local backup disk, btrbk, and NAS-hosted restic REST server (backup disk: init, mount, health)
-status:            draft
+status:            ready
 priority:          must
 version:           3.0
 quality:           feature-level scores in [backup-overview.md](backup-overview.md)
@@ -53,7 +53,7 @@ BD-FR-25, BD-FR-27, BD-FR-28 and BD-FR-33 (mount guards and unit properties) are
 - BD-FR-34 [Must]: If a `backup_disk_mounts` path is not mounted when the health check runs, then the health check shall fail.
 - BD-FR-35 [Must]: If `btrfs device stats --check` reports a non-zero error counter for the backup filesystem, then the health check shall fail.
 - BD-FR-36 [Must]: If no direct child of a `backup_disk_freshness_checks` path has a birth time (`stat -c %W`) within that entry's `max_age_hours`, then the health check shall fail, with a journal line naming that path.
-- BD-FR-37 [Must]: smartd shall monitor the backup disk, addressed by its `/dev/disk/by-id/` path, with the `-a` directive.
+- BD-FR-37 [Must]: (The hook, packages and `smartd.service` of BD-FR-37 to BD-FR-42 come from the shared `smartd` role, see [smartd-main-disk.md](smartd-main-disk.md); `backup_disk` adds only its own device line.) smartd shall monitor the backup disk, addressed by its `/dev/disk/by-id/` path, with the `-a` directive.
 - BD-FR-38 [Must]: smartd shall schedule self-tests of the backup disk with `-s <backup_disk_smartd_schedule>`.
 - BD-FR-39 [Must]: When smartd logs a warning for the backup disk, an email shall reach `notify_failure_to_address` within 5 min, sent with the `notify_failure` Resend credentials.
 - BD-FR-40 [Must]: The BD-FR-39 email shall contain the device path and smartd's message text.
@@ -79,7 +79,7 @@ BD-FR-25, BD-FR-27, BD-FR-28 and BD-FR-33 (mount guards and unit properties) are
 | R-01 | `backup_disk_init_confirm` is undefined, or is not exactly equal to `backup_disk_device` |
 | R-02 | The play's host list (`ansible_play_hosts_all`) has more than one host |
 | R-03 | `backup_disk_device` is not below `/dev/disk/by-id/` |
-| R-04 | `backup_disk_device` resolves to a partition, not a whole disk |
+| R-04 | `backup_disk_device` does not resolve to a whole disk (`lsblk` TYPE is not `disk`, e.g. a partition) |
 | R-05 | The device size differs from `backup_disk_expected_size_bytes` by more than `backup_disk_size_tolerance_percent` (default 1) |
 | R-06 | The device or one of its partitions is mounted |
 | R-07 | The device or one of its partitions is active swap |
@@ -222,7 +222,7 @@ Scenario BD-AC-28 [V]: The NAS keeps working while the backup filesystem is abse
 - When the operator reboots the VM
 - Then `systemctl is-system-running --wait` prints `running` or `degraded`, with no manual action (BD-NFR-08)
 - And `restic-server.service` is active, and a client `restic backup` exits 0 (BD-BR-12)
-- And after `systemctl start btrbk.service`, `find /mnt/backup -xdev -mindepth 2` prints nothing (BD-FR-28), and `btrbk.service` did not start its `OnFailure=` instance (BD-A-19)
+- And after `systemctl start btrbk.service`, `find /mnt/backup -xdev -mindepth 2` prints nothing (BD-FR-28), and the `btrbk.service` start job ends with result `dependency` (its `OnFailure=` instance does start, BD-A-19)
 - And `systemctl start backup-disk-health.service` ends `failed`, and an alert is raised within 5 min (BD-FR-34, BD-NFR-10)
 - And the `disk-space-check.service` journal contains `/mnt/backup/btrbk: not a mount point` and no usage line for that path (BD-FR-46)
 - And after the disk is re-attached and the VM rebooted, BD-AC-26 passes

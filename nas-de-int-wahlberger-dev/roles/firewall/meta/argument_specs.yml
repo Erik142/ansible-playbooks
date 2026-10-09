@@ -21,3 +21,10 @@ argument_specs:
         elements: str
         required: false
         description: "Ports (as port/proto strings, e.g. '9993/udp') to allow inbound."
+      firewall_rich_rules:
+        type: list
+        elements: str
+        required: false
+        description: >-
+          firewalld rich rules (full rule strings) applied to firewall_zone,
+          permanent and immediate. Default is an empty list.

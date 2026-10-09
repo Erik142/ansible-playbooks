@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: restic_server
+  author: Erik Wahlberger
+  description: Append-only restic REST server backup target, running as a Podman Quadlet.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - backup
+    - restic
+    - podman
+
+dependencies: []

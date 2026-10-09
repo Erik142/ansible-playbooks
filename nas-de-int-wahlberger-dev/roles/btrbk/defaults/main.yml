@@ -1,0 +1,43 @@
+---
+# Default variables for the `btrbk` role. Every variable here is declared in
+# meta/argument_specs.yml.
+
+# --- Replication (consumed by the configuration slice) ---------------------
+# One section per entry in btrbk.conf. Each path must be a storage_mounts path.
+btrbk_sources:
+  - name: data
+    path: /mnt/data
+  - name: containers
+    path: /mnt/containers
+btrbk_target_dir: /mnt/backup/btrbk
+# Must not be ".snapshots": that name belongs to snapper.
+btrbk_snapshot_dirname: .btrbk
+btrbk_snapshot_preserve_min: 2d
+btrbk_snapshot_preserve: "no"
+btrbk_target_preserve: 14d 8w 12m 3y
+btrbk_target_preserve_min: "no"
+btrbk_on_calendar: "*-*-* 01:30:00"
+btrbk_conf_path: /etc/btrbk/btrbk.conf
+# Serialises runs (BD-FR-61); /run is tmpfs, so a crash never leaves a stale lock.
+btrbk_lockfile: /run/btrbk.lock
+
+# --- Pinned OBS repository ---------------------------------------------------
+btrbk_zypper_repo_url: https://download.opensuse.org/repositories/filesystems/openSUSE_Tumbleweed/
+# 150 is below the OSS default of 99 in preference, so OSS packages stay on OSS
+# and only packages absent from OSS (btrbk) come from this repository.
+btrbk_zypper_repo_priority: 150
+# Primary-key fingerprint of the filesystems OBS project. The key expires
+# 2027-05-07; btrbk-key-refresh.timer renews and alerts, see README.md.
+btrbk_zypper_repo_gpg_fingerprint: B1FB53748720472205FA601998C97FE7324E6311
+
+# Repository alias (file name below /etc/zypp/repos.d) and where the signing
+# key is fetched from. The key URL may be a file:// URL (used by tests).
+btrbk_zypper_repo_alias: filesystems
+btrbk_zypper_repo_key_url: "{{ btrbk_zypper_repo_url }}repodata/repomd.xml.key"
+# Private scratch directory holding the downloaded key for the fingerprint check.
+btrbk_zypper_repo_key_dir: /var/lib/btrbk-repo
+
+# Weekly key renewal check (btrbk-key-refresh.timer). The unit fails, and so
+# emails, when the fetched key expires in fewer than btrbk_key_warn_days days.
+btrbk_key_refresh_on_calendar: weekly
+btrbk_key_warn_days: 60

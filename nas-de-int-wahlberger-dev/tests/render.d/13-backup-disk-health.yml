@@ -1,0 +1,32 @@
+---
+# backup_disk daily health check (T-10, BD-AC-07 rows for BD-BR-05).
+render_items:
+  - role: backup_disk
+    src: backup-disk-health.timer.j2
+    dest: backup-disk-health.timer
+    kind: systemd-unit
+    asserts:
+      - '^OnCalendar=\*-\*-\* 09:00:00$'
+      - '^Persistent=true$'
+  - role: backup_disk
+    src: backup-disk-health.service.j2
+    dest: backup-disk-health.service
+    kind: systemd-unit
+    asserts:
+      - '^OnFailure=notify-failure-immediate@%n\.service$'
+      - '^Type=oneshot$'
+      - '^NoNewPrivileges=true$'
+      - '^PrivateTmp=true$'
+      - '^ExecStart=/usr/local/bin/backup-disk-health\.py$'
+      # Must still run (and fail) when the disk is gone.
+      - '(?s)\A(?!.*^RequiresMountsFor=)'
+  - role: backup_disk
+    src: backup-disk-health.py.j2
+    dest: backup-disk-health.py
+    kind: python-script
+    asserts:
+      - '^#!/usr/bin/python3$'
+      - 'btrfs", "device", "stats", "--check"'
+      - '"max_age_hours\\": 26'
+      # Read-only: no write, chattr, dd or wipefs in the script.
+      - '(?s)\A(?!.*(chattr|wipefs|\bdd\b|open\([^)]*[''"][wa]|write_text|mkdir|unlink|btrfs", "subvolume))'

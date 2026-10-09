@@ -1,0 +1,44 @@
+---
+# Every overridable value of the backup_disk role (init playbook and the
+# main/mount/health tasks added by later tasks). One definition per variable.
+#
+# The init confirmation is deliberately NOT defined here or anywhere in the
+# repository: it is an extra-var of backup_disk_init.yml only (BD-FR-05).
+
+# The backup disk, addressed by a stable by-id path (never /dev/sdX).
+backup_disk_device: /dev/disk/by-id/wwn-0x500003982b7021c1
+# Identity check next to the by-id path: exact `lsblk -bdno SIZE` of the disk.
+backup_disk_expected_size_bytes: 6001175126016
+backup_disk_size_tolerance_percent: 1
+
+# Filesystem UUID of the initialised backup disk. Empty on purpose: the role
+# fails with a pointer to the README until it is set (runbook step 3).
+backup_disk_uuid: ""
+backup_disk_label: backups
+
+# One /etc/fstab entry per item. subvol is relative to the top level.
+backup_disk_mounts:
+  - path: /mnt/backup/btrbk
+    subvol: /@btrbk
+backup_disk_device_timeout: 30s
+
+# smartd -s schedule: short test Sundays 01:00, long test on the 1st at 10:00.
+backup_disk_smartd_schedule: "(S/../../7/01|L/../01/./10)"
+# Mail hook installed by the smartd role; smartd runs it as root (BD-FR-39).
+# The fallback only matters when this role runs without the smartd role.
+backup_disk_smartd_hook_path: "{{ smartd_hook_path | default('/usr/local/bin/smartd-notify.sh') }}"
+backup_disk_smartd_conf: /etc/smartd.conf
+# hdparm -S value (0-251); 0 leaves the standby timer alone.
+backup_disk_hdparm_spindown: 0
+
+# btrfs scrub: file edited in place, and period (daily, weekly or monthly).
+backup_disk_btrfsmaintenance_sysconfig: /etc/sysconfig/btrfsmaintenance
+backup_disk_scrub_period: monthly
+
+# Daily health check (backup-disk-health.timer).
+backup_disk_health_on_calendar: "*-*-* 09:00:00"
+backup_disk_health_script_path: /usr/local/bin/backup-disk-health.py
+# Each entry (path, max_age_hours) needs a direct child born within max_age_hours;
+# a path that does not exist yet is logged and skipped (BD-FR-159). The 26 h
+# production list is set in vars.yml.
+backup_disk_freshness_checks: []

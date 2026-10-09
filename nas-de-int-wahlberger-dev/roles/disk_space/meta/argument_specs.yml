@@ -7,7 +7,7 @@ argument_specs:
         type: list
         elements: str
         required: false
-        description: Mountpoints to monitor.
+        description: Mountpoints to monitor. An entry that is not a mount point is logged as not a mount point and skipped (no usage figure, no state change).
       disk_space_threshold_percent:
         type: int
         required: false

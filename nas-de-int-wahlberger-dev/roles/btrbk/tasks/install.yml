@@ -1,0 +1,112 @@
+---
+# Order matters (BD-FR-49): fetch the key, compare its fingerprint, and only
+# then import the key and add the repository. Nothing below the assert runs
+# when the fingerprint differs.
+
+- name: Install gpg (reads the key's fingerprint)
+  community.general.zypper:
+    name: gpg2
+    state: present
+
+- name: Create private directory for the repository key
+  ansible.builtin.file:
+    path: "{{ btrbk_zypper_repo_key_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+# Read-only download into a private scratch dir; safe to run in --check so
+# the fingerprint assert below has a file to inspect.
+- name: Fetch the repository signing key
+  ansible.builtin.get_url:
+    url: "{{ btrbk_zypper_repo_key_url }}"
+    dest: "{{ btrbk_zypper_repo_key_dir }}/{{ btrbk_zypper_repo_alias }}.key"
+    owner: root
+    group: root
+    mode: "0600"
+  check_mode: false
+  register: btrbk_repo_key
+
+- name: Read the signing key's primary fingerprint
+  ansible.builtin.command:
+    argv:
+      - gpg
+      - --batch
+      - --show-keys
+      - --with-colons
+      - --with-fingerprint
+      - "{{ btrbk_repo_key.dest }}"
+  register: btrbk_repo_key_info
+  changed_when: false
+  check_mode: false
+
+# A key file with extra keys would let rpm_key import more than the one whose
+# fingerprint was checked: require exactly one primary key and one primary fpr.
+- name: Require the key file to hold exactly one primary key
+  ansible.builtin.assert:
+    that:
+      - btrbk_repo_key_info.stdout_lines | select('match', '^pub:') | list | length == 1
+      - >-
+        btrbk_repo_key_info.stdout_lines | select('match', '^fpr:') | list | length
+        == 1 + (btrbk_repo_key_info.stdout_lines | select('match', '^sub:') | list | length)
+    fail_msg: >-
+      The file from {{ btrbk_zypper_repo_key_url }} must contain exactly one
+      primary key (one pub record); nothing was imported.
+    quiet: true
+
+# The first "fpr" record is the primary key; later ones are subkeys.
+- name: Require the key to match btrbk_zypper_repo_gpg_fingerprint
+  ansible.builtin.assert:
+    that:
+      - >-
+        (btrbk_repo_key_info.stdout_lines | select('match', '^fpr:') | list
+        | first | default('') | split(':'))[9] | default('')
+        | upper == btrbk_zypper_repo_gpg_fingerprint | upper
+    fail_msg: >-
+      The signing key at {{ btrbk_zypper_repo_key_url }} does not have the
+      fingerprint in btrbk_zypper_repo_gpg_fingerprint
+      ({{ btrbk_zypper_repo_gpg_fingerprint }}). The repository and key were
+      not added. If the key was legitimately rotated, verify the new
+      fingerprint out of band and update the variable (see README.md).
+    quiet: true
+
+- name: Import the verified signing key
+  ansible.builtin.rpm_key:
+    key: "{{ btrbk_repo_key.dest }}"
+    fingerprint: "{{ btrbk_zypper_repo_gpg_fingerprint }}"
+    state: present
+
+- name: Add the pinned btrbk repository
+  community.general.zypper_repository:
+    name: "{{ btrbk_zypper_repo_alias }}"
+    repo: "{{ btrbk_zypper_repo_url }}"
+    priority: "{{ btrbk_zypper_repo_priority }}"
+    disable_gpg_check: false
+    auto_import_keys: false
+    autorefresh: true
+    state: present
+
+# zypper_repository (community.general 8.x) has no repo_gpgcheck option, so
+# set both checks explicitly in the repo file instead of relying on zypp.conf.
+- name: Enforce package and metadata signature checks on the repository
+  community.general.ini_file:
+    path: "/etc/zypp/repos.d/{{ btrbk_zypper_repo_alias }}.repo"
+    section: "{{ btrbk_zypper_repo_alias }}"
+    option: "{{ item.key }}"
+    value: "{{ item.value }}"
+    mode: "0644"
+    owner: root
+    group: root
+  loop:
+    - { key: gpgcheck, value: "1" }
+    - { key: repo_gpgcheck, value: "1" }
+  loop_control:
+    label: "{{ item.key }}"
+
+# No "zypper dup" and no vendor-change flags for this repository: btrbk is the
+# only package taken from it (BD-FR-50).
+- name: Install btrbk
+  community.general.zypper:
+    name: btrbk
+    state: present

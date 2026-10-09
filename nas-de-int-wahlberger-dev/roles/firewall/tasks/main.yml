@@ -29,6 +29,18 @@
     state: enabled
   loop: "{{ firewall_allowed_ports }}"
 
+# Source-restricted rules (e.g. the restic REST server port for specific CIDRs).
+# Placed after the services/ports above so a malformed rule can never be the
+# reason SSH is not yet allowed. An empty list yields an empty loop.
+- name: Apply firewalld rich rules
+  ansible.posix.firewalld:
+    rich_rule: "{{ item }}"
+    zone: "{{ firewall_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ firewall_rich_rules }}"
+
 # Rootful Podman publishes container ports (e.g. Caddy's 80/443) via DNAT.
 # Masquerading on this zone is required for that forwarded/NATed traffic to be
 # routed correctly — the equivalent of ufw's DEFAULT_FORWARD_POLICY=ACCEPT in

@@ -7,3 +7,5 @@
 .vault_pass
 .vault_password
 vault_pass.txt
+__pycache__/
+*.pyc

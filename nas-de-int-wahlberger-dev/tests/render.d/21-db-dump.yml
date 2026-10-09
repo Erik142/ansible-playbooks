@@ -1,0 +1,48 @@
+---
+# db_dump role (T-13): the unit, the dump script and a credentials file.
+# The fixture password (inventories/vm) is a fake value; the negative asserts
+# prove it appears only in the credentials file, never in the unit or script.
+render_items:
+  - role: db_dump
+    src: db-dump.service.j2
+    dest: db-dump.service
+    kind: systemd-unit
+    asserts:
+      - '^OnFailure=notify-failure-immediate@%n\.service$'
+      - '^RequiresMountsFor=/mnt/containers$'
+      - '^Type=oneshot$'
+      - '^NoNewPrivileges=true$'
+      - '^ExecStart=/usr/local/bin/db-dump\.sh$'
+      # Only btrbk.service pulls this unit in: no [Install] section, no timer.
+      - '(?s)\A(?!.*\[Install\])'
+      - '(?s)\A(?!.*fixture-postgres-not-a-secret)'
+  - role: db_dump
+    src: db-dump.sh.j2
+    dest: db-dump.sh
+    kind: text
+    asserts:
+      - "^DUMP_DIR=/mnt/containers/db-dumps$"
+      - "^CREDENTIALS_DIR=/var/lib/db-dump$"
+      - "^TIMEOUT_SECONDS=1800$"
+      - "^dump_postgres fixture fixture-postgres fixture fixture$"
+      - "^dump_sqlite forgejo /mnt/containers/forgejo/volume/data/forgejo\\.db$"
+      - '(?s)\A(?!.*fixture-postgres-not-a-secret)'
+  - role: db_dump
+    src: db-dump.sh.j2
+    dest: db-dump-timeout-2s.sh
+    kind: text
+    vars:
+      db_dump_timeout: 2s
+      db_dump_timeout_seconds: 2
+    asserts:
+      - "^TIMEOUT_SECONDS=2$"
+  - role: db_dump
+    src: postgres-pgpass.env.j2
+    dest: fixture-pgpass.env
+    kind: text
+    vars:
+      db_dump_entry:
+        name: fixture
+        password: fixture-postgres-not-a-secret
+    asserts:
+      - "^PGPASSWORD=fixture-postgres-not-a-secret$"

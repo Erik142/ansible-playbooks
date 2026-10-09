@@ -1,0 +1,27 @@
+---
+# smartd monitoring of the backup disk (BD-FR-37 to BD-FR-42). Packages, the mail
+# hook and smartd.service come from the `smartd` role (applied earlier in
+# site.yml); this role only owns the backup disk's own line. Existing lines of
+# smartd.conf (device lines, DEVICESCAN) are never removed.
+
+# smartd stops reading at DEVICESCAN, so a new line must go before it. For an
+# existing line (same device) lineinfile replaces in place and ignores insertbefore.
+- name: Monitor the backup disk (BD-FR-37, BD-FR-38, BD-FR-42, BD-FR-44)
+  ansible.builtin.lineinfile:
+    path: "{{ backup_disk_smartd_conf }}"
+    regexp: '^{{ backup_disk_device | regex_escape }}(\s|$)'
+    insertbefore: '^\s*DEVICESCAN'
+    line: "{{ lookup('ansible.builtin.template', 'smartd-line.j2') | trim }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  register: backup_disk_smartd_line
+  tags: [backup_disk_smartd_config]
+
+- name: Apply the configuration when the line changed (BD-FR-41)
+  ansible.builtin.systemd:
+    name: smartd.service
+    enabled: true
+    state: "{{ 'restarted' if backup_disk_smartd_line is changed else 'started' }}"
+  when: not ansible_check_mode

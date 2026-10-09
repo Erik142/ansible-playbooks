@@ -1,0 +1,16 @@
+---
+# One-time initialisation of the local backup disk (partition table, btrfs,
+# subvolume @btrbk). The ONLY code that writes to the disk. Deliberately not
+# imported by site.yml (BD-FR-02). Single host only (R-02).
+#
+# Always `--check` first, then without it; the exact commands (with the
+# required confirm extra-var) are in roles/backup_disk/README.md.
+- name: Initialise the backup disk
+  hosts: nas
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Run the init tasks of the backup_disk role
+      ansible.builtin.import_role:
+        name: backup_disk
+        tasks_from: init

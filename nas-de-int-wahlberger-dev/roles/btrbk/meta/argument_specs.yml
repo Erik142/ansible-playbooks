@@ -1,0 +1,87 @@
+---
+argument_specs:
+  main:
+    short_description: btrbk from a pinned OBS repository; replication of btrfs sources to the backup disk.
+    options:
+      btrbk_sources:
+        type: list
+        elements: dict
+        required: false
+        description: Replicated sources, one btrbk section each. Every path is a storage_mounts path.
+        options:
+          name:
+            type: str
+            required: true
+            description: Target subdirectory name below btrbk_target_dir.
+          path:
+            type: path
+            required: true
+            description: Mounted btrfs subvolume to snapshot.
+      btrbk_target_dir:
+        type: path
+        required: false
+        description: Directory on the backup disk that receives the snapshots.
+      btrbk_snapshot_dirname:
+        type: str
+        required: false
+        description: Snapshot directory name inside each source. Never ".snapshots" (snapper's).
+      btrbk_snapshot_preserve_min:
+        type: str
+        required: false
+        description: btrbk snapshot_preserve_min (source side).
+      btrbk_snapshot_preserve:
+        type: str
+        required: false
+        description: btrbk snapshot_preserve (source side).
+      btrbk_target_preserve:
+        type: str
+        required: false
+        description: btrbk target_preserve (backup disk retention).
+      btrbk_target_preserve_min:
+        type: str
+        required: false
+        description: btrbk target_preserve_min.
+      btrbk_on_calendar:
+        type: str
+        required: false
+        description: OnCalendar of btrbk.timer.
+      btrbk_conf_path:
+        type: path
+        required: false
+        description: Where the btrbk configuration is written.
+      btrbk_lockfile:
+        type: path
+        required: false
+        description: btrbk lockfile; a second run while it is held does not run.
+      btrbk_zypper_repo_url:
+        type: str
+        required: false
+        description: URL of the OBS repository btrbk is installed from.
+      btrbk_zypper_repo_priority:
+        type: int
+        required: false
+        description: zypper priority of that repository (150 keeps OSS packages on OSS).
+      btrbk_zypper_repo_gpg_fingerprint:
+        type: str
+        required: false
+        description: Expected 40-hex primary fingerprint of the repository signing key. A mismatch fails the role before the repository or key is added.
+      btrbk_zypper_repo_alias:
+        type: str
+        required: false
+        description: Repository alias (file name below /etc/zypp/repos.d).
+      btrbk_zypper_repo_key_url:
+        type: str
+        required: false
+        description: Where the signing key is fetched from (file:// allowed for tests).
+      btrbk_zypper_repo_key_dir:
+        type: path
+        required: false
+        description: Private directory holding the downloaded key during the fingerprint check.
+      btrbk_key_refresh_on_calendar:
+        type: str
+        required: false
+        description: OnCalendar of btrbk-key-refresh.timer (weekly check and renewal of the repository signing key).
+      btrbk_key_warn_days:
+        type: int
+        required: false
+        description: btrbk-key-refresh.service fails (and alerts) when the fetched signing key expires in fewer days than this.

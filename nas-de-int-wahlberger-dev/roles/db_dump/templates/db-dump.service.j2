@@ -1,0 +1,19 @@
+[Unit]
+Description=Dump the databases (Postgres, Forgejo SQLite) before a btrbk run
+# The immediate variant: a oneshot that runs once a day has no flap to deduplicate.
+OnFailure=notify-failure-immediate@%n.service
+# The dumps are written below this mount; never create files on the bare
+# mount-point directory when it is not mounted (BD-FR-27).
+RequiresMountsFor={{ db_dump_mount_path }}
+
+# No install section and no timer: btrbk.service pulls this unit in with
+# Wants=/After= so the dumps are written before btrbk snapshots the source.
+
+[Service]
+Type=oneshot
+# Only these two: the script drives podman, so no further sandboxing.
+NoNewPrivileges=true
+# Up to (dump count x db_dump_timeout) in the worst case; each dump is limited
+# by timeout(1) inside the script, so the unit itself needs no start timeout.
+TimeoutStartSec=infinity
+ExecStart=/usr/local/bin/db-dump.sh

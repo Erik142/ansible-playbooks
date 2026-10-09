@@ -97,14 +97,18 @@ host sshd, not Forgejo's SSH server.
 
 ## Backup and restore
 
-`/mnt/containers` (including `forgejo/volume`) is covered by `restic_backup`.
-The live SQLite file is excluded and replaced by a consistent
-`sqlite3 .backup` copy (`forgejo.db` in `restic_backup_staging_dir`), made on
-the host each night before `restic backup`. Restore: stop `forgejo.service`,
-restore the tree, copy `forgejo.db` over
+`/mnt/containers` (including `forgejo/volume`) is replicated by btrbk. The
+live SQLite file in those snapshots is only crash-consistent. The `db_dump`
+role also writes a consistent host `sqlite3 .backup` copy to
+`/mnt/containers/db-dumps/forgejo.db`. Restore: stop `forgejo.service`,
+restore the tree, copy `forgejo.db` from the dump directory over
 `/mnt/containers/forgejo/volume/data/forgejo.db` (owner uid 1000), start it.
 The database is kept in rollback-journal mode on purpose; do not switch it to
-WAL without adapting the backup script.
+WAL without adapting the `db_dump` script.
+
+Changing the Jinja comment in `forgejo.container.j2` (the old job reference
+was removed there) re-renders the Quadlet once, so the next real apply
+restarts Forgejo one time.
 
 ## Provisioning notes
 

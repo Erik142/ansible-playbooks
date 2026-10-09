@@ -1,0 +1,21 @@
+---
+# Second inventory for the VM fixture: points inventories/vm's single host at
+# the local qemu guest (user-mode networking, ssh forwarded to 127.0.0.1:2222)
+# and at the throwaway key. Use it together with inventories/vm so the fixture
+# group_vars still apply:
+#   ansible -i inventories/vm -i tests/vm/inventory.yml nas -m ping
+# FIXTURE_VM_DIR must match the one given to up.sh (default ~/.cache/nas-fixture-vm).
+all:
+  children:
+    nas:
+      hosts:
+        nas-vm-fixture:
+          ansible_host: 127.0.0.1
+          ansible_port: 2222
+          ansible_ssh_private_key_file: >-
+            {{ (lookup('env', 'FIXTURE_VM_DIR') | default(lookup('env', 'HOME') ~ '/.cache/nas-fixture-vm', true))
+            ~ '/id_fixture' }}
+          ansible_ssh_common_args: >-
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+            -o IdentitiesOnly=yes
+          ansible_python_interpreter: auto_silent

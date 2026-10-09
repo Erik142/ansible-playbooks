@@ -1,0 +1,119 @@
+---
+argument_specs:
+  main:
+    short_description: Mount the backup disk's @btrbk subvolume, scrub it, watch it with smartd and a daily health check.
+    description:
+      - Never formats or partitions anything. The disk is initialised once by
+        backup_disk_init.yml (entry point init).
+    options:
+      backup_disk_device:
+        type: path
+        required: false
+        description: Backup disk as a /dev/disk/by-id/ path.
+      backup_disk_expected_size_bytes:
+        type: int
+        required: false
+        description: Exact size of the disk in bytes (`lsblk -bdno SIZE`).
+      backup_disk_size_tolerance_percent:
+        type: int
+        required: false
+        description: Allowed deviation of the real size from backup_disk_expected_size_bytes, in percent.
+      backup_disk_uuid:
+        type: str
+        required: false
+        description: Filesystem UUID of the initialised backup disk. The role fails while it is empty.
+      backup_disk_label:
+        type: str
+        required: false
+        description: Label the backup filesystem must carry.
+      backup_disk_mounts:
+        type: list
+        elements: dict
+        required: false
+        description: Mounts to persist in /etc/fstab, each with path and subvol (relative to the top level, e.g. /@btrbk).
+        options:
+          path:
+            type: path
+            required: true
+            description: Mount point.
+          subvol:
+            type: str
+            required: true
+            description: Subvolume to mount, with leading slash.
+      backup_disk_device_timeout:
+        type: str
+        required: false
+        description: Value of x-systemd.device-timeout= in the fstab options.
+      backup_disk_smartd_schedule:
+        type: str
+        required: false
+        description: Regular expression for smartd's -s directive (self-test schedule).
+      backup_disk_smartd_hook_path:
+        type: path
+        required: false
+        description: Path of the smartd mail hook script installed by the smartd role (defaults to smartd_hook_path).
+      backup_disk_smartd_conf:
+        type: path
+        required: false
+        description: smartd configuration file the backup disk line is written to.
+      backup_disk_btrfsmaintenance_sysconfig:
+        type: path
+        required: false
+        description: btrfsmaintenance sysconfig file whose BTRFS_SCRUB_MOUNTPOINTS and BTRFS_SCRUB_PERIOD are edited.
+      backup_disk_scrub_period:
+        type: str
+        required: false
+        choices: [daily, weekly, monthly]
+        description: BTRFS_SCRUB_PERIOD; at most monthly (BD-FR-32).
+      backup_disk_hdparm_spindown:
+        type: int
+        required: false
+        description: hdparm -S standby timeout value (0-251). 0 leaves the disk alone.
+      backup_disk_health_on_calendar:
+        type: str
+        required: false
+        description: systemd OnCalendar= expression of the daily health check.
+      backup_disk_health_script_path:
+        type: path
+        required: false
+        description: Install path of the daily health check script.
+      backup_disk_freshness_checks:
+        type: list
+        elements: dict
+        required: false
+        description: Paths whose newest direct child must be younger than max_age_hours; each entry has path and max_age_hours.
+        options:
+          path:
+            type: path
+            required: true
+            description: Directory to inspect.
+          max_age_hours:
+            type: int
+            required: true
+            description: Maximum age of the newest direct child, in hours.
+  init:
+    short_description: Partition and format the backup disk once (used by backup_disk_init.yml only).
+    description:
+      - Evaluates the refusal conditions R-01 to R-10 first and writes to the
+        disk only when none holds and the disk is not yet initialised.
+    options:
+      backup_disk_init_confirm:
+        type: str
+        required: false
+        description: Extra-var only. Must equal backup_disk_device exactly (R-01).
+      backup_disk_device:
+        type: path
+        required: false
+        description: Backup disk as a /dev/disk/by-id/ path.
+      backup_disk_expected_size_bytes:
+        type: int
+        required: false
+        description: Exact size of the disk in bytes (`lsblk -bdno SIZE`).
+      backup_disk_size_tolerance_percent:
+        type: int
+        required: false
+        description: Allowed deviation of the real size from backup_disk_expected_size_bytes, in percent.
+      backup_disk_label:
+        type: str
+        required: false
+        description: Label given to the new btrfs filesystem.

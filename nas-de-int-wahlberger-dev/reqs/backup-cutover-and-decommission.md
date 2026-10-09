@@ -1,5 +1,5 @@
 ## Feature: Local backup disk, btrbk, and NAS-hosted restic REST server (cut-over, decommission, wiring)
-status:            draft
+status:            ready
 priority:          must
 version:           3.0
 quality:           feature-level scores in [backup-overview.md](backup-overview.md)
@@ -238,7 +238,7 @@ Scenario Outline BD-AC-13 [S]: Documentation contains one required item (BD-FR-1
 | DOC-O8 | NAS docs | What to do when the prune guard trips: inspect the listed IDs, remove forged snapshots by hand |
 | DOC-O9 | `roles/restic_server/README.md` | The BD-BR-10 risk statement |
 | DOC-O10 | NAS docs | Re-baselining after an owner-side `restic tag`, `restic rewrite` or `restic copy`: after verifying the snapshots, `touch -d "<recorded time>" <repository>/snapshots/<id>` for each new file, then a maintenance run |
-| DOC-O11 | NAS docs | Renewing the `filesystems` repository key after expiry (2027-05-07): remove the old `gpg-pubkey` package, run `site.yml --tags btrbk` (the BD-FR-49 check runs again), confirm `zypper refresh` succeeds |
+| DOC-O11 | NAS docs | Renewing the `filesystems` repository key when `btrbk-key-refresh.service` alerts (BD-FR-166) or after expiry (2027-05-07): same fingerprint, remove the old `gpg-pubkey` package, run `site.yml --tags btrbk` and `systemctl start btrbk-key-refresh.service`; new fingerprint, verify with `osc signkey filesystems`, update `btrbk_zypper_repo_gpg_fingerprint` first (BD-FR-164). Confirm `zypper refresh` succeeds |
 | DOC-O12 | `roles/restic_server/README.md` | The repository location decision (BD-D-08), its effect on snapper `data` and btrbk, and how to override `restic_server_data_dir` within BD-FR-97 |
 | DOC-T | `roles/tandoor/README.md` | The rotation step `ansible-playbook site.yml --tags tandoor,db_dump`, and no `--tags tandoor,restic_backup` |
 | DOC-K1 | cloud `roles/restic_backup/README.md` | With `restic_backup_forget_enabled: false`, the target is append-only and the NAS applies retention |

@@ -8,7 +8,7 @@ EnvironmentFile=/etc/notify-failure/notify-failure.env
 # there) specifically so this can set it here without a same-key conflict
 # — EnvironmentFile= always wins over a same-named Environment=, so this
 # would silently NOT have worked if the shared file also defined it. For
-# units with no Restart= (a one-shot job like restic-backup.service, or a
+# units with no Restart= (a one-shot job like btrbk.service, or a
 # native service like Samba with no auto-restart at all) there's no
 # repeating flap to deduplicate — every failure is already a distinct,
 # meaningful event, so this skips the dedup entirely instead of waiting for

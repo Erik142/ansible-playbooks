@@ -1,4 +1,4 @@
-## Plan: Replace Mealie with Tandoor Recipes on nas.de.int.wahlberger.dev          spec: nas-de-int-wahlberger-dev/REQS.md#feature-replace-mealie-with-tandoor-recipes-on-nasdeintwahlbergerdev   planned: 2026-09-27   status: planned
+## Plan: Replace Mealie with Tandoor Recipes on nas.de.int.wahlberger.dev          spec: nas-de-int-wahlberger-dev/reqs/tandoor-replaces-mealie.md   planned: 2026-09-27   status: planned
 
 ### Assumptions / open risks
 - **No live apply this cycle.** Per repo policy for this planning/implementation pass, no task runs `ansible-playbook site.yml` (or `--check`) against `nas.de.int.wahlberger.dev`. Every task's Verification uses static checks only (`yamllint`, `ansible-lint`, `--syntax-check`, `--list-tasks`, `ansible-vault view`, `grep`/`git grep`/`git diff`). All runtime/demonstration acceptance criteria from REQS.md (browser OIDC flows, `curl` against the live host, `podman inspect`/`stats`, reboot, restart-recovery, backup dry runs) are consolidated into T-12, a hardware-validation runbook that is **not executed** by any agent — it requires explicit separate authorization to run against production.

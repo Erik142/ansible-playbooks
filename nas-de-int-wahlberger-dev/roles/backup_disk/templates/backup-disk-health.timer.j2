@@ -1,0 +1,11 @@
+# Managed by Ansible (role backup_disk). Do NOT edit on the host.
+[Unit]
+Description=Daily health check of the backup disk
+
+[Timer]
+OnCalendar={{ backup_disk_health_on_calendar }}
+# Catch up a run missed while the NAS was off.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

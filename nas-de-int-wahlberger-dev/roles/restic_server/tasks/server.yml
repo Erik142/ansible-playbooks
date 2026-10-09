@@ -1,0 +1,100 @@
+---
+# Account, repository directory, htpasswd and the rest-server container.
+
+# Explicit group: on openSUSE `useradd -r` would otherwise put the account in
+# the shared `users` group.
+- name: Create the restic_server group
+  ansible.builtin.group:
+    name: "{{ restic_server_user }}"
+    system: true
+
+- name: Create the restic_server system account
+  ansible.builtin.user:
+    name: "{{ restic_server_user }}"
+    group: "{{ restic_server_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+    comment: restic REST server
+
+# Numeric ids for the Quadlet User=/Group= lines. fail_key false so check mode
+# on a first run (account not created yet) does not abort; the assert below
+# then only applies to real runs.
+- name: Look up the restic_server account ids
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ restic_server_user }}"
+    fail_key: false
+
+- name: Record the restic_server uid and gid
+  ansible.builtin.set_fact:
+    restic_server_uid: "{{ (ansible_facts.getent_passwd[restic_server_user] | default([], true))[1] | default('0') }}"
+    restic_server_gid: "{{ (ansible_facts.getent_passwd[restic_server_user] | default([], true))[2] | default('0') }}"
+
+- name: Verify the account is not root and is a system account
+  ansible.builtin.assert:
+    that:
+      - restic_server_uid | int > 0
+      - restic_server_uid | int < 1000
+      - restic_server_gid | int > 0
+    fail_msg: >-
+      {{ restic_server_user }} must be a system account with uid and gid between
+      1 and 999 (uid {{ restic_server_uid }}, gid {{ restic_server_gid }}).
+    quiet: true
+  when: not ansible_check_mode
+
+- name: Create the restic_server data directory
+  ansible.builtin.file:
+    path: "{{ restic_server_data_dir }}"
+    state: directory
+    owner: "{{ restic_server_user }}"
+    group: "{{ restic_server_user }}"
+    mode: "0700"
+
+# community.general.htpasswd hashes with passlib and needs a bcrypt backend
+# (Python 3.13+ has no crypt module). Both must belong to the interpreter
+# Ansible runs the module with: python3<minor>-passlib and python3<minor>-bcrypt.
+- name: Install passlib and bcrypt for Ansible's Python interpreter
+  community.general.zypper:
+    name:
+      - "python3{{ ansible_facts.python.version.minor }}-passlib"
+      - "python3{{ ansible_facts.python.version.minor }}-bcrypt"
+    state: present
+
+- name: Verify the passlib and bcrypt packages are installed
+  ansible.builtin.command:
+    argv:
+      - rpm
+      - -q
+      - "python3{{ ansible_facts.python.version.minor }}-passlib"
+      - "python3{{ ansible_facts.python.version.minor }}-bcrypt"
+  changed_when: false
+  check_mode: false
+
+# One bcrypt entry per client. The module only rewrites an entry whose password
+# no longer verifies, so a re-run is a no-op. A change restarts rest-server so
+# the new password works and the old one gets 401 (BD-FR-104, BD-FR-105).
+# Clients removed from the list are not removed from .htpasswd; see README.md.
+- name: Create the htpasswd entry for each backup client
+  community.general.htpasswd:
+    path: "{{ restic_server_data_dir }}/.htpasswd"
+    name: "{{ item.username }}"
+    password: "{{ item.password }}"
+    hash_scheme: bcrypt
+    owner: "{{ restic_server_user }}"
+    group: "{{ restic_server_user }}"
+    mode: "0600"
+  loop: "{{ restic_server_clients }}"
+  loop_control:
+    label: "{{ item.username }}"
+  no_log: true
+  notify: Restart restic-server
+
+# Rendered immediately after the htpasswd tasks; the container role flushes
+# handlers at its end, so the restart above runs after the Quadlet exists.
+- name: Deploy the Restic REST server container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: restic-server
+    container_quadlet_src: restic-server.container.j2

@@ -1,0 +1,31 @@
+---
+# Role-internal check inputs (not meant to be overridden). Each result is a JSON
+# list so Ansible hands the task a real list, not its string form.
+
+# btrbk_sources paths that contain db_dump_dir. Must be non-empty (BD-FR-67):
+# only then does a btrbk snapshot of that source carry the dumps.
+db_dump_dir_sources: >-
+  {%- set ns = namespace(found=[]) -%}
+  {%- for s in btrbk_sources -%}
+  {%- set p = s.path | regex_replace('/+$', '') -%}
+  {%- if db_dump_dir == p or db_dump_dir.startswith(p ~ '/') -%}
+  {%- set ns.found = ns.found + [s.path] -%}
+  {%- endif -%}
+  {%- endfor -%}
+  {{ ns.found | to_json }}
+
+# btrbk_sources paths that contain db_dump_credentials_dir. Must be empty
+# (BD-FR-71): credentials must never enter a snapshot.
+db_dump_credentials_sources: >-
+  {%- set ns = namespace(found=[]) -%}
+  {%- for s in btrbk_sources -%}
+  {%- set p = s.path | regex_replace('/+$', '') -%}
+  {%- if db_dump_credentials_dir == p or db_dump_credentials_dir.startswith(p ~ '/') -%}
+  {%- set ns.found = ns.found + [s.path] -%}
+  {%- endif -%}
+  {%- endfor -%}
+  {{ ns.found | to_json }}
+
+# Names of db_dump_postgres entries with an empty password (names only, so the
+# failure message never contains a secret).
+db_dump_empty_password_names: "{{ db_dump_postgres | rejectattr('password') | map(attribute='name') | list | to_json }}"

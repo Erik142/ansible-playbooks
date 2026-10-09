@@ -1,0 +1,111 @@
+---
+argument_specs:
+  main:
+    short_description: Append-only restic REST server (host networking) with a NAS-side maintenance run.
+    options:
+      restic_server_image:
+        type: str
+        required: false
+        description: Pinned restic/rest-server image.
+      restic_server_mount_path:
+        type: path
+        required: false
+        description: Mount point of the storage_mounts filesystem holding the repositories.
+      restic_server_data_dir:
+        type: path
+        required: false
+        description: >-
+          Directory holding the repositories and .htpasswd. Must be on the
+          restic_server_mount_path filesystem and not at or below samba_data_dir,
+          .snapshots or the btrbk snapshot directory.
+      restic_server_port:
+        type: int
+        required: false
+        description: TCP port rest-server listens on (host networking). Never added to firewall ports or services.
+      restic_server_allowed_sources:
+        type: list
+        elements: str
+        required: true
+        description: >-
+          CIDRs allowed to reach restic_server_port. Consumed by group_vars to
+          build firewall_rich_rules; this role opens nothing itself.
+      restic_server_user:
+        type: str
+        required: false
+        description: System account rest-server and the maintenance run use; its primary group has the same name.
+      restic_server_clients:
+        type: list
+        elements: dict
+        required: true
+        description: One {username, password} entry per backup client.
+        options:
+          username:
+            type: str
+            required: true
+            description: htpasswd user; with private repos also the repository subdirectory.
+          password:
+            type: str
+            required: true
+            no_log: true
+            description: Client password (stored bcrypt-hashed in .htpasswd).
+      restic_server_private_repos:
+        type: bool
+        required: false
+        description: Run rest-server with --private-repos.
+      restic_server_append_only:
+        type: bool
+        required: false
+        description: Run rest-server with --append-only.
+      restic_server_max_size_bytes:
+        type: int
+        required: false
+        description: rest-server --max-size, in bytes.
+      restic_server_maintenance_repo:
+        type: str
+        required: false
+        description: Repository (subdirectory of restic_server_data_dir) the maintenance run prunes.
+      restic_server_maintenance_repo_password:
+        type: str
+        required: true
+        no_log: true
+        description: Encryption password of that repository; must be non-empty.
+      restic_server_maintenance_keep_daily:
+        type: int
+        required: false
+        description: restic forget --keep-daily.
+      restic_server_maintenance_keep_weekly:
+        type: int
+        required: false
+        description: restic forget --keep-weekly.
+      restic_server_maintenance_keep_monthly:
+        type: int
+        required: false
+        description: restic forget --keep-monthly.
+      restic_server_maintenance_check_read_data_subset:
+        type: str
+        required: false
+        description: restic check --read-data-subset value.
+      restic_server_maintenance_retry_lock:
+        type: str
+        required: false
+        description: restic --retry-lock duration.
+      restic_server_maintenance_max_time_skew_hours:
+        type: int
+        required: false
+        description: Largest allowed difference between a snapshot's recorded time and its file mtime.
+      restic_server_maintenance_on_calendar:
+        type: str
+        required: false
+        description: systemd OnCalendar expression of the maintenance timer.
+      restic_server_maintenance_timeout_start_sec:
+        type: str
+        required: false
+        description: TimeoutStartSec of the maintenance service; must exceed the lock wait plus prune and check time.
+      restic_server_maintenance_script_path:
+        type: path
+        required: false
+        description: Install path of the maintenance script.
+      restic_server_maintenance_env_file:
+        type: path
+        required: false
+        description: Root-only (0600) file with RESTIC_PASSWORD, read by systemd through EnvironmentFile=.

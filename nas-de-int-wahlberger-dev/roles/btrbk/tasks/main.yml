@@ -1,0 +1,80 @@
+---
+# All checks come first: nothing below changes the host until they pass.
+- name: Validate the snapshot directory name and sources
+  ansible.builtin.assert:
+    that:
+      - btrbk_snapshot_dirname is match('^[^/]+$')
+      - btrbk_snapshot_dirname != '.snapshots'
+      - btrbk_sources | length > 0
+      - >-
+        btrbk_sources | map(attribute='path')
+        | map('regex_replace', '/+$', '') | map('regex_replace', '$', '/' ~ btrbk_snapshot_dirname)
+        | reject('match', '^' ~ (samba_data_dir | default('/mnt/data/samba') | regex_escape) ~ '(/|$)')
+        | list | length == btrbk_sources | length
+    fail_msg: >-
+      btrbk_snapshot_dirname '{{ btrbk_snapshot_dirname }}' must be a single
+      directory name, not '.snapshots' (snapper's), and btrbk_sources must not
+      be empty (BD-FR-52, BD-FR-53).
+    quiet: true
+  tags: [btrbk]
+
+# BD-BR-04 paths: the target and every source. Computed once for the guard,
+# the unit's RequiresMountsFor= and the directories below.
+- name: Collect the paths that must be mounted
+  ansible.builtin.set_fact:
+    btrbk_mount_paths: "{{ ([btrbk_target_dir] + (btrbk_sources | map(attribute='path') | list)) | map('regex_replace', '(.)/+$', '\\1') | list }}"
+  tags: [btrbk]
+
+# Reads the live mount table (BD-FR-25), not facts gathered at play start.
+- name: Read the live mount table entry for every path
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - --noheadings
+      - --raw
+      - --output
+      - UUID,FSROOT
+      - --mountpoint
+      - "{{ item }}"
+  loop: "{{ btrbk_mount_paths }}"
+  register: btrbk_findmnt
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags: [btrbk]
+
+# For a path listed in storage_mounts the filesystem UUID and subvolume must
+# match too; the target is matched on its subvolume (backup_disk_mounts).
+- name: Fail before any change when a path is not mounted from the expected filesystem
+  ansible.builtin.assert:
+    that:
+      - item.rc == 0
+      - item.stdout | trim | length > 0
+      - >-
+        (btrbk_expected | length == 0) or
+        (item.stdout | trim | split(' ') | last == btrbk_expected.subvol)
+      - >-
+        (btrbk_expected.uuid | default('') | length == 0) or
+        (item.stdout | trim | split(' ') | first == btrbk_expected.uuid)
+    fail_msg: >-
+      {{ item.item }} is not mounted from the expected filesystem
+      (findmnt: {{ item.stdout | default('') | trim | default('not mounted', true) }};
+      expected {{ btrbk_expected | default({}) }}). Mount it (storage or
+      backup_disk role) before running btrbk.
+    quiet: true
+  vars:
+    btrbk_expected: >-
+      {{ ((storage_mounts | default([])) + (backup_disk_mounts | default([])))
+         | selectattr('path', 'equalto', item.item) | first | default({}) }}
+  loop: "{{ btrbk_findmnt.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  tags: [btrbk]
+
+- name: Install btrbk from the pinned repository
+  ansible.builtin.import_tasks: install.yml
+  tags: [btrbk]
+
+- name: Configure btrbk and its units
+  ansible.builtin.import_tasks: config.yml
+  tags: [btrbk]

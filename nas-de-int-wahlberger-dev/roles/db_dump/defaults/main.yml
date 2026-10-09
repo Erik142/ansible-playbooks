@@ -1,0 +1,66 @@
+---
+# Default variables for the `db_dump` role. Every variable here is declared in
+# meta/argument_specs.yml.
+#
+# Cross-role variables read from the other roles' defaults (all roles of a play
+# see each other's defaults, so ansible.cfg must not set DEFAULT_PRIVATE_ROLE_VARS):
+#   btrbk_sources, storage_mounts, forgejo_volume_dir, paperless_ngx_db_password,
+#   immich_db_password, tandoor_db_password.
+
+# Dumps land here; btrbk snapshots /mnt/containers, so the files travel with the
+# `containers` snapshot. Must be below a btrbk_sources path (BD-FR-67).
+db_dump_dir: /mnt/containers/db-dumps
+
+# Database credentials files. Deliberately NOT below a btrbk_sources path, so
+# the passwords never enter a snapshot or the backup disk (BD-FR-71).
+db_dump_credentials_dir: /var/lib/db-dump
+
+# One pg_dump per entry, run with `podman exec` inside the named container.
+# Container, database and user names are the ones the services hardcode (see
+# roles/paperless_ngx, roles/immich and roles/tandoor templates); the passwords
+# come from the services' own vault-backed variables.
+db_dump_postgres:
+  - name: paperless
+    container: paperless-db
+    database: paperless
+    user: paperless
+    password: "{{ paperless_ngx_db_password }}"
+  - name: immich
+    container: immich-postgres
+    database: immich
+    user: immich
+    password: "{{ immich_db_password }}"
+  - name: tandoor
+    container: tandoor-db
+    database: tandoor
+    user: tandoor
+    password: "{{ tandoor_db_password }}"
+
+# Forgejo's SQLite file on the host (bind-mounted volume); copied with the host's
+# sqlite3 into db_dump_dir/forgejo.db. Must match Forgejo's [database] PATH.
+db_dump_forgejo_db_path: "{{ forgejo_volume_dir }}/data/forgejo.db"
+
+# Upper limit for EACH dump command; a dump that runs longer is stopped and
+# counts as failed (BD-FR-73). Format: <integer><s|sec|m|min|h>.
+db_dump_timeout: 30min
+
+# --- Derived values (computed from the variables above; normally not set) ----
+# The storage_mounts path that contains db_dump_dir (the longest match). Used for
+# RequiresMountsFor= on db-dump.service and for the live mount check (BD-FR-25).
+# Empty when db_dump_dir is below no storage_mounts path; the role then fails.
+db_dump_mount_path: >-
+  {%- set ns = namespace(best='') -%}
+  {%- for m in storage_mounts -%}
+  {%- set p = m.path | regex_replace('/+$', '') -%}
+  {%- if (db_dump_dir == p or db_dump_dir.startswith(p ~ '/')) and (p | length) > (ns.best | length) -%}
+  {%- set ns.best = p -%}
+  {%- endif -%}
+  {%- endfor -%}
+  {{ ns.best }}
+
+# db_dump_timeout in seconds, for coreutils timeout(1). 0 when the format is
+# invalid; the role then fails before any change.
+db_dump_timeout_seconds: >-
+  {%- set parts = db_dump_timeout | string | regex_findall('^([0-9]+)(s|sec|m|min|h)$') -%}
+  {%- set factor = {'s': 1, 'sec': 1, 'm': 60, 'min': 60, 'h': 3600} -%}
+  {{ ((parts[0][0] | int) * factor[parts[0][1]]) if parts else 0 }}

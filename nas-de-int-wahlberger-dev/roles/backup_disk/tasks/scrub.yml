@@ -1,0 +1,81 @@
+---
+# Monthly btrfs scrub of the backup filesystem (BD-FR-30 to BD-FR-32).
+# btrfsmaintenance reads /etc/sysconfig/btrfsmaintenance; only the two keys
+# below are edited, in place, so every other line and every existing scrub
+# mount point survives (BD-FR-31). Probes run under --check too and write nothing.
+
+- name: Install btrfsmaintenance
+  ansible.builtin.package:
+    name: btrfsmaintenance
+    state: present
+
+- name: Probe whether the btrfsmaintenance sysconfig file exists
+  ansible.builtin.stat:
+    path: "{{ backup_disk_btrfsmaintenance_sysconfig }}"
+  register: backup_disk_scrub_conf_stat
+
+# slurp, not grep: the file is read whole and parsed in Jinja, so the append
+# below is a pure function of the old line (second run, same input, no change).
+- name: Read the sysconfig file
+  ansible.builtin.slurp:
+    src: "{{ backup_disk_btrfsmaintenance_sysconfig }}"
+  register: backup_disk_scrub_conf
+  when: backup_disk_scrub_conf_stat.stat.exists
+
+- name: Work out the new BTRFS_SCRUB_MOUNTPOINTS value
+  ansible.builtin.set_fact:
+    backup_disk_scrub_old_line: >-
+      {{ (backup_disk_scrub_conf.content | default('') | b64decode).splitlines()
+         | select('match', '^BTRFS_SCRUB_MOUNTPOINTS=') | list | last | default('') }}
+    backup_disk_scrub_old_list: >-
+      {{ (backup_disk_scrub_conf.content | default('') | b64decode).splitlines()
+         | select('match', '^BTRFS_SCRUB_MOUNTPOINTS=') | list | last | default('=')
+         | regex_replace('^[^=]*=', '') | replace('"', '') | replace("'", '') | trim
+         | split(':') | select | list }}
+
+- name: Append the backup mounts to BTRFS_SCRUB_MOUNTPOINTS, keeping every old value (BD-FR-30, BD-FR-31)
+  ansible.builtin.lineinfile:
+    path: "{{ backup_disk_btrfsmaintenance_sysconfig }}"
+    regexp: '^BTRFS_SCRUB_MOUNTPOINTS='
+    create: true
+    line: >-
+      BTRFS_SCRUB_MOUNTPOINTS="{{ (backup_disk_scrub_old_list
+        + (backup_disk_mounts | map(attribute='path') | reject('in', backup_disk_scrub_old_list) | list))
+        | join(':') }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: >-
+    backup_disk_mounts | map(attribute='path') | reject('in', backup_disk_scrub_old_list) | list | length > 0
+    or backup_disk_scrub_old_line | length == 0
+  register: backup_disk_scrub_mountpoints
+  tags: [backup_disk_scrub_config]
+
+# The period is forced because "none" or "yearly" would break BD-FR-32.
+- name: Set the scrub period (at most monthly, BD-FR-32)
+  ansible.builtin.lineinfile:
+    path: "{{ backup_disk_btrfsmaintenance_sysconfig }}"
+    regexp: '^BTRFS_SCRUB_PERIOD='
+    create: true
+    line: 'BTRFS_SCRUB_PERIOD="{{ backup_disk_scrub_period }}"'
+    owner: root
+    group: root
+    mode: "0644"
+  register: backup_disk_scrub_period_result
+  tags: [backup_disk_scrub_config]
+
+# btrfsmaintenance-refresh turns the sysconfig into the timer schedule.
+- name: Apply the sysconfig to the scrub timer
+  ansible.builtin.systemd:
+    name: btrfsmaintenance-refresh.service
+    state: restarted
+  when: >-
+    not ansible_check_mode
+    and (backup_disk_scrub_mountpoints is changed or backup_disk_scrub_period_result is changed)
+
+- name: Enable the scrub timer (BD-FR-32)
+  ansible.builtin.systemd:
+    name: btrfs-scrub.timer
+    enabled: true
+    state: started
+  when: not ansible_check_mode

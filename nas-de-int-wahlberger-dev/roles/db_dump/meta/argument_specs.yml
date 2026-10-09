@@ -1,0 +1,58 @@
+---
+argument_specs:
+  main:
+    short_description: Database dumps (pg_dump, sqlite3 .backup) written before every btrbk run.
+    options:
+      db_dump_dir:
+        type: path
+        required: false
+        description: Directory the dump files are written to. Must be below a btrbk_sources path.
+      db_dump_credentials_dir:
+        type: path
+        required: false
+        description: Directory holding the pg_dump credentials files. Must not be below a btrbk_sources path.
+      db_dump_postgres:
+        type: list
+        elements: dict
+        required: false
+        description: One pg_dump per entry, run inside the named container.
+        options:
+          name:
+            type: str
+            required: true
+            description: Dump name; the file is written as <name>.sql.
+          container:
+            type: str
+            required: true
+            description: Podman container name of the Postgres server.
+          database:
+            type: str
+            required: true
+            description: Database to dump.
+          user:
+            type: str
+            required: true
+            description: Postgres user to dump as.
+          password:
+            type: str
+            required: true
+            no_log: true
+            description: Password of the Postgres user.
+      db_dump_forgejo_db_path:
+        type: path
+        required: false
+        description: Host path of Forgejo's SQLite database, copied with sqlite3 .backup.
+      db_dump_timeout:
+        type: str
+        required: false
+        description: Upper limit for each dump command, as <integer><s|sec|m|min|h>. A stopped dump counts as failed.
+      db_dump_mount_path:
+        type: str
+        required: false
+        description: >-
+          Derived. The storage_mounts path containing db_dump_dir, used for RequiresMountsFor=
+          and the live mount check. Normally not set.
+      db_dump_timeout_seconds:
+        type: str
+        required: false
+        description: Derived. db_dump_timeout in seconds, for timeout(1). Normally not set.

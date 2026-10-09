@@ -12,7 +12,7 @@
   roles:
     - role: common
       tags: [common]
-    # Early: other roles' units (e.g. restic_backup) hook OnFailure= into
+    # Early: other roles' units (e.g. btrbk, db_dump) hook OnFailure= into
     # the unit this role deploys.
     - role: notify_failure
       tags: [notify_failure]
@@ -39,6 +39,17 @@
     # mounted.
     - role: storage
       tags: [storage]
+    # smartd + mail hook, monitoring the main data HDD. After notify_failure
+    # (hook reuses its Resend credentials); before backup_disk, which only adds
+    # its own device line. Not gated: the main disk is monitored from day one.
+    - role: smartd
+      tags: [smartd]
+    # Backup disk (mount, SMART, scrub, health check). After storage; before
+    # snapper. Off until runbook step 3 (backup_disk_enabled in vars.yml), so
+    # a merged site.yml does not fail on the not-yet-initialised disk.
+    - role: backup_disk
+      tags: [backup_disk]
+      when: backup_disk_enabled | bool
     # After storage: needs the subvolumes actually mounted to verify their
     # .snapshots directories.
     - role: snapper
@@ -74,14 +85,32 @@
     - role: immich
       tags: [immich]
     # Git forge + OCI registry (SQLite). After caddy (shared network) and
-    # before restic_backup, which dumps its database.
+    # before db_dump, which dumps its database.
     - role: forgejo
       tags: [forgejo]
     # Dashboard linking this NAS's and cloud-wahlberger-dev's services.
     - role: homepage
       tags: [homepage]
-    # After samba, paperless_ngx and immich: backs up samba_mount_path and
-    # needs paperless_ngx's/immich's DB containers+passwords to dump them
-    # before backing up.
-    - role: restic_backup
-      tags: [restic_backup]
+    # restic REST server for cloud-wahlberger-dev's backups (host networking,
+    # gated by the firewall role's rich rules). After firewall, podman and
+    # storage (needs /mnt/data mounted). Gated with the backup disk: its
+    # repositories are only protected by btrbk once that disk exists.
+    - role: restic_server
+      tags: [restic_server]
+      when: backup_disk_enabled | bool
+    # Database dumps (Postgres containers + Forgejo SQLite) for btrbk to
+    # snapshot. After paperless_ngx, immich, tandoor, forgejo and homepage,
+    # whose containers and passwords it needs. Gated with the backup disk.
+    - role: db_dump
+      tags: [db_dump]
+      when: backup_disk_enabled | bool
+    # After db_dump (snapshots its output) and backup_disk (target mount).
+    - role: btrbk
+      tags: [btrbk]
+      when: backup_disk_enabled | bool
+    # Removes the old NAS-to-Pi restic job (timer, service, script, state).
+    # Separate flag, set only at runbook step 5; the job keeps running until
+    # then. Depends on no other flag.
+    - role: restic_backup_decommission
+      tags: [restic_backup_decommission]
+      when: restic_backup_decommission_enabled | bool

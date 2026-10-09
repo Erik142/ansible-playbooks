@@ -1,0 +1,107 @@
+---
+# Runs after the mount guard in main.yml: every path below is mounted.
+- name: Create the btrbk configuration directory
+  ansible.builtin.file:
+    path: "{{ btrbk_conf_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# btrbk does not create the snapshot directory and aborts with exit 10 without
+# it (A-07 spike). It sits inside the mounted source, never below an unmounted path.
+- name: Create the btrbk snapshot directory inside every source
+  ansible.builtin.file:
+    path: "{{ item.path | regex_replace('/+$', '') }}/{{ btrbk_snapshot_dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  loop: "{{ btrbk_sources }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Create the target directory of every source on the backup disk
+  ansible.builtin.file:
+    path: "{{ btrbk_target_dir | regex_replace('/+$', '') }}/{{ item.name }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  loop: "{{ btrbk_sources }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Deploy the btrbk configuration
+  ansible.builtin.template:
+    src: btrbk.conf.j2
+    dest: "{{ btrbk_conf_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy the btrbk service unit
+  ansible.builtin.template:
+    src: btrbk.service.j2
+    dest: /etc/systemd/system/btrbk.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Deploy the btrbk timer unit
+  ansible.builtin.template:
+    src: btrbk.timer.j2
+    dest: /etc/systemd/system/btrbk.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+  register: btrbk_timer_unit
+
+# Weekly signing-key renewal and expiry alert (BD-FR-162 to BD-FR-168).
+- name: Install the btrbk key refresh script
+  ansible.builtin.copy:
+    src: btrbk-key-refresh.py
+    dest: /usr/local/bin/btrbk-key-refresh.py
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy the btrbk key refresh service unit
+  ansible.builtin.template:
+    src: btrbk-key-refresh.service.j2
+    dest: /etc/systemd/system/btrbk-key-refresh.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Deploy the btrbk key refresh timer unit
+  ansible.builtin.template:
+    src: btrbk-key-refresh.timer.j2
+    dest: /etc/systemd/system/btrbk-key-refresh.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+  register: btrbk_key_timer_unit
+
+# The timer must be known to systemd before it is enabled.
+- name: Reload systemd now
+  ansible.builtin.meta: flush_handlers
+
+# Under --check the unit file does not exist yet on a first run.
+- name: Enable and start the btrbk timer
+  ansible.builtin.systemd:
+    name: btrbk.timer
+    enabled: true
+    state: started
+  when: not (ansible_check_mode and btrbk_timer_unit is changed)
+
+- name: Enable and start the btrbk key refresh timer
+  ansible.builtin.systemd:
+    name: btrbk-key-refresh.timer
+    enabled: true
+    state: started
+  when: not (ansible_check_mode and btrbk_key_timer_unit is changed)

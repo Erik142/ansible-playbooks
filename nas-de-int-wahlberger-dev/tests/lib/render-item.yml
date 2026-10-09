@@ -1,0 +1,26 @@
+---
+# Renders ONE item (`item`, see render.yml). Included once per item.
+- name: Reload role defaults for this item's role
+  ansible.builtin.include_vars:
+    file: "{{ render_check_nas_dir }}/roles/{{ item.role }}/defaults/main.yml"
+  when: item.role is defined
+
+- name: Reload VM fixture overrides (after role defaults so they win)
+  ansible.builtin.include_vars:
+    file: "{{ render_check_nas_dir }}/inventories/vm/group_vars/all/vars.yml"
+
+- name: Write this item's own vars
+  ansible.builtin.copy:
+    content: "{{ item.vars | default({}) | to_nice_yaml }}"
+    dest: "{{ render_check_workdir }}/item-vars.yml"
+    mode: "0600"
+
+- name: Load this item's own vars
+  ansible.builtin.include_vars:
+    file: "{{ render_check_workdir }}/item-vars.yml"
+
+- name: Render template
+  ansible.builtin.template:
+    src: "{{ render_check_nas_dir }}/{{ ('roles/' ~ item.role ~ '/templates/' ~ item.src) if item.role is defined else item.src }}"
+    dest: "{{ render_check_workdir }}/out/{{ item.dest }}"
+    mode: "0644"

@@ -1,0 +1,18 @@
+---
+# Walking-skeleton registration (T-01): one existing role template and one
+# hand-written sample btrbk config prove the harness end to end. Later tasks
+# add their own tests/render.d/NN-<name>.yml; see tests/lib/render.yml for the
+# item format.
+render_items:
+  - role: notify_failure
+    src: notify-failure-immediate@.service.j2
+    dest: notify-failure-immediate@.service
+    kind: systemd-unit
+    asserts:
+      - '^ExecStart=/usr/local/bin/notify-failure\.sh %i$'
+  - src: tests/lib/sample-btrbk.conf
+    dest: sample-btrbk.conf
+    kind: btrbk-conf
+    print_asserts:
+      - 'snapshot_dir\s+\.btrbk'
+      - 'target_preserve\s+14d 8w 12m 3y'

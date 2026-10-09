@@ -1,0 +1,36 @@
+[Unit]
+Description=Restic REST server (append-only backup target)
+After=network-online.target
+Wants=network-online.target
+# The repositories are on the data filesystem: do not start without it (BD-BR-04).
+RequiresMountsFor={{ restic_server_mount_path }}
+# Emails the owner via the notify_failure role after 5 failures in 10 minutes
+# (BD-BR-05): with Restart=always a crash loop would otherwise send one email per
+# restart. The once-a-day oneshot units use the immediate variant instead.
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=restic-server
+Image={{ restic_server_image }}
+# Host networking (spike A-05, tests/spikes/A-05-firewall-podman.md): a
+# published port is DNATed and takes the FORWARD path, so firewalld rich rules
+# would not filter it. With the host namespace the traffic is INPUT and the
+# source-restricted rich rules are the gate. No PublishPort and no Caddy network.
+Network=host
+# Numeric ids of {{ restic_server_user }}: never root, and rest-server then
+# writes files owned by the account the maintenance run also uses.
+User={{ restic_server_uid }}
+Group={{ restic_server_gid }}
+NoNewPrivileges=true
+DropCapability=ALL
+# `:Z` relabels only this directory (BD-FR-160).
+Volume={{ restic_server_data_dir }}:/data:Z
+# Exec= replaces the image's CMD (/entrypoint.sh), which would try to create
+# .htpasswd and cannot be steered to --append-only/--max-size without OPTIONS.
+Exec=rest-server --path /data --htpasswd-file /data/.htpasswd --listen :{{ restic_server_port }}{% if restic_server_private_repos %} --private-repos{% endif %}{% if restic_server_append_only %} --append-only{% endif %} --max-size {{ restic_server_max_size_bytes }}
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

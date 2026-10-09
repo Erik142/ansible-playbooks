@@ -26,10 +26,19 @@ also means every alert genuinely is a distinct occurrence, matching the
 immediate variant's own assumption — no need for notify_failure's
 time-window dedup on top.
 
+## Paths that are not mount points
+
+An entry in `disk_space_paths` that is not a mount point (for example
+`/mnt/backup/btrbk` while the backup disk is detached) is not measured: `df`
+would report the root filesystem's usage under that path. The script prints
+exactly `<path>: not a mount point`, prints no usage line, leaves the stored
+state untouched and does not count it as a crossing. Use `mountpoint -q <path>`
+to see what the script sees.
+
 ## Role variables
 
 See `defaults/main.yml`. `disk_space_paths` defaults to `["/"]` only —
-override it per host for any additional mounted disks (see this repo's
+override it per host for any additional mounted disks (entries must be mount points to be measured) (see this repo's
 other playbooks for examples: the NAS's `/mnt/data` + `/mnt/containers`,
 the Pi's `/mnt/data`).
 

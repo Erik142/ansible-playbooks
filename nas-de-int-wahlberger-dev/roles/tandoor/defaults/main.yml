@@ -2,7 +2,7 @@
 # Default variables for the `tandoor` role.
 
 # Confirmed against upstream during the T-01 spike (2026-09-27): the official
-# image tag, an internal HTTP port of 80 (not 8080, the REQS.md default
+# image tag, an internal HTTP port of 80 (not 8080, the reqs/tandoor-replaces-mealie.md default
 # assumption), and PostgreSQL 16 as a supported major version.
 tandoor_image: "docker.io/vabene1111/recipes:2.6.15"
 tandoor_db_image: "docker.io/library/postgres:16"

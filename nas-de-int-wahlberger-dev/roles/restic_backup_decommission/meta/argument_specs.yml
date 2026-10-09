@@ -1,0 +1,33 @@
+---
+argument_specs:
+  main:
+    short_description: Idempotently remove the old NAS to Pi restic backup job.
+    description:
+      - Stops and disables restic-backup.timer and restic-backup.service,
+        removes their unit files, the backup script, /etc/restic-backup and
+        /var/lib/restic-backup, then reloads systemd (BD-FR-79 to BD-FR-81).
+        Every task reports ok when none of these exist (BD-FR-82). Local to
+        the host; never contacts the Pi (BD-FR-83). The enable flag
+        restic_backup_decommission_enabled is applied by site.yml, not here.
+    options:
+      restic_backup_decommission_units:
+        type: list
+        elements: str
+        required: false
+        description: Unit names to stop, disable and remove (timer first).
+      restic_backup_decommission_unit_dir:
+        type: path
+        required: false
+        description: Directory holding the unit files.
+      restic_backup_decommission_script:
+        type: path
+        required: false
+        description: Path of the old backup script.
+      restic_backup_decommission_config_dir:
+        type: path
+        required: false
+        description: Old config directory, removed recursively.
+      restic_backup_decommission_state_dir:
+        type: path
+        required: false
+        description: Old state/staging directory, removed recursively.

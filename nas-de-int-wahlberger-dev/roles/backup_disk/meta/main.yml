@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: backup_disk
+  author: Erik Wahlberger
+  description: Local backup disk. One-time initialisation (separate playbook), mount of the @btrbk subvolume, scrub, smartd and health check.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - backup
+    - btrfs
+
+dependencies: []
