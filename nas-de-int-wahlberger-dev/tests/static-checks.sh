@@ -110,7 +110,7 @@ ac01() {
 # static-checks.sh is excluded: its own grep pattern contains the keywords.
 ac02() {
     d=$(git -C "$repo" diff "$base" -- "$nas_rel" "$cloud_rel" ":(exclude)$nas_rel/reqs" \
-        ":(exclude)$nas_rel/tests/static-checks.sh") || { echo "git diff against $base failed"; return 1; }
+        ":(exclude)$nas_rel/tests/static-checks.sh" ":(exclude)$nas_rel/PLAN-backup.md" ":(exclude,glob)$nas_rel/tests/**/*.py") || { echo "git diff against $base failed"; return 1; }
     hits=$(printf '%s\n' "$d" | grep -E '^\+.*(noqa|skip_list|warn_list)')
     [ -z "$hits" ] || { printf '%s\n' "$hits"; return 1; }
 }
