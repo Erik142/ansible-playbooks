@@ -37,7 +37,16 @@ runtime=$(pick_runtime) || { echo "render-check: no working docker or podman fou
 command -v ansible-playbook >/dev/null 2>&1 || { echo "render-check: ansible-playbook not on PATH" >&2; exit 2; }
 
 workdir=$(mktemp -d "${TMPDIR:-/tmp}/render-check.XXXXXX")
-trap 'rm -rf "$workdir"' EXIT INT TERM
+# The container stage runs as root, so on Linux (no user-namespace remap) it
+# leaves root-owned files in $workdir; remove those as root through the same
+# image, then the directory itself.
+cleanup() {
+    rm -rf "$workdir" 2>/dev/null && return 0
+    "$runtime" run --rm -v "$workdir:/work" --entrypoint sh "$image" \
+        -c 'rm -rf /work/* /work/.[!.]*' >/dev/null 2>&1 || true
+    rm -rf "$workdir"
+}
+trap cleanup EXIT INT TERM
 
 # A private ansible.cfg keeps the repo's vault_password_file (1Password) and
 # fact cache out of this run: the fixture needs neither.
