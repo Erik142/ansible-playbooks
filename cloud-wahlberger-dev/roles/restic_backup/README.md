@@ -66,15 +66,25 @@ what actually catches that. A failed check fails the whole script (same
 `restic_backup_check_read_data_subset` (accepts restic's own syntax, e.g.
 `"10%"` or `"1/10"`).
 
-## Why 03:30, not nas-de-int-wahlberger-dev's 03:00
+## Retention switch (`restic_backup_forget_enabled`) — append-only target
 
-Both hosts back up to the same `restic_server` on `pi-de-int-wahlberger-dev`
-— offset by half an hour so the two nightly runs don't land on it at
-literally the same moment.
+With `restic_backup_forget_enabled: true` (the default) the script runs
+`restic forget` with the `restic_backup_keep_*` values after each backup.
+With `restic_backup_forget_enabled: false` the target is append-only for
+this client and the NAS applies retention: the rendered script contains no
+forget/prune step at all (comments included), only the backup and the
+nightly integrity check.
+
+## Why 04:30
+
+The NAS's rebootmgr window is 03:00-04:00, so the backup starts at 04:30
+(`restic_backup_on_calendar`) to stay clear of it. A run is expected to
+take at most 60 minutes and so ends before the NAS maintenance run at
+06:00.
 
 ## Why a systemd timer, not a Semaphore-scheduled Ansible run
 
-The backup itself (`restic backup` + `restic forget --prune`) is a
+The backup itself (the backup plus, while `restic_backup_forget_enabled` is true, retention) is a
 data-plane operation that runs every night regardless of whether Ansible
 runs that day — it shouldn't depend on Semaphore being reachable. Ansible's
 job here is only to *deploy* the script, environment, and timer

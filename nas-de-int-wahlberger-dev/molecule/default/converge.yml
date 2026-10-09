@@ -15,3 +15,16 @@
     # firewalld's own rule application that fails). Testing "does the
     # firewall actually apply" isn't meaningful in a container anyway, since
     # its network stack isn't representative of the real host.
+    # Converged without its `restic_backup_decommission_enabled` flag (that
+    # `when:` lives in site.yml). Needs only systemd; on this fresh container
+    # no old restic units exist, so it exercises the no-op path twice.
+    - role: restic_backup_decommission
+    # NOT backup_disk: it needs a real block device (by-id path, btrfs
+    # filesystem, mount and hdparm), which a container does not have.
+    # NOT btrbk: it snapshots btrfs subvolumes of /mnt/data and /mnt/containers
+    # onto the backup disk; neither exists in the container.
+    # NOT db_dump: it dumps the Podman-hosted Postgres containers and the
+    # Forgejo SQLite file, and Podman does not run in this container.
+    # NOT restic_server: it runs rest-server as a Podman Quadlet and relies on
+    # firewalld rich rules, neither of which works inside the container.
+    # These four are proven on the VM fixture (inventories/vm) instead.

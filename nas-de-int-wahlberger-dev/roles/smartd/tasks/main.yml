@@ -1,0 +1,53 @@
+---
+# smartd monitoring (SM-FR-1 to SM-FR-6). Existing lines of smartd.conf (device
+# lines, DEVICESCAN) are never removed: only the line that starts with a listed
+# device's by-id path is owned by this role.
+
+- name: Validate smartd_devices
+  ansible.builtin.assert:
+    that:
+      - smartd_devices is sequence
+      - smartd_devices | map(attribute='device', default='') | select('match', '^/dev/') | list | length == smartd_devices | length
+    fail_msg: Every smartd_devices entry needs a `device` that starts with /dev/ (use /dev/disk/by-id/...). See roles/smartd/README.md.
+    quiet: true
+
+- name: Install smartmontools and the tools the mail hook needs
+  ansible.builtin.package:
+    name:
+      - smartmontools
+      - jq
+      - curl
+    state: present
+
+- name: Install the smartd mail hook (SM-FR-3, SM-FR-4)
+  ansible.builtin.template:
+    src: smartd-notify.sh.j2
+    dest: "{{ smartd_hook_path }}"
+    owner: root
+    group: root
+    mode: "0750"
+
+# smartd stops reading at DEVICESCAN, so a new line must go before it. For an
+# existing line (same device) lineinfile replaces in place and ignores insertbefore.
+- name: Monitor the listed disks (SM-FR-1, SM-FR-2, SM-FR-6)
+  ansible.builtin.lineinfile:
+    path: "{{ smartd_conf }}"
+    regexp: '^{{ smartd_device.device | regex_escape }}(\s|$)'
+    insertbefore: '^\s*DEVICESCAN'
+    line: "{{ lookup('ansible.builtin.template', 'smartd-line.j2') | trim }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ smartd_devices }}"
+  loop_control:
+    loop_var: smartd_device
+    label: "{{ smartd_device.device }}"
+  register: smartd_lines
+
+- name: Enable smartd and apply the configuration (SM-FR-5)
+  ansible.builtin.systemd:
+    name: smartd.service
+    enabled: true
+    state: "{{ 'restarted' if smartd_lines is changed else 'started' }}"
+  when: not ansible_check_mode

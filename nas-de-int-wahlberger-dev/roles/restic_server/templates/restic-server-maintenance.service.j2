@@ -1,0 +1,46 @@
+[Unit]
+Description=Restic repository maintenance (prune guard, forget --prune, check)
+# The immediate variant: a oneshot that runs once a day has no flap to deduplicate.
+OnFailure=notify-failure-immediate@%n.service
+# The repositories are on the data filesystem; never run on the bare mount point.
+RequiresMountsFor={{ restic_server_mount_path }}
+
+[Service]
+Type=oneshot
+# Every file the run creates belongs to the rest-server account (BD-D-14,
+# BD-FR-112). systemd reads EnvironmentFile= as root before dropping to User=,
+# so the password file stays 0600 root:root (BD-FR-113).
+User={{ restic_server_user }}
+Group={{ restic_server_user }}
+EnvironmentFile={{ restic_server_maintenance_env_file }}
+# The nologin account has no usable home: systemd creates a cache directory
+# owned by it (/var/cache/restic-server-maintenance) for restic.
+CacheDirectory=restic-server-maintenance
+Environment=HOME=/var/cache/restic-server-maintenance
+Environment=RESTIC_CACHE_DIR=/var/cache/restic-server-maintenance
+# Hardening: restic runs against a local path only, so no network, no
+# capabilities and a read-only system. The cache directory stays writable
+# through CacheDirectory=; the repositories need ReadWritePaths.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateNetwork=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ restic_server_data_dir }}
+CapabilityBoundingSet=
+# 30 min lock wait (--retry-lock) plus forget/prune and a data subset check.
+TimeoutStartSec={{ restic_server_maintenance_timeout_start_sec }}
+ExecStart={{ restic_server_maintenance_script_path }} \
+  --repo-root {{ restic_server_data_dir }} \
+  --repo {{ restic_server_maintenance_repo }} \
+  --keep-daily {{ restic_server_maintenance_keep_daily }} \
+  --keep-weekly {{ restic_server_maintenance_keep_weekly }} \
+  --keep-monthly {{ restic_server_maintenance_keep_monthly }} \
+  --check-subset {{ restic_server_maintenance_check_read_data_subset | replace('%', '%%') }} \
+  --retry-lock {{ restic_server_maintenance_retry_lock }} \
+  --max-skew-hours {{ restic_server_maintenance_max_time_skew_hours }}
+# rest-server --max-size counts usage once at start; an out-of-band prune makes
+# that counter drift. Restart it after a SUCCESSFUL run only (ExecStartPost= is
+# skipped when ExecStart= fails). The `+` prefix runs the command outside the
+# User=/PrivateNetwork=/CapabilityBoundingSet= sandbox, as root.
+ExecStartPost=+/usr/bin/systemctl try-restart restic-server.service

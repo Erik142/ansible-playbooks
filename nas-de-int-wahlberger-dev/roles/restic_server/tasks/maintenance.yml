@@ -1,0 +1,56 @@
+---
+# NAS-side retention for the append-only repository: restic, the T-15 script,
+# the root-only password file, and the service + timer (BD-D-11, BD-D-14).
+
+- name: Install restic
+  community.general.zypper:
+    name: restic
+    state: present
+
+- name: Deploy the maintenance script
+  ansible.builtin.copy:
+    src: restic-maintenance.py
+    dest: "{{ restic_server_maintenance_script_path }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+# systemd reads this as root (EnvironmentFile=), so it is not readable by the
+# service account and not in the unit (BD-FR-113).
+- name: Write the maintenance password file
+  ansible.builtin.template:
+    src: restic-maintenance.env.j2
+    dest: "{{ restic_server_maintenance_env_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Deploy the maintenance service unit
+  ansible.builtin.template:
+    src: restic-server-maintenance.service.j2
+    dest: /etc/systemd/system/restic-server-maintenance.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: restic_server_maintenance_service_unit
+
+- name: Deploy the maintenance timer unit
+  ansible.builtin.template:
+    src: restic-server-maintenance.timer.j2
+    dest: /etc/systemd/system/restic-server-maintenance.timer
+    owner: root
+    group: root
+    mode: "0644"
+  register: restic_server_maintenance_timer_unit
+
+- name: Reload systemd after unit changes
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: restic_server_maintenance_service_unit is changed or restic_server_maintenance_timer_unit is changed
+
+- name: Enable and start the maintenance timer
+  ansible.builtin.systemd:
+    name: restic-server-maintenance.timer
+    enabled: true
+    state: started

@@ -1,0 +1,183 @@
+---
+# Mount the @btrbk subvolume (BD-FR-20 to BD-FR-23, BD-FR-26, BD-FR-29).
+# Read-only except for the fstab line, the mount and the root dir mode. This
+# file never creates or deletes a subvolume and never sets the C attribute
+# (BD-FR-24): the subvolume must already exist from backup_disk_init.yml.
+# All probes run under --check too (check_mode: false) and write nothing.
+
+- name: Precondition, backup_disk_uuid must be set (BD-FR-20)
+  ansible.builtin.assert:
+    that: backup_disk_uuid | string | length > 0
+    fail_msg: >-
+      backup_disk_uuid is empty. Initialise the disk with backup_disk_init.yml, set
+      backup_disk_uuid to the printed UUID, or skip this role with
+      --skip-tags backup_disk,btrbk. See roles/backup_disk/README.md.
+    quiet: true
+
+- name: Precondition, look up the device carrying the filesystem UUID (BD-FR-21)
+  ansible.builtin.command: blkid --uuid {{ backup_disk_uuid | quote }}
+  register: backup_disk_blkid
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Precondition, a filesystem with that UUID must be present (BD-FR-21)
+  ansible.builtin.assert:
+    that: backup_disk_blkid.rc == 0 and backup_disk_blkid.stdout | trim | length > 0
+    fail_msg: >-
+      No filesystem with UUID {{ backup_disk_uuid }} is present on {{ inventory_hostname }}.
+      Is the disk attached? See roles/backup_disk/README.md.
+    quiet: true
+
+- name: Precondition, read type, label and parent of the filesystem device
+  ansible.builtin.command: lsblk --json --nodeps -o NAME,TYPE,FSTYPE,LABEL,PKNAME -- {{ backup_disk_blkid.stdout | trim | quote }}
+  register: backup_disk_lsblk
+  changed_when: false
+  check_mode: false
+
+# lsblk reads the udev database, which is stale after `btrfs filesystem label`
+# (found on the VM, BD-AC-24 row 3); blkid -p probes the superblock directly.
+- name: Precondition, probe type and label from the superblock (not the udev cache)
+  ansible.builtin.command: blkid -p -o export -- {{ backup_disk_blkid.stdout | trim | quote }}
+  register: backup_disk_blkid_probe
+  changed_when: false
+  check_mode: false
+
+- name: Precondition, resolve backup_disk_device to its kernel name
+  ansible.builtin.command: realpath -- {{ backup_disk_device | quote }}
+  register: backup_disk_device_real
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Precondition, the filesystem must be a labelled btrfs on a partition of the device (BD-FR-22)
+  vars:
+    backup_disk_fs: >-
+      {{ (backup_disk_lsblk.stdout | from_json).blockdevices[0]
+         | combine({'fstype': (backup_disk_blkid_probe.stdout | regex_findall('(?m)^TYPE=(.*)$') | first | default('')),
+                    'label': (backup_disk_blkid_probe.stdout | regex_findall('(?m)^LABEL=(.*)$') | first | default(''))}) }}
+  ansible.builtin.assert:
+    that:
+      - backup_disk_fs.fstype == 'btrfs'
+      - backup_disk_fs.label == backup_disk_label
+      - backup_disk_device_real.rc == 0
+      - backup_disk_fs.type == 'part'
+      - backup_disk_fs.pkname == (backup_disk_device_real.stdout | trim | basename)
+    fail_msg: >-
+      Filesystem {{ backup_disk_uuid }} does not match the expected backup disk:
+      {{ ['fstype is ' ~ (backup_disk_fs.fstype | default('none', true)) ~ ', expected btrfs'
+          if backup_disk_fs.fstype != 'btrfs' else '',
+          'label is ' ~ (backup_disk_fs.label | default('none', true)) ~ ', expected ' ~ backup_disk_label
+          if backup_disk_fs.label != backup_disk_label else '',
+          'device: it is not on a partition of ' ~ backup_disk_device
+          if (backup_disk_device_real.rc != 0 or backup_disk_fs.type != 'part'
+              or backup_disk_fs.pkname != (backup_disk_device_real.stdout | trim | basename)) else ''
+         ] | select | join('; ') }}.
+    quiet: true
+
+- name: Read the live mount state of every backup mount
+  ansible.builtin.command: findmnt --noheadings --raw --output UUID,FSROOT --mountpoint {{ item.path | quote }}
+  loop: "{{ backup_disk_mounts }}"
+  loop_control:
+    label: "{{ item.path }}"
+  register: backup_disk_premount
+  changed_when: false
+  failed_when: backup_disk_premount.rc not in [0, 1]
+  check_mode: false
+
+# Probe the subvolume read-only before the fstab line is written, so a
+# filesystem without @btrbk leaves fstab untouched (BD-FR-26). Skipped for a
+# path that is already mounted correctly.
+- name: Probe that the subvolume exists (temporary read-only mount)
+  ansible.builtin.shell: |
+    set -eu
+    tmp=$(mktemp -d)
+    trap 'umount "$tmp" 2>/dev/null || true; rmdir "$tmp"' EXIT
+    mount -t btrfs -o ro,rescue=nologreplay,subvol={{ item.item.subvol | quote }} UUID={{ backup_disk_uuid | quote }} "$tmp"
+  args:
+    executable: /bin/bash
+  loop: "{{ backup_disk_premount.results }}"
+  loop_control:
+    label: "{{ item.item.path }}"
+  register: backup_disk_probe
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: >-
+    item.stdout | trim != backup_disk_uuid ~ ' ' ~ item.item.subvol
+
+- name: Precondition, every subvolume must exist (BD-FR-26)
+  ansible.builtin.assert:
+    that: item.skipped | default(false) or item.rc == 0
+    fail_msg: >-
+      Cannot mount subvolume {{ item.item.item.subvol }} for {{ item.item.item.path }}:
+      filesystem {{ backup_disk_uuid }} has no such subvolume (create it with
+      backup_disk_init.yml; this role never creates one). Details: {{ item.stderr | default('') | trim }}
+    quiet: true
+  loop: "{{ backup_disk_probe.results }}"
+  loop_control:
+    label: "{{ item.item.item.path }}"
+
+# The mount point itself must exist, but only while nothing is mounted there:
+# once mounted, the directory is the subvolume root and its mode is set below.
+- name: Create the mount point while it is not mounted
+  ansible.builtin.file:
+    path: "{{ item.item.path }}"
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  loop: "{{ backup_disk_premount.results }}"
+  loop_control:
+    label: "{{ item.item.path }}"
+  when: item.rc != 0
+
+- name: Persist the fstab line and mount the subvolume (BD-FR-23)
+  ansible.posix.mount:
+    path: "{{ item.path }}"
+    src: "UUID={{ backup_disk_uuid }}"
+    fstype: btrfs
+    opts: "{{ lookup('ansible.builtin.template', 'fstab-options.j2') | trim }}"
+    state: mounted
+  vars:
+    backup_disk_mount_item: "{{ item }}"
+  loop: "{{ backup_disk_mounts }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Read the live mount table after mounting
+  ansible.builtin.command: findmnt --noheadings --raw --output UUID,FSROOT --mountpoint {{ item.path | quote }}
+  loop: "{{ backup_disk_mounts }}"
+  loop_control:
+    label: "{{ item.path }}"
+  register: backup_disk_postmount
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+# Skipped under --check on a first run: nothing is mounted there yet.
+- name: Assert the live mount table shows the path with that UUID and subvolume (BD-FR-26)
+  ansible.builtin.assert:
+    that:
+      - item.rc == 0
+      - item.stdout | trim == backup_disk_uuid ~ ' ' ~ item.item.subvol
+    fail_msg: >-
+      {{ item.item.path }} is not mounted from subvolume {{ item.item.subvol }} of
+      filesystem {{ backup_disk_uuid }} (findmnt: {{ item.stdout | default('') | trim | default('not mounted', true) }}).
+    quiet: true
+  loop: "{{ backup_disk_postmount.results }}"
+  loop_control:
+    label: "{{ item.item.path }}"
+  when: not ansible_check_mode
+
+- name: Restrict the root of each mounted subvolume to root (BD-FR-29)
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "0700"
+    owner: root
+    group: root
+  loop: "{{ backup_disk_mounts }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: not ansible_check_mode

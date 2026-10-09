@@ -15,6 +15,13 @@ mkdir -p "$STATE_DIR"
 FAILED=0
 
 for MOUNT in {{ disk_space_paths | map('quote') | join(' ') }}; do
+  # An unmounted path (e.g. the detached backup disk) is just a directory on
+  # the root filesystem: df would report root's usage under the wrong name.
+  # Log it and skip without touching the stored state or the exit status.
+  if ! mountpoint -q "$MOUNT"; then
+    echo "$MOUNT: not a mount point"
+    continue
+  fi
   USE_PERCENT="$(df -P "$MOUNT" | awk 'NR==2 { gsub("%", "", $5); print $5 }')"
   STATE_FILE="$STATE_DIR/$(printf '%s' "$MOUNT" | tr '/' '_')"
   PREV="ok"

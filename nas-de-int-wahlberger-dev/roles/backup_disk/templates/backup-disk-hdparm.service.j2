@@ -1,0 +1,14 @@
+# Managed by Ansible (role backup_disk). Do NOT edit on the host.
+# Sets the standby timeout of the backup disk at every boot (BD-FR-43).
+[Unit]
+Description=Set the standby timeout of the backup disk
+After=local-fs.target
+# nofail disk: when it is absent the unit is skipped, not failed (BD-BR-12).
+ConditionPathExists={{ backup_disk_device }}
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/hdparm -S {{ backup_disk_hdparm_spindown }} {{ backup_disk_device }}
+
+[Install]
+WantedBy=multi-user.target

@@ -25,11 +25,13 @@ if ! BACKUP_OUTPUT="$(restic backup \
 fi
 printf '%s\n' "$BACKUP_OUTPUT"
 
+{% if restic_backup_forget_enabled | bool %}
 restic forget \
   --keep-daily {{ restic_backup_keep_daily }} \
   --keep-weekly {{ restic_backup_keep_weekly }} \
   --keep-monthly {{ restic_backup_keep_monthly }} \
   --prune
+{% endif %}
 
 # Verifies the repository's structure/index every run (cheap: no data
 # read), plus re-reads and re-hashes a rotating slice of the actual data

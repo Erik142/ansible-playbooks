@@ -1,0 +1,42 @@
+---
+# restic_server role (T-14): the rest-server Quadlet (kind text: systemd-analyze cannot verify .container files). The uid/gid are runtime
+# facts (getent), so the items supply fixture values. The fixture client and
+# maintenance passwords must appear in no rendered file (BD-FR-107).
+render_items:
+  - role: restic_server
+    src: restic-server.container.j2
+    dest: restic-server.container
+    kind: text
+    vars:
+      restic_server_uid: "993"
+      restic_server_gid: "992"
+    asserts:
+      - '^Network=host$'
+      - '^User=993$'
+      - '^Group=992$'
+      - '^Volume=/mnt/data/restic-repos:/data:Z$'
+      - '^Exec=rest-server .*--listen :8000( |$)'
+      - '^Exec=.*--private-repos( |$)'
+      - '^Exec=.*--append-only( |$)'
+      - '^Exec=.* --max-size 107374182400$'
+      - '^Restart=always$'
+      - '^WantedBy=default\.target$'
+      - '^OnFailure=notify-failure@%n\.service$'
+      - '^RequiresMountsFor=/mnt/data$'
+      - '(?s)\A(?!.*^PublishPort=)'
+      - '(?s)\A(?!.*caddy\.network)'
+      - '(?s)\A(?!.*8000/tcp)'
+      - '(?s)\A(?!.*fixture-restic-htpasswd-not-a-secret)'
+      - '(?s)\A(?!.*fixture-restic-repo-not-a-secret)'
+  - role: restic_server
+    src: restic-server.container.j2
+    dest: restic-server-flags-off.container
+    kind: text
+    vars:
+      restic_server_uid: "993"
+      restic_server_gid: "992"
+      restic_server_private_repos: false
+      restic_server_append_only: false
+      restic_server_port: 8123
+    asserts:
+      - '^Exec=rest-server --path /data --htpasswd-file /data/\.htpasswd --listen :8123 --max-size 107374182400$'

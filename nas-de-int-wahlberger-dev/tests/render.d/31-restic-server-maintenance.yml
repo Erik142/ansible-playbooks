@@ -1,0 +1,43 @@
+---
+# restic_server maintenance units (T-16). The fixture repo password
+# (fixture-restic-repo-not-a-secret) may appear only in the env file.
+render_items:
+  - role: restic_server
+    src: restic-server-maintenance.service.j2
+    dest: restic-server-maintenance.service
+    kind: systemd-unit
+    asserts:
+      - '^User=restic-server$'
+      - '^Group=restic-server$'
+      - '^EnvironmentFile=/etc/restic-server-maintenance\.env$'
+      - '^RequiresMountsFor=/mnt/data$'
+      - '^OnFailure=notify-failure-immediate@%n\.service$'
+      - '^Type=oneshot$'
+      - '^NoNewPrivileges=true$'
+      - '^PrivateTmp=true$'
+      - '^PrivateNetwork=true$'
+      - '^ProtectSystem=strict$'
+      - '^ReadWritePaths=/mnt/data/restic-repos$'
+      - '^CapabilityBoundingSet=$'
+      - '^ExecStart=/usr/local/bin/restic-maintenance\.py '
+      - '^ExecStartPost=\+/usr/bin/systemctl try-restart restic-server\.service$'
+      - '--repo cloud '
+      - '--keep-daily 7 '
+      - '--check-subset 10%% '
+      - '--retry-lock 30m '
+      - '(?s)\A(?!.*fixture-restic-repo-not-a-secret)'
+  - role: restic_server
+    src: restic-server-maintenance.timer.j2
+    dest: restic-server-maintenance.timer
+    kind: systemd-unit
+    asserts:
+      - '^OnCalendar=\*-\*-\* 06:00:00$'
+      - '^Persistent=true$'
+      - '^RandomizedDelaySec=5min$'
+      - '(?s)\A(?!.*fixture-restic-repo-not-a-secret)'
+  - role: restic_server
+    src: restic-maintenance.env.j2
+    dest: restic-maintenance.env
+    kind: text
+    asserts:
+      - '^RESTIC_PASSWORD="fixture-restic-repo-not-a-secret"$'

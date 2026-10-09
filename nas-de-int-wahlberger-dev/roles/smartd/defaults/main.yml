@@ -1,0 +1,20 @@
+---
+# Default variables for the `smartd` role.
+
+# Disks smartd watches, one smartd.conf line each. Keys:
+#   device    (required) /dev/disk/by-id/ path; by-id stays stable across reboots
+#   schedule  (optional) smartd -s regexp; default smartd_default_schedule
+#   standby   (optional, default false) add `-n standby` so a spun-down disk is
+#             not woken for checks
+# Default: the main data HDD behind /mnt/data. The root SSD
+# (ata-INTEL_SSDSC2BW240A4_CVDA4471015P2403GN) and the NVMe
+# (nvme-Samsung_SSD_970_EVO_Plus_2TB_S4J4NM0R808398K) are one entry away.
+smartd_devices:
+  - device: /dev/disk/by-id/ata-TOSHIBA_MG04ACA600EY_57I9K068FTTB
+
+# Short test Sundays 01:00, long test on the 1st at 10:00.
+smartd_default_schedule: "(S/../../7/01|L/../01/./10)"
+
+# Mail hook run by smartd (-M exec); other roles' lines reuse this path.
+smartd_hook_path: /usr/local/bin/smartd-notify.sh
+smartd_conf: /etc/smartd.conf

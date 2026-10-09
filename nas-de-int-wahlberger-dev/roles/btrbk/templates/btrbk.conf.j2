@@ -1,0 +1,20 @@
+# {{ ansible_managed | default('Managed by Ansible') }}
+# Retention is independent of snapper (BD-BR-15): these keys come only from the
+# btrbk_* role variables. Source snapshots live in <source>/{{ btrbk_snapshot_dirname }},
+# never in a .snapshots directory and never below the Samba share (BD-FR-52/53).
+lockfile                  {{ btrbk_lockfile }}
+timestamp_format          long
+snapshot_create           always
+snapshot_preserve_min     {{ btrbk_snapshot_preserve_min }}
+snapshot_preserve         {{ btrbk_snapshot_preserve }}
+target_preserve_min       {{ btrbk_target_preserve_min }}
+target_preserve           {{ btrbk_target_preserve }}
+{% for source in btrbk_sources %}
+
+# {{ source.name }}: the whole mounted subvolume, restic repositories included (BD-FR-161).
+volume {{ source.path }}
+  snapshot_dir {{ btrbk_snapshot_dirname }}
+  subvolume .
+    snapshot_name {{ source.name }}
+    target {{ btrbk_target_dir | regex_replace('/+$', '') }}/{{ source.name }}
+{% endfor %}

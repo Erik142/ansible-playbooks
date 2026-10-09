@@ -1,0 +1,39 @@
+---
+# Teardown of the old NAS -> Pi restic job (BD-FR-79 to BD-FR-82). Local only;
+# never contacts the Pi (BD-FR-83). `state: absent` is a no-op on missing
+# paths; stopping a unit that does not exist would fail, so the systemd task
+# is gated on the unit file's presence.
+- name: Check which old restic units still have a unit file
+  ansible.builtin.stat:
+    path: "{{ restic_backup_decommission_unit_dir }}/{{ item }}"
+  loop: "{{ restic_backup_decommission_units }}"
+  register: restic_backup_decommission_unit_stat
+
+- name: Stop and disable the old restic units
+  ansible.builtin.systemd:
+    name: "{{ item.item }}"
+    state: stopped
+    enabled: false
+  loop: "{{ restic_backup_decommission_unit_stat.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.stat.exists
+
+- name: Remove the old restic unit files
+  ansible.builtin.file:
+    path: "{{ restic_backup_decommission_unit_dir }}/{{ item }}"
+    state: absent
+  loop: "{{ restic_backup_decommission_units }}"
+  notify: Reload systemd after removing restic units
+
+- name: Remove the old restic script, config and state
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ restic_backup_decommission_script }}"
+    - "{{ restic_backup_decommission_config_dir }}"
+    - "{{ restic_backup_decommission_state_dir }}"
+
+- name: Apply the systemd reload now so it is done when the role ends
+  ansible.builtin.meta: flush_handlers

@@ -1,0 +1,2 @@
+{# One smartd.conf line for the device in `smartd_device`, rendered by tasks/main.yml. #}
+{{ smartd_device.device }} -a -s {{ smartd_device.schedule | default(smartd_default_schedule) }} {{ '-n standby ' if smartd_device.standby | default(false) | bool else '' }}-m root -M exec {{ smartd_hook_path }}

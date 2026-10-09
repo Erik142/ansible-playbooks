@@ -1,0 +1,90 @@
+---
+# Render-check playbook (driven by ../render-check.sh; never run against a host).
+#
+# Stage "render": renders every item registered in tests/render.d/*.yml with the
+# role defaults, then the VM fixture overrides, then any `-e` extra vars (later
+# wins; extra vars always win) and writes <workdir>/out/* plus manifest.tsv.
+# Stage "assert": after the container checks, greps the rendered files and the
+# `btrbk config print` output for the patterns each item lists.
+#
+# Item format (list under the key `render_items` in a render.d file):
+#   role:          role whose defaults/main.yml supplies variables (optional)
+#   src:           template path: roles/<role>/templates/<src> when `role` is set,
+#                  otherwise relative to the NAS dir
+#   dest:          file name in the output dir (must be unique)
+#   kind:          btrbk-conf | systemd-unit | python-script | text
+#                  (python-script: also compiled with python3 in the container)
+#   vars:          variables for this item (optional). Should override variables that
+#                  already have a default: a key unknown to the baseline stays set
+#                  for the items rendered after it
+#   asserts:       regexes that must match the rendered file (optional)
+#   skip_asserts_when_extra: name of a variable; when it is passed with -e the
+#                  item's asserts are skipped (they describe the default value that
+#                  the -e override replaces; another item asserts the override)
+#   print_asserts: regexes that must match `btrbk config print` (btrbk-conf only)
+- name: Render check
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Collect render items from tests/render.d
+      ansible.builtin.set_fact:
+        render_check_items: >-
+          {{ render_check_items | default([])
+             + (lookup('ansible.builtin.file', item) | from_yaml).render_items }}
+      loop: "{{ query('ansible.builtin.fileglob', render_check_nas_dir ~ '/tests/render.d/*.yml') | sort }}"
+      tags: [always]
+
+    - name: Fail on duplicate dest names
+      ansible.builtin.assert:
+        that: render_check_items | map(attribute='dest') | unique | length == render_check_items | length
+        fail_msg: "tests/render.d contains duplicate dest names"
+      tags: [always]
+
+    - name: Prepare output directory
+      ansible.builtin.file:
+        path: "{{ render_check_workdir }}/out"
+        state: directory
+        mode: "0755"
+      tags: [render]
+
+    # One include per item: Ansible cannot template a task's `vars:` as a whole
+    # dict, so render-item.yml reloads the baseline (role defaults + fixture)
+    # and then loads the item's own vars from a file.
+    - name: Render items
+      ansible.builtin.include_tasks:
+        file: render-item.yml
+        apply:
+          tags: [render]
+      loop: "{{ render_check_items }}"
+      loop_control:
+        label: "{{ item.dest }}"
+      tags: [render]
+
+    - name: Write manifest for the container stage
+      ansible.builtin.copy:
+        content: "{% for i in render_check_items %}{{ i.kind }}\t{{ i.dest }}\n{% endfor %}"
+        dest: "{{ render_check_workdir }}/manifest.tsv"
+        mode: "0644"
+      tags: [render]
+
+    - name: Assert patterns in rendered files
+      ansible.builtin.assert:
+        that: lookup('ansible.builtin.file', render_check_workdir ~ '/out/' ~ item.0.dest) is search(item.1, multiline=True)
+        fail_msg: "{{ item.0.dest }}: rendered file does not match /{{ item.1 }}/"
+        quiet: true
+      when: item.0.skip_asserts_when_extra is not defined or item.0.skip_asserts_when_extra not in vars
+      loop: "{{ render_check_items | subelements('asserts', skip_missing=True) }}"
+      loop_control:
+        label: "{{ item.0.dest }}: {{ item.1 }}"
+      tags: [assert]
+
+    - name: Assert patterns in btrbk config print output
+      ansible.builtin.assert:
+        that: lookup('ansible.builtin.file', render_check_workdir ~ '/out/' ~ item.0.dest ~ '.print') is search(item.1, multiline=True)
+        fail_msg: "{{ item.0.dest }}: btrbk config print does not match /{{ item.1 }}/"
+        quiet: true
+      loop: "{{ render_check_items | subelements('print_asserts', skip_missing=True) }}"
+      loop_control:
+        label: "{{ item.0.dest }}: {{ item.1 }}"
+      tags: [assert]

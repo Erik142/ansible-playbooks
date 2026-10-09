@@ -11,8 +11,8 @@ This is its own notification class, not a failure alert — a distinct role
 and a distinct (blue "REBOOTING", not red "FAILED") email template. It
 only *reuses* [`notify_failure`](../notify_failure/README.md)'s Resend API
 credentials file (`/etc/notify-failure/notify-failure.env`) so the key
-doesn't need a second copy in Vault — the same pattern `restic_backup`'s
-success email already uses. It does not go through `notify_failure`'s own
+doesn't need a second copy in Vault — the same pattern the
+old NAS job's success email used (the `restic_backup` role, now removed). It does not go through `notify_failure`'s own
 alerting mechanism (`OnFailure=`, crash-loop dedup) at all.
 
 ## Emails synchronously, called from security's reboot-request script

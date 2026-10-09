@@ -1,0 +1,55 @@
+---
+# Default variables for the `restic_server` role. Every variable here is
+# declared in meta/argument_specs.yml.
+#
+# NOT defaulted on purpose (argument_specs makes the role fail if unset):
+#   restic_server_allowed_sources  list of CIDRs; the role itself opens nothing,
+#                                  the production firewall_rich_rules are built
+#                                  from it (group_vars, BD-FR-109).
+
+# Single line, matched by the Renovate custom manager in renovate.json.
+restic_server_image: docker.io/restic/rest-server:0.14.0
+
+# The storage_mounts filesystem the repositories live on. Also the path the
+# units wait for (RequiresMountsFor=).
+restic_server_mount_path: /mnt/data
+
+# A plain directory in @data, deliberately NOT below samba_data_dir (so the
+# `:Z` relabel never touches Samba's context, BD-FR-160), `.snapshots` or the
+# btrbk snapshot dir. See README.md (location decision).
+restic_server_data_dir: "{{ restic_server_mount_path }}/restic-repos"
+
+# rest-server runs with host networking (spike A-05): it listens on this port
+# on every host interface, and firewalld rich rules are the only gate.
+restic_server_port: 8000
+
+# System account (UID < 1000, nologin) the container and the maintenance run
+# use. Its primary group has the same name.
+restic_server_user: restic-server
+
+# REQUIRED, no usable default: one {username, password} entry per backup
+# client. With --private-repos each user is confined to <data_dir>/<username>.
+restic_server_clients: []
+
+restic_server_private_repos: true
+restic_server_append_only: true
+
+# 100 GiB.
+restic_server_max_size_bytes: 107374182400
+
+# --- Maintenance run (consumed by the maintenance tasks and units) ---------
+restic_server_maintenance_repo: cloud
+# REQUIRED, no usable default (empty fails the role before any change).
+restic_server_maintenance_repo_password: ""
+restic_server_maintenance_keep_daily: 7
+restic_server_maintenance_keep_weekly: 4
+restic_server_maintenance_keep_monthly: 6
+restic_server_maintenance_check_read_data_subset: 10%
+restic_server_maintenance_retry_lock: 30m
+restic_server_maintenance_max_time_skew_hours: 6
+restic_server_maintenance_on_calendar: "*-*-* 06:00:00"
+# 30 min lock wait plus forget/prune and the data subset check.
+restic_server_maintenance_timeout_start_sec: 4h
+restic_server_maintenance_script_path: /usr/local/bin/restic-maintenance.py
+# 0600 root:root, read by systemd (EnvironmentFile=); holds the repo password.
+restic_server_maintenance_env_file: /etc/restic-server-maintenance.env

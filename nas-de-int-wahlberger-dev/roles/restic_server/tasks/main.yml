@@ -1,0 +1,111 @@
+---
+# Validation first: every failure below happens before any task of this role
+# can report `changed` (BD-FR-101 to BD-FR-103).
+- name: Validate restic_server_clients is not empty
+  ansible.builtin.assert:
+    that:
+      - restic_server_clients | length > 0
+    fail_msg: >-
+      restic_server_clients is empty. Set it in group_vars: one
+      {username, password} entry per backup client. See
+      roles/restic_server/README.md.
+    quiet: true
+
+- name: Validate each restic_server_clients entry has a password
+  ansible.builtin.assert:
+    that:
+      - item.password | default('') | length > 0
+    fail_msg: >-
+      restic_server_clients entry "{{ item.username }}" has an empty password.
+      Set its matching vault_* secret. See roles/restic_server/README.md.
+    quiet: true
+  loop: "{{ restic_server_clients }}"
+  loop_control:
+    label: "{{ item.username }}"
+
+- name: Validate the maintenance repository password is set
+  ansible.builtin.assert:
+    that:
+      - restic_server_maintenance_repo_password | length > 0
+    fail_msg: >-
+      restic_server_maintenance_repo_password is empty. It must equal the
+      encryption password of the cloud repository (vault_restic_server_cloud_repo_password).
+      See roles/restic_server/README.md.
+    quiet: true
+
+# BD-FR-97: the repositories must sit on the data filesystem, but never inside
+# Samba's tree (the `:Z` relabel would change its SELinux context), nor in a
+# snapper or btrbk snapshot directory. Cross-role variables fall back to the
+# role defaults' values when that role is not part of the play.
+- name: Validate the restic_server_data_dir location
+  vars:
+    restic_server_data_dir_slash: "{{ (restic_server_data_dir | ansible.builtin.normpath) ~ '/' }}"
+    restic_server_forbidden_dirs:
+      - "{{ samba_data_dir | default(restic_server_mount_path ~ '/samba') }}"
+      - "{{ restic_server_mount_path }}/.snapshots"
+      - "{{ restic_server_mount_path }}/{{ btrbk_snapshot_dirname | default('.btrbk') }}"
+    restic_server_forbidden_hits: >-
+      {% set ns = namespace(hits=[]) %}
+      {% for d in restic_server_forbidden_dirs %}
+      {% if restic_server_data_dir_slash.startswith(d ~ '/') %}{% set ns.hits = ns.hits + [d] %}{% endif %}
+      {% endfor %}
+      {{ ns.hits | to_json }}
+  ansible.builtin.assert:
+    that:
+      - restic_server_mount_path in (storage_mounts | map(attribute='path') | list)
+      - restic_server_data_dir_slash.startswith(restic_server_mount_path ~ '/')
+      - restic_server_data_dir_slash != restic_server_mount_path ~ '/'
+      - (restic_server_forbidden_hits | from_json) | length == 0
+    fail_msg: >-
+      restic_server_data_dir "{{ restic_server_data_dir }}" must be a directory
+      below {{ restic_server_mount_path }} (a storage_mounts path) and not at or
+      below any of {{ restic_server_forbidden_dirs | join(', ') }}.
+      See roles/restic_server/README.md.
+    quiet: true
+
+# BD-FR-25 (BD-BR-04): the data filesystem must be mounted, from its subvolume,
+# when this role runs; otherwise the tasks below would write the account, the
+# repository directory and .htpasswd into the bare mount-point directory. Reads
+# the live mount table, not facts gathered at play start. Found on the VM
+# (BD-AC-27 rows 4 and 5): the role used to run on an unmounted /mnt/data.
+- name: Read the live mount table entry for the data filesystem
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - --noheadings
+      - --raw
+      - --output
+      - UUID,FSROOT
+      - --mountpoint
+      - "{{ restic_server_mount_path }}"
+  register: restic_server_findmnt
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Fail before any change when the data filesystem is not mounted from the expected subvolume
+  vars:
+    restic_server_expected: >-
+      {{ storage_mounts | selectattr('path', 'equalto', restic_server_mount_path) | first | default({}) }}
+  ansible.builtin.assert:
+    that:
+      - restic_server_findmnt.rc == 0
+      - restic_server_findmnt.stdout | trim | length > 0
+      - >-
+        (restic_server_expected.subvol | default('') | length == 0) or
+        (restic_server_findmnt.stdout | trim | split(' ') | last == restic_server_expected.subvol)
+      - >-
+        (restic_server_expected.uuid | default('') | length == 0) or
+        (restic_server_findmnt.stdout | trim | split(' ') | first == restic_server_expected.uuid)
+    fail_msg: >-
+      {{ restic_server_mount_path }} is not mounted from the expected filesystem
+      (findmnt: {{ restic_server_findmnt.stdout | default('') | trim | default('not mounted', true) }};
+      expected {{ restic_server_expected | default({}) }}). Mount it (storage role)
+      before running restic_server.
+    quiet: true
+
+- name: Deploy the rest-server account, repository directory and container
+  ansible.builtin.import_tasks: server.yml
+
+- name: Deploy the NAS-side maintenance run
+  ansible.builtin.import_tasks: maintenance.yml

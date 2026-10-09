@@ -1,0 +1,125 @@
+#!/usr/bin/python3
+# Managed by Ansible (role backup_disk). Do NOT edit on the host.
+"""Daily health check of the backup disk (BD-D-09, BD-FR-34 to BD-FR-36, BD-FR-159).
+
+Fails (exit 1, every finding on stdout for the journal) when
+  * a backup mount is not mounted from the expected filesystem UUID and subvolume,
+  * ``btrfs device stats --check`` exits non-zero for a backup mount,
+  * no direct child of a freshness path was born within that entry's
+    ``max_age_hours`` (a freshness path that does not exist is skipped).
+The unit has OnFailure=notify-failure-immediate@%n.service, so a failure alerts.
+
+Read-only by design (BD-FR-28): it lists directories and runs findmnt, btrfs
+(stats, no reset) and stat. It never creates or writes a file below a mount.
+No RequiresMountsFor= on the unit: the check must run, and fail, when the disk
+is gone (a unit blocked by a failed mount would not trigger OnFailure=).
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+import time
+from collections.abc import Callable, Sequence
+from typing import TextIO
+
+{% set config = {"uuid": backup_disk_uuid, "mounts": backup_disk_mounts, "freshness": backup_disk_freshness_checks} %}
+# Rendered from the role variables at deploy time (a JSON string literal).
+CONFIG = json.loads({{ config | to_json | to_json }})
+
+EXIT_OK = 0
+EXIT_FAILED = 1
+EXIT_COMMAND_NOT_FOUND = 127
+SECONDS_PER_HOUR = 3600
+
+Runner = Callable[[Sequence[str]], "tuple[int, str]"]
+
+
+def run_command(argv: Sequence[str]) -> "tuple[int, str]":
+    """Run argv; return (exit code, stdout). A binary that cannot be run is code 127 with the OSError text."""
+    try:
+        done = subprocess.run(argv, capture_output=True, text=True, check=False)
+    except OSError as err:
+        return EXIT_COMMAND_NOT_FOUND, str(err)
+    return done.returncode, done.stdout
+
+
+def check_mount(mount: dict, uuid: str, run: Runner) -> "list[str]":
+    """BD-FR-34 and the identity check: live mount table shows uuid and subvol."""
+    code, out = run(["findmnt", "--noheadings", "--raw", "--output", "UUID,FSROOT",
+                     "--mountpoint", mount["path"]])  # fmt: skip
+    expected = uuid + " " + mount["subvol"]
+    if code == EXIT_COMMAND_NOT_FOUND:
+        return [mount["path"] + ": findmnt could not be run: " + out.strip()]
+    if code != 0:
+        return [mount["path"] + ": not mounted (expected " + expected + ")"]
+    if out.strip() != expected:
+        return [mount["path"] + ": mounted as '" + out.strip() + "', expected '" + expected + "'"]
+    return []
+
+
+def check_device_stats(path: str, run: Runner) -> "list[str]":
+    """BD-FR-35: a non-zero error counter makes `--check` exit non-zero."""
+    code, out = run(["btrfs", "device", "stats", "--check", path])
+    if code == EXIT_COMMAND_NOT_FOUND:
+        return [path + ": btrfs could not be run: " + out.strip()]
+    if code != 0:
+        return [path + ": btrfs device stats --check exited " + str(code) + " (error counters non-zero)"]
+    return []
+
+
+def newest_birth(path: str, run: Runner, listdir: Callable[[str], "list[str]"]) -> "int | None":
+    """Newest birth time (epoch s) among the direct children, None if none known."""
+    newest = None
+    for name in listdir(path):
+        code, out = run(["stat", "-c", "%W", "--", os.path.join(path, name)])
+        if code != 0 or not out.strip().isdigit():
+            continue
+        born = int(out.strip())
+        if born > 0 and (newest is None or born > newest):  # 0 = birth time unknown (BD-A-20)
+            newest = born
+    return newest
+
+
+def check_freshness(entry: dict, now: float, run: Runner, listdir: Callable[[str], "list[str]"],
+                    exists: Callable[[str], bool], out: TextIO) -> "list[str]":  # fmt: skip
+    """BD-FR-36 and BD-FR-159."""
+    path = entry["path"]
+    if not exists(path):
+        print(path + ": absent, skipped", file=out)
+        return []
+    limit = int(entry["max_age_hours"]) * SECONDS_PER_HOUR
+    newest = newest_birth(path, run, listdir)
+    if newest is None:
+        return [path + ": stale, no direct child with a known birth time"]
+    age = now - newest
+    if age >= limit:  # max_age_hours 0 therefore always fails
+        return [path + ": stale, newest child is " + str(int(age // SECONDS_PER_HOUR))
+                + " h old, limit " + str(entry["max_age_hours"]) + " h"]
+    print(path + ": fresh", file=out)
+    return []
+
+
+def main(config: dict = CONFIG, run: Runner = run_command, now: Callable[[], float] = time.time,
+         listdir: Callable[[str], "list[str]"] = os.listdir, exists: Callable[[str], bool] = os.path.exists,
+         out: TextIO = sys.stdout) -> int:  # fmt: skip
+    problems: "list[str]" = []
+    for mount in config["mounts"]:
+        found = check_mount(mount, config["uuid"], run)
+        problems += found
+        if not found:  # stats of an unmounted path would only repeat the finding
+            problems += check_device_stats(mount["path"], run)
+    for entry in config["freshness"]:
+        problems += check_freshness(entry, now(), run, listdir, exists, out)
+    for problem in problems:
+        print("FAIL: " + problem, file=out)
+    if problems:
+        return EXIT_FAILED
+    print("backup disk healthy", file=out)
+    return EXIT_OK
+
+
+if __name__ == "__main__":
+    sys.exit(main())

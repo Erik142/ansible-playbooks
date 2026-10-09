@@ -43,6 +43,27 @@ disk_space_paths:
   - /
   - /mnt/data
   - /mnt/containers
+  - /mnt/backup/btrbk
+
+# --- Backup disk (backup_disk, db_dump, btrbk roles) -------------------------
+# Off until runbook step 3 (backup disk initialised and backup_disk_uuid set):
+# gates backup_disk, db_dump and btrbk in site.yml.
+backup_disk_enabled: false
+# Filesystem UUID printed by backup_disk_init.yml (runbook step 3). Empty on
+# purpose; the backup_disk role fails with a pointer to its README until set.
+backup_disk_uuid: ""
+# Newest direct child of each path must be younger than max_age_hours.
+backup_disk_freshness_checks:
+  - path: /mnt/backup/btrbk/data
+    max_age_hours: 26
+  - path: /mnt/backup/btrbk/containers
+    max_age_hours: 26
+  - path: /mnt/data/restic-repos/cloud/snapshots
+    max_age_hours: 26
+
+# Removes the old NAS-to-Pi restic job from step 5 of the runbook; the old
+# job is removed from that step on and keeps running until then.
+restic_backup_decommission_enabled: false
 
 # --- Firewall -----------------------------------------------------------------
 # Beszel's hub (cloud-wahlberger-dev) connects to this host's beszel_agent
@@ -53,6 +74,20 @@ firewall_allowed_ports:
   # 22. This host has no public inbound port, so this is reachable from the
   # LAN/ZeroTier only. Must match forgejo_ssh_port.
   - "2222/tcp"
+
+# --- restic REST server (restic_server role) ---------------------------------
+# Sources allowed to reach the rest-server: the home LAN (10.10.0.0/16) and
+# ZeroTier (10.243.0.0/16). firewall_rich_rules below opens restic_server_port
+# for exactly these; that port must equal restic_server_port (8000), and 8000/tcp
+# stays out of firewall_allowed_ports.
+restic_server_allowed_sources:
+  - "10.10.0.0/16"
+  - "10.243.0.0/16"
+# Ungated on purpose (BD-D-06): the rules exist before anything listens.
+firewall_rich_rules: >-
+  {{ restic_server_allowed_sources
+  | map('regex_replace', '^(.*)$', 'rule family="ipv4" source address="\1" port port="' ~ restic_server_port ~ '" protocol="tcp" accept')
+  | list }}
 
 # --- Reverse proxy (caddy role) ----------------------------------------------
 # DNS-01 via Cloudflare (not HTTP-01): this host has no public inbound port,
@@ -199,13 +234,14 @@ forgejo_oidc_client_secret: "{{ vault_forgejo_oidc_client_secret | default('') }
 # same zone — reused rather than minted fresh.
 cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token | default('') }}"
 
-# restic repository encryption password. Keep a copy outside Vault too (e.g.
-# 1Password) — see roles/restic_backup/README.md.
-restic_backup_repo_password: "{{ vault_restic_backup_repo_password | default('') }}"
-
-# restic REST server auth password. SHARED SECRET: must be the exact same
-# value as pi-de-int-wahlberger-dev's vault_restic_server_htpasswd_password.
-restic_backup_rest_server_password: "{{ vault_restic_backup_rest_server_password | default('') }}"
+# restic REST server: the single client is cloud-wahlberger-dev. The htpasswd
+# password is the shared secret the Pi's server used (BD-BR-09); the repository
+# password is cloud's vault_restic_backup_repo_password, used by the daily
+# maintenance run to forget/prune the append-only repository.
+restic_server_clients:
+  - username: cloud
+    password: "{{ vault_restic_server_cloud_htpasswd_password | default('') }}"
+restic_server_maintenance_repo_password: "{{ vault_restic_server_cloud_repo_password | default('') }}"
 
 # Resend API key for failure notification emails (notify_failure role). Same
 # account/key as cloud-wahlberger-dev and pi-de-int-wahlberger-dev.

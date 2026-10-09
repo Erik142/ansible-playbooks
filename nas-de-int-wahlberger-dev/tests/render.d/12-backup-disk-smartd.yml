@@ -1,0 +1,31 @@
+---
+# backup_disk role (T-09): its smartd line (hook comes from the smartd role,
+# see 14-smartd.yml) and the optional hdparm unit.
+# The default line must not contain `-n standby`; the spindown-120 item must.
+render_items:
+  - role: backup_disk
+    src: smartd-line.j2
+    dest: backup-disk-smartd-line
+    kind: text
+    # With `-e backup_disk_hdparm_spindown=120` the line gets `-n standby` by design.
+    skip_asserts_when_extra: backup_disk_hdparm_spindown
+    asserts:
+      - '\A/dev/disk/by-id/\S+ -a -s \(S/\.\./\.\./7/01\|L/\.\./01/\./10\) -m root -M exec /usr/local/bin/smartd-notify\.sh\n?\Z'
+  - role: backup_disk
+    src: smartd-line.j2
+    dest: backup-disk-smartd-line-spindown
+    kind: text
+    vars:
+      backup_disk_hdparm_spindown: 120
+    asserts:
+      - '^/dev/disk/by-id/\S+ -a -s \S+ -n standby -m root -M exec /usr/local/bin/smartd-notify\.sh\n?$'
+  # Rendered only when backup_disk_hdparm_spindown > 0 (spindown.yml). Forced
+  # to 120 here so the default render run also verifies the unit.
+  - role: backup_disk
+    src: backup-disk-hdparm.service.j2
+    dest: backup-disk-hdparm.service
+    kind: systemd-unit
+    vars:
+      backup_disk_hdparm_spindown: 120
+    asserts:
+      - '^ExecStart=/usr/sbin/hdparm -S 120 /dev/disk/by-id/\S+$'

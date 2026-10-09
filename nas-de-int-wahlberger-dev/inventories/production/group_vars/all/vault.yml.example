@@ -68,14 +68,28 @@ vault_forgejo_oidc_client_secret: "REPLACE-with-pocket-id-client-secret"
 # reuse it instead of minting a new one.
 vault_cloudflare_dns_api_token: "REPLACE-with-a-cloudflare-api-token"
 
+# RESTORE-ONLY: kept solely to restore from the Pi's frozen `nas` restic
+# repository (the old NAS-to-Pi job is removed); no role reads it any more.
 # restic repository encryption password. Keep a copy outside Vault too (e.g.
-# 1Password) — losing this makes every backup permanently unrecoverable.
+# 1Password) — losing this makes that frozen repository unrecoverable.
 #     LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 40; echo
 vault_restic_backup_repo_password: "REPLACE-with-a-40-char-alnum-password"
 
+# RESTORE-ONLY, see above: access to the Pi's frozen `nas` repository.
 # restic REST server auth password. SHARED SECRET: must be the exact same
 # value as pi-de-int-wahlberger-dev's vault_restic_server_htpasswd_password.
 vault_restic_backup_rest_server_password: "REPLACE-with-a-32-char-alnum-password"
+
+# restic REST server (restic_server role), client `cloud`. SHARED SECRET: must
+# be the exact same value as cloud-wahlberger-dev's
+# vault_restic_backup_rest_server_password (and the Pi's current
+# vault_restic_server_cloud_htpasswd_password it replaces).
+vault_restic_server_cloud_htpasswd_password: "REPLACE-with-the-cloud-rest-server-password"
+
+# Repository password of cloud's restic repository, used by the maintenance
+# run. Must be the exact same value as cloud-wahlberger-dev's
+# vault_restic_backup_repo_password.
+vault_restic_server_cloud_repo_password: "REPLACE-with-cloud-restic-repo-password"
 
 # Resend API key for failure notification emails. Same key as
 # cloud-wahlberger-dev and pi-de-int-wahlberger-dev — one Resend account.

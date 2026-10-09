@@ -2,7 +2,8 @@
 # Default variables for the `disk_space` role.
 
 # Mountpoints to monitor. Defaults to just the root filesystem — override
-# per host for extra mounted disks.
+# per host for extra mounted disks. An entry that is not a mount point is
+# logged as "<path>: not a mount point" and not measured.
 disk_space_paths:
   - /
 

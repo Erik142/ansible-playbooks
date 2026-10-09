@@ -1,0 +1,15 @@
+[Unit]
+Description=Renew and check the btrbk repository signing key
+# A key that is near expiry, or does not match the pinned fingerprint, must
+# reach the owner: the immediate variant mails on every failed run (weekly).
+OnFailure=notify-failure-immediate@%n.service
+# No RequiresMountsFor=: the check does not touch the backup disk.
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Wait for a running zypper (the weekly patch run) instead of failing on its lock.
+Environment=ZYPP_LOCK_TIMEOUT=300
+TimeoutStartSec=15min
+ExecStart=/usr/local/bin/btrbk-key-refresh.py --url {{ btrbk_zypper_repo_key_url | quote }} --fingerprint {{ btrbk_zypper_repo_gpg_fingerprint | quote }} --alias {{ btrbk_zypper_repo_alias | quote }} --warn-days {{ btrbk_key_warn_days }}

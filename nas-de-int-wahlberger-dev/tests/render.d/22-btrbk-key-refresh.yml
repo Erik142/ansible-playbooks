@@ -1,0 +1,34 @@
+---
+# btrbk-key-refresh (BD-FR-162 to BD-FR-168): weekly signing-key renewal and
+# expiry alert. The script is a static file (no role templates dir entry), so
+# it is rendered by path; the container compiles it with python3.
+render_items:
+  - role: btrbk
+    src: btrbk-key-refresh.service.j2
+    dest: btrbk-key-refresh.service
+    kind: systemd-unit
+    asserts:
+      - '^OnFailure=notify-failure-immediate@%n\.service$'
+      - '^Type=oneshot$'
+      - '^Environment=ZYPP_LOCK_TIMEOUT=300$'
+      - '^ExecStart=/usr/local/bin/btrbk-key-refresh\.py --url https://download\.opensuse\.org/'
+      - 'repomd\.xml\.key --fingerprint B1FB53748720472205FA601998C97FE7324E6311 '
+      - ' --alias filesystems --warn-days 60$'
+      # Needs no backup-disk mount.
+      - '(?s)\A(?!.*^RequiresMountsFor=)'
+  - role: btrbk
+    src: btrbk-key-refresh.timer.j2
+    dest: btrbk-key-refresh.timer
+    kind: systemd-unit
+    asserts:
+      - '^OnCalendar=weekly$'
+      - '^Persistent=true$'
+      - '^RandomizedDelaySec=1h$'
+  - src: roles/btrbk/files/btrbk-key-refresh.py
+    dest: btrbk-key-refresh.py
+    kind: python-script
+    asserts:
+      - '^#!/usr/bin/python3$'
+      # Never weakens verification and never auto-imports an unverified key.
+      - '(?s)\A(?!.*(gpg-auto-import-keys|--no-gpg-checks|--insecure|curl[^\n]*\s-k\b))'
+      - '"--proto", "=https"'

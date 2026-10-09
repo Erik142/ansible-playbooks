@@ -1,0 +1,60 @@
+---
+# btrbk role (T-12): configuration, service and timer for the VM fixture
+# target_preserve default is exactly `14d 8w 12m 3y`; the 7d override (BD-BR-15)
+# has its own item below.
+# (sources /mnt/data and /mnt/containers, target /mnt/backup/btrbk).
+render_items:
+  - role: btrbk
+    src: btrbk.conf.j2
+    dest: btrbk.conf
+    kind: btrbk-conf
+    asserts:
+      - '^lockfile\s+/run/btrbk\.lock$'
+      - '^snapshot_preserve_min\s+2d$'
+      - '^target_preserve\s+14d 8w 12m 3y$'
+      - '^  snapshot_dir \.btrbk$'
+      # BD-FR-52/53/161: no .snapshots, nothing below samba, no exclusion.
+      - '(?s)\A(?!.*snapshot_dir[^\n]*\.snapshots)'
+      - '(?s)\A(?!.*snapshot_dir[^\n]*samba)'
+      - '(?s)\A(?!.*restic-repos)'
+      - '(?s)\A(?!.*exclude)'
+    print_asserts:
+      - 'snapshot_dir\s+\.btrbk'
+      - 'snapshot_preserve_min\s+2d'
+      - 'snapshot_preserve\s+no'
+      - 'target_preserve\s+14d 8w 12m 3y\b'
+      - 'target_preserve_min\s+no'
+      - 'volume\s+/mnt/data'
+      - 'volume\s+/mnt/containers'
+      - 'target\s+send-receive\s+/mnt/backup/btrbk/data'
+      - 'target\s+send-receive\s+/mnt/backup/btrbk/containers'
+  - role: btrbk
+    src: btrbk.conf.j2
+    dest: btrbk-7d.conf
+    kind: btrbk-conf
+    vars:
+      btrbk_target_preserve: 7d
+    asserts:
+      - '^target_preserve\s+7d$'
+    print_asserts:
+      - 'target_preserve\s+7d\b'
+  - role: btrbk
+    src: btrbk.service.j2
+    dest: btrbk.service
+    kind: systemd-unit
+    vars:
+      btrbk_mount_paths: [/mnt/backup/btrbk, /mnt/data, /mnt/containers]
+    asserts:
+      - '^OnFailure=notify-failure-immediate@%n\.service$'
+      - '^RequiresMountsFor=/mnt/backup/btrbk /mnt/data /mnt/containers$'
+      - '^Wants=db-dump\.service$'
+      - '^After=db-dump\.service$'
+      - '^Type=oneshot$'
+      - '^ExecStart=/usr/bin/btrbk -c /etc/btrbk/btrbk\.conf run$'
+  - role: btrbk
+    src: btrbk.timer.j2
+    dest: btrbk.timer
+    kind: systemd-unit
+    asserts:
+      - '^OnCalendar=\*-\*-\* 01:30:00$'
+      - '^Persistent=true$'

@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily restic repository maintenance
+
+[Timer]
+OnCalendar={{ restic_server_maintenance_on_calendar }}
+# Catch up a run missed while the NAS was off.
+Persistent=true
+# Small jitter (BD-D-11); the 04:30 cloud run ends by 05:30, so 06:00 + 5 min stays clear.
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

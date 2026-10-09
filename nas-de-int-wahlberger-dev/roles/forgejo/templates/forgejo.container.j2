@@ -31,9 +31,8 @@ Environment=FORGEJO__server__SSH_LISTEN_PORT=2222
 Environment=FORGEJO__server__LFS_START_SERVER=true
 Environment=FORGEJO__database__DB_TYPE=sqlite3
 Environment=FORGEJO__database__PATH=/var/lib/gitea/data/forgejo.db
-# Rollback-journal mode (SQLite's default, set explicitly): the nightly
-# `sqlite3 -readonly .backup` from the host (roles/restic_backup) then never
-# creates root-owned -wal/-shm files next to the live DB.
+{# Rollback-journal mode (SQLite's default, set explicitly): the `sqlite3 -readonly .backup`
+   from the host (roles/db_dump) then never creates root-owned -wal/-shm files next to the live DB. #}
 Environment=FORGEJO__database__SQLITE_JOURNAL_MODE=DELETE
 Environment=FORGEJO__security__INSTALL_LOCK=true
 Environment=FORGEJO__session__COOKIE_SECURE=true

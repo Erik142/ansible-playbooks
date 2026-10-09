@@ -1,0 +1,65 @@
+#!/bin/bash
+# Rendered by the db_dump role. Do NOT edit on the host: re-run Ansible.
+#
+# Writes one consistent dump per database into the dump directory. Each dump
+# goes to "<name>.tmp" and is renamed over the previous file only when its
+# command exited 0, so a failed or stopped dump keeps the previous good file.
+# Every dump runs even if an earlier one failed; the script exits 1 if any
+# failed, which ends db-dump.service in "failed" and fires OnFailure=.
+# No `set -e` on purpose: a failing dump must not skip the remaining dumps.
+set -u
+umask 077
+
+DUMP_DIR={{ db_dump_dir | quote }}
+CREDENTIALS_DIR={{ db_dump_credentials_dir | quote }}
+TIMEOUT_SECONDS={{ db_dump_timeout_seconds | int }}
+# Grace period between SIGTERM and SIGKILL when a dump exceeds its timeout.
+KILL_AFTER_SECONDS=30
+
+failed=0
+
+# Renames the finished dump over the previous file, or reports why it failed
+# and discards the partial one.
+finish() { # <label> <final path> <tmp path> <exit code>
+    local label=$1 final=$2 tmp=$3 rc=$4
+    if [ "$rc" -eq 0 ]; then
+        if mv -f -- "$tmp" "$final"; then
+            return 0
+        fi
+        echo "db-dump: ${label}: renaming the finished dump failed" >&2
+    elif [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+        echo "db-dump: ${label}: stopped after ${TIMEOUT_SECONDS}s (db_dump_timeout), previous file kept" >&2
+    else
+        echo "db-dump: ${label}: command failed (exit ${rc}), previous file kept" >&2
+    fi
+    rm -f -- "$tmp"
+    failed=1
+}
+
+dump_postgres() { # <name> <container> <database> <user>
+    local name=$1 container=$2 database=$3 user=$4
+    local tmp="$DUMP_DIR/$name.sql.tmp" final="$DUMP_DIR/$name.sql"
+    timeout --kill-after="$KILL_AFTER_SECONDS" "$TIMEOUT_SECONDS" \
+        podman exec --env-file "$CREDENTIALS_DIR/$name-pgpass.env" "$container" \
+        pg_dump -U "$user" "$database" >"$tmp"
+    finish "$name" "$final" "$tmp" "$?"
+}
+
+# Online-backup API: a consistent snapshot of the live file (a plain cp of a DB
+# mid-write is not restorable). -readonly plus Forgejo's rollback-journal mode
+# means this never creates root-owned -wal/-shm files beside the live DB.
+dump_sqlite() { # <name> <source db path>
+    local name=$1 source=$2
+    local tmp="$DUMP_DIR/$name.db.tmp" final="$DUMP_DIR/$name.db"
+    rm -f -- "$tmp"
+    timeout --kill-after="$KILL_AFTER_SECONDS" "$TIMEOUT_SECONDS" \
+        sqlite3 -readonly -cmd ".timeout 30000" "$source" ".backup '$tmp'"
+    finish "$name" "$final" "$tmp" "$?"
+}
+
+{% for entry in db_dump_postgres %}
+dump_postgres {{ entry.name | quote }} {{ entry.container | quote }} {{ entry.database | quote }} {{ entry.user | quote }}
+{% endfor %}
+dump_sqlite forgejo {{ db_dump_forgejo_db_path | quote }}
+
+exit "$failed"

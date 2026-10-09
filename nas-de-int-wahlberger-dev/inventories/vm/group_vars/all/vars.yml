@@ -1,0 +1,63 @@
+---
+# VM fixture overrides (see "Fixture overrides" in reqs/backup-overview.md).
+# Every value here is a fake test value or a VM-specific path. NEVER copy a
+# value out of the production vault.yml into this directory (BD-FR-156).
+
+ansible_user: fixture
+
+# --- Backup disk: the spare virtual disk, addressed by a by-id path ----------
+backup_disk_device: /dev/disk/by-id/virtio-FIXTUREBACKUP
+# 20 GiB virtual disk.
+backup_disk_expected_size_bytes: 21474836480
+backup_disk_freshness_checks:
+  - path: /mnt/backup/btrbk/data
+    max_age_hours: 26
+  - path: /mnt/backup/btrbk/containers
+    max_age_hours: 26
+  - path: /mnt/data/restic-repos/cloud/snapshots
+    max_age_hours: 26
+
+# --- Data / containers filesystems of the VM (fake UUIDs) --------------------
+storage_mounts:
+  - path: /mnt/containers
+    uuid: "00000000-0000-4000-8000-0000000000c1"
+    subvol: "/@containers"
+  - path: /mnt/data
+    uuid: "00000000-0000-4000-8000-0000000000d1"
+    subvol: "/@data"
+
+# --- db_dump: one fixture Postgres container and one SQLite file -------------
+db_dump_postgres:
+  - name: fixture
+    container: fixture-postgres
+    database: fixture
+    user: fixture
+    password: fixture-postgres-not-a-secret
+db_dump_forgejo_db_path: /mnt/containers/forgejo/volume/data/forgejo.db
+
+# --- restic REST server -------------------------------------------------------
+# First entry: the VM network (libvirt default). Second: the dedicated Podman
+# network `ac45-allowed` created for BD-AC-45 (placeholder CIDR, adjust to the
+# subnet the README's command creates).
+restic_server_allowed_sources:
+  - 192.168.122.0/24
+  - 10.89.45.0/24
+# Same derivation as production (BD-FR-109), so BD-AC-45 sees the real rules.
+firewall_rich_rules: >-
+  {{ restic_server_allowed_sources
+  | map('regex_replace', '^(.*)$', 'rule family="ipv4" source address="\1" port port="' ~ restic_server_port ~ '" protocol="tcp" accept')
+  | list }}
+# Username `cloud` like production: with --private-repos it names the repository
+# directory (restic-repos/cloud), which the freshness check, the maintenance run
+# (restic_server_maintenance_repo) and BD-AC-30/42 all address.
+restic_server_clients:
+  - username: cloud
+    password: fixture-restic-htpasswd-not-a-secret
+restic_server_maintenance_repo_password: fixture-restic-repo-not-a-secret
+
+# --- Failure notifications (fake key: no mail leaves the VM) ------------------
+notify_failure_resend_api_key: re_fixture_not_a_real_key
+
+# --- Cut-over flags: both on, except where a scenario sets them ---------------
+backup_disk_enabled: true
+restic_backup_decommission_enabled: true

@@ -1,0 +1,23 @@
+---
+# Entry point `main`. Static imports only (BD-AC-04 b): the init tasks are never
+# reachable from here (BD-FR-02). Later tasks (scrub, smartd, spindown, health)
+# are appended below the mount, because they need the mounted filesystem.
+- name: Mount the backup filesystem
+  ansible.builtin.import_tasks: mount.yml
+  tags: [backup_disk]
+
+- name: Scrub the backup filesystem
+  ansible.builtin.import_tasks: scrub.yml
+  tags: [backup_disk]
+
+- name: Watch the backup disk with smartd
+  ansible.builtin.import_tasks: smartd.yml
+  tags: [backup_disk]
+
+- name: Set or remove the optional standby timeout
+  ansible.builtin.import_tasks: spindown.yml
+  tags: [backup_disk]
+
+- name: Check the backup disk daily
+  ansible.builtin.import_tasks: health.yml
+  tags: [backup_disk]

@@ -1,0 +1,16 @@
+[Unit]
+Description=btrbk: snapshot the sources and replicate them to the backup disk
+# The immediate variant: a oneshot that runs once a day has no flap to deduplicate.
+OnFailure=notify-failure-immediate@%n.service
+# A source or the target that is not mounted must stop the start; btrbk would
+# otherwise write below a bare mount point (BD-FR-27, BD-FR-28).
+RequiresMountsFor={{ btrbk_mount_paths | join(' ') }}
+# The dumps are written first so the containers snapshot carries them. Wants=
+# (not Requires=) so a failed dump does not stop btrbk (BD-FR-75, BD-BR-11).
+Wants=db-dump.service
+After=db-dump.service
+
+[Service]
+Type=oneshot
+# Any non-zero exit, including 10 (partial failure), fails the unit (BD-FR-60).
+ExecStart=/usr/bin/btrbk -c {{ btrbk_conf_path }} run

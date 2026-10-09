@@ -1,0 +1,14 @@
+---
+# Default variables for the `restic_backup_decommission` role.
+#
+# Names and paths of the old NAS -> Pi restic job, as deployed by the (deleted)
+# roles/restic_backup of this directory. There is deliberately no enable flag
+# here: site.yml applies `restic_backup_decommission_enabled` with a `when:`
+# (BD-FR-158, BD-BR-14 step 5).
+restic_backup_decommission_units:
+  - restic-backup.timer
+  - restic-backup.service
+restic_backup_decommission_unit_dir: /etc/systemd/system
+restic_backup_decommission_script: /usr/local/bin/restic-backup.sh
+restic_backup_decommission_config_dir: /etc/restic-backup
+restic_backup_decommission_state_dir: /var/lib/restic-backup

@@ -97,9 +97,9 @@ password Postgres doesn't recognize yet (BR-04).
    ```
 
 2. Update `vault_tandoor_db_password` in Vault to the same new password.
-3. Run `ansible-playbook site.yml --tags tandoor,restic_backup` — tagging
-   `restic_backup` too is required so `tandoor-pgpass.env` is re-rendered
-   with the new password before the next backup, not just the `tandoor` app
+3. Run `ansible-playbook site.yml --tags tandoor,db_dump` — tagging
+   `db_dump` too is required so the `db_dump` role picks up the new password
+   (`tandoor_db_password`) before the next dump, not just the `tandoor` app
    container.
 
 ## Changing the Django secret key

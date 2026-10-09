@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: smartd
+  author: Erik Wahlberger
+  description: Enables smartd with an email hook (Resend) and monitors the configured disks.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - monitoring
+    - smart
+
+dependencies: []

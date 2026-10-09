@@ -1,0 +1,2 @@
+{# One smartd.conf line, rendered by smartd.yml. #}
+{{ backup_disk_device }} -a -s {{ backup_disk_smartd_schedule }} {{ '-n standby ' if backup_disk_hdparm_spindown | int > 0 else '' }}-m root -M exec {{ backup_disk_smartd_hook_path }}

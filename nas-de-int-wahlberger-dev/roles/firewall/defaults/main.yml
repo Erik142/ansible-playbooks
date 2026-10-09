@@ -15,3 +15,9 @@ firewall_allowed_services:
 # Ports with no predefined firewalld service. Empty by default — add entries
 # here (as "port/proto" strings) for anything that needs one.
 firewall_allowed_ports: []
+
+# firewalld rich rules (full rule strings), applied to firewall_zone. Use these
+# for source-restricted access; do NOT put such ports in firewall_allowed_ports,
+# which admits every source. Example:
+#   rule family="ipv4" source address="10.10.0.0/16" port port="8000" protocol="tcp" accept
+firewall_rich_rules: []

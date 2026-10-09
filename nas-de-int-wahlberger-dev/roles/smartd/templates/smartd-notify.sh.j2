@@ -1,0 +1,39 @@
+#!/bin/sh
+# Managed by Ansible (role smartd). Do NOT edit on the host.
+# smartd mail hook (-M exec): emails the owner through Resend with the
+# credentials of the notify_failure role (SM-FR-3, SM-FR-4). smartd passes
+# SMARTD_DEVICE, SMARTD_MESSAGE, SMARTD_FULLMESSAGE and SMARTD_FAILTYPE.
+set -eu
+
+ENV_FILE=/etc/notify-failure/notify-failure.env
+if [ ! -r "$ENV_FILE" ]; then
+  echo "smartd-notify: $ENV_FILE missing (notify_failure role not applied)" >&2
+  exit 1
+fi
+# The file holds plain KEY=value lines, quoted where needed; sourcing is safe.
+# shellcheck source=/dev/null
+. "$ENV_FILE"
+
+DEVICE="${SMARTD_DEVICE:-unknown device}"
+MESSAGE="${SMARTD_FULLMESSAGE:-${SMARTD_MESSAGE:-no message from smartd}}"
+HOST="$(hostname -f)"
+NOW="$(date '+%Y-%m-%d %H:%M:%S %Z')"
+
+BODY="$(jq -n \
+  --arg from "$NOTIFY_FROM" \
+  --arg to "$NOTIFY_TO" \
+  --arg device "$DEVICE" \
+  --arg host "$HOST" \
+  --arg time "$NOW" \
+  --arg message "$MESSAGE" \
+  '{
+    from: $from,
+    to: [$to],
+    subject: ("[" + $host + "] smartd warning for " + $device),
+    text: ("smartd reported a problem with " + $device + " on " + $host + ", as of " + $time + ".\n\n" + $message)
+  }')"
+
+curl -fsS https://api.resend.com/emails \
+  -H "Authorization: Bearer ${RESEND_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d "$BODY"

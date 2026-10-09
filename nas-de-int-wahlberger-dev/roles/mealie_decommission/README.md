@@ -10,7 +10,7 @@ change that adds Tandoor Recipes (`roles/tandoor/`), so it can no longer
 manage its own teardown. `mealie_decommission` is the small, standalone
 piece of code that survives after `roles/mealie/` is gone and does the
 actual host-side cleanup (FR-37, FR-38, FR-82 in
-`nas-de-int-wahlberger-dev/REQS.md`).
+`nas-de-int-wahlberger-dev/reqs/tandoor-replaces-mealie.md`).
 
 ## What it does
 
@@ -30,7 +30,7 @@ against an already-decommissioned host is a clean no-op — it never reports
 
 It never creates, modifies or deletes `/mnt/containers/mealie` or any path
 below it (FR-46). That directory holds the only copy of Mealie's data
-during the rollback window (see `nas-de-int-wahlberger-dev/REQS.md`'s
+during the rollback window (see `nas-de-int-wahlberger-dev/reqs/tandoor-replaces-mealie.md`'s
 `BR-01`), and its deletion is an explicit manual owner step, documented in
 `roles/tandoor/README.md`, run once BR-01 is met. No task in this repo,
 including this role, is allowed to touch that path.

@@ -222,13 +222,12 @@ reconcile.
 
 ## Backup
 
-`restic_backup` covers Immich the same way it already covers Paperless-ngx:
-nightly `pg_dump` of `immich-postgres` into `restic_backup_staging_dir` (the
-raw Postgres data directory is excluded — a live filesystem copy isn't
-guaranteed restorable). `immich_library_root` and the import folders need no
-special handling — they're plain files under `samba_mount_path`, already
-covered by `restic_backup_paths`. `immich_library_export_dir` is separately
-excluded there, since (being a bind mount of `immich_library_root/library`)
-it's the exact same files reachable a second time — backing it up too would
-just mean walking/checksumming everything twice for no benefit. See
-`roles/restic_backup/README.md`.
+The `db_dump` role writes a `pg_dump` of `immich-postgres` to
+`/mnt/containers/db-dumps/immich.sql` (`db_dump_dir`), and btrbk then
+replicates the `/mnt/containers` and `/mnt/data` snapshots to the backup
+disk. The dump is the restorable copy of the database. The live Postgres
+data directory is also in the snapshots, but it is only crash-consistent
+(as after a power loss), so restore from the dump. `immich_library_root` and
+the import folders are plain files under `samba_mount_path` on `/mnt/data`
+and are covered by btrbk without special handling. See
+`roles/db_dump/README.md` and `roles/btrbk/README.md`.

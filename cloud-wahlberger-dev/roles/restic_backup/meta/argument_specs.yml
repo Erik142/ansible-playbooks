@@ -37,6 +37,10 @@ argument_specs:
         type: str
         required: true
         description: Password to authenticate to the REST server with.
+      restic_backup_forget_enabled:
+        type: bool
+        required: false
+        description: Run restic forget with the keep_* retention after each backup; false leaves retention to the append-only target (the NAS).
       restic_backup_keep_daily:
         type: int
         required: false

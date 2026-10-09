@@ -1,0 +1,128 @@
+---
+# All checks come first: nothing below changes the host until they pass.
+- name: Validate the dump timeout format
+  ansible.builtin.assert:
+    that:
+      - db_dump_timeout_seconds | int > 0
+    fail_msg: >-
+      db_dump_timeout '{{ db_dump_timeout }}' is not <integer><s|sec|m|min|h>
+      with a value above zero (for example 30min). See README.md.
+    quiet: true
+
+- name: Validate every Postgres dump entry has a password
+  ansible.builtin.assert:
+    that:
+      - db_dump_empty_password_names | from_json | length == 0
+    fail_msg: >-
+      db_dump_postgres entries with an empty password:
+      {{ db_dump_empty_password_names | from_json | join(', ') }}. Set the
+      matching vault_*_db_password in Ansible Vault. See README.md.
+    quiet: true
+
+- name: Validate db_dump_dir is below a btrbk_sources path
+  ansible.builtin.assert:
+    that:
+      - db_dump_dir_sources | from_json | length > 0
+    fail_msg: >-
+      db_dump_dir '{{ db_dump_dir }}' is not below any btrbk_sources path
+      ({{ btrbk_sources | map(attribute='path') | join(', ') }}), so a btrbk
+      snapshot would not contain the dumps. Set db_dump_dir below one of them.
+    quiet: true
+
+- name: Validate db_dump_credentials_dir is not below a btrbk_sources path
+  ansible.builtin.assert:
+    that:
+      - db_dump_credentials_sources | from_json | length == 0
+    fail_msg: >-
+      db_dump_credentials_dir '{{ db_dump_credentials_dir }}' is below the
+      btrbk_sources path {{ db_dump_credentials_sources | from_json | join(', ') }};
+      the database passwords would end up in the backups. Move it elsewhere.
+    quiet: true
+
+- name: Validate db_dump_dir is on a storage_mounts path
+  ansible.builtin.assert:
+    that:
+      - db_dump_mount_path | length > 0
+    fail_msg: >-
+      db_dump_dir '{{ db_dump_dir }}' is below no storage_mounts path, so
+      db-dump.service has no mount to require.
+    quiet: true
+
+# Reads the live mount table (BD-FR-25), not facts gathered at play start.
+- name: Read the live mount table entry for the dump mount
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - --noheadings
+      - --output
+      - TARGET
+      - --mountpoint
+      - "{{ db_dump_mount_path }}"
+  register: db_dump_findmnt
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Fail before any change when the dump mount is not mounted
+  ansible.builtin.assert:
+    that:
+      - db_dump_findmnt.rc == 0
+      - db_dump_findmnt.stdout | trim == db_dump_mount_path
+    fail_msg: >-
+      {{ db_dump_mount_path }} is not mounted (needed for db_dump_dir
+      {{ db_dump_dir }}). Mount it (storage role) before running db_dump.
+    quiet: true
+
+# sqlite3 (the CLI) for Forgejo's consistent SQLite copy: the Forgejo image
+# ships no sqlite3 binary to exec into.
+- name: Install sqlite3
+  community.general.zypper:
+    name: sqlite3
+    state: present
+
+- name: Create the dump directory
+  ansible.builtin.file:
+    path: "{{ db_dump_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Create the credentials directory
+  ansible.builtin.file:
+    path: "{{ db_dump_credentials_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Render one Postgres auth file per dump entry
+  ansible.builtin.template:
+    src: postgres-pgpass.env.j2
+    dest: "{{ db_dump_credentials_dir }}/{{ db_dump_entry.name }}-pgpass.env"
+    owner: root
+    group: root
+    mode: "0600"
+  loop: "{{ db_dump_postgres }}"
+  loop_control:
+    loop_var: db_dump_entry
+    label: "{{ db_dump_entry.name }}"
+  no_log: true
+
+- name: Deploy the dump script
+  ansible.builtin.template:
+    src: db-dump.sh.j2
+    dest: /usr/local/bin/db-dump.sh
+    owner: root
+    group: root
+    mode: "0700"
+
+# Not enabled and not started: btrbk.service pulls this unit in.
+- name: Deploy the db-dump systemd service unit
+  ansible.builtin.template:
+    src: db-dump.service.j2
+    dest: /etc/systemd/system/db-dump.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd

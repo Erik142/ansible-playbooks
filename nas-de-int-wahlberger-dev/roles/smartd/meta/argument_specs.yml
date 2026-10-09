@@ -1,0 +1,35 @@
+---
+argument_specs:
+  main:
+    short_description: Enables smartd with a Resend mail hook and monitors the listed disks.
+    options:
+      smartd_devices:
+        type: list
+        elements: dict
+        required: false
+        description: Disks to monitor, one smartd.conf line each.
+        options:
+          device:
+            type: path
+            required: true
+            description: Stable /dev/disk/by-id/ path of the disk.
+          schedule:
+            type: str
+            required: false
+            description: smartd -s regexp for this disk; defaults to smartd_default_schedule.
+          standby:
+            type: bool
+            required: false
+            description: Add -n standby so a spun-down disk is not woken for checks.
+      smartd_default_schedule:
+        type: str
+        required: false
+        description: Regular expression for smartd's -s directive (self-test schedule).
+      smartd_hook_path:
+        type: path
+        required: false
+        description: Install path of the smartd mail hook script.
+      smartd_conf:
+        type: path
+        required: false
+        description: smartd configuration file the device lines are written to.
