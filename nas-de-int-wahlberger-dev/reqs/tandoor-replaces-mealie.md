@@ -1,7 +1,3 @@
-# Requirements
-
----
-
 ## Feature: Replace Mealie with Tandoor Recipes on nas.de.int.wahlberger.dev
 status:            ready
 priority:          must
@@ -114,7 +110,7 @@ Assumptions (non-blocking; upstream facts to verify during implementation, each 
 - FR-54 [Must]: `roles/tandoor/README.md` shall state that the owner creates the household space at the owner's first sign-in, before any other household user signs in.
 - FR-55 [Must]: `roles/tandoor/README.md` shall document how the owner invites, by invite link, a user who signed in before the household space existed (A-12).
 - FR-56 [Must]: `roles/tandoor/README.md` shall document local admin recovery with `manage.py createsuperuser` in the `tandoor` container (A-05).
-- FR-57 [Must]: `roles/tandoor/README.md` shall document the manual procedure for rotating `vault_tandoor_db_password` (BR-04).
+- FR-57 [Must]: `roles/tandoor/README.md` shall document the manual procedure for rotating `vault_tandoor_db_password` (BR-04). [Amended by BD-FR-153 (Local backup disk feature): the rotation run uses `--tags tandoor,db_dump`.]
 - FR-58 [Must]: `roles/tandoor/README.md` shall state the effect of rotating `vault_tandoor_secret_key` (BR-05).
 - FR-59 [Must]: `roles/tandoor/README.md` shall state that a Postgres major-version upgrade of `tandoor-db` needs a dump and restore.
 - FR-75 [Must]: `roles/tandoor/README.md` shall state that Renovate does not propose Postgres major-version bumps (existing `renovate.json` rule).
@@ -152,12 +148,12 @@ Assumptions (non-blocking; upstream facts to verify during implementation, each 
 - FR-79 [Must]: The `tandoor` role entry in `site.yml` shall carry `tags: [tandoor]`.
 
 #### Backup
-- FR-33 [Must]: Each `restic-backup.service` run shall include, in the snapshot it creates, a `pg_dump` of the Tandoor database taken during that same run and written to `restic_backup_staging_dir`.
-- FR-34 [Must]: The restic snapshot shall exclude Tandoor's raw Postgres data directory.
-- FR-80 [Must]: The restic snapshot shall exclude the credentials file used for the Tandoor `pg_dump`.
-- FR-35 [Must]: The restic snapshot shall include Tandoor's media files directory.
-- FR-36 [Must]: If the Tandoor `pg_dump` fails, then `restic-backup.service` shall end in the failed state (the existing `set -eu` behaviour for the paperless and immich dumps).
-- FR-81 [Must]: If the Tandoor `pg_dump` fails, then `restic-backup.service` shall create no restic snapshot in that run.
+- FR-33 [Must]: Each `restic-backup.service` run shall include, in the snapshot it creates, a `pg_dump` of the Tandoor database taken during that same run and written to `restic_backup_staging_dir`. [Superseded by BD-FR-65 (Local backup disk feature): dumps go to `db_dump_dir` and are captured by btrbk.]
+- FR-34 [Must]: The restic snapshot shall exclude Tandoor's raw Postgres data directory. [Superseded by BD-CC-05 (Local backup disk feature): raw Postgres data is now backed up as a crash-consistent copy.]
+- FR-80 [Must]: The restic snapshot shall exclude the credentials file used for the Tandoor `pg_dump`. [Superseded by BD-FR-71 (Local backup disk feature): dump credentials live outside every btrbk source.]
+- FR-35 [Must]: The restic snapshot shall include Tandoor's media files directory. [Superseded by BD-FR-51 (Local backup disk feature): the whole `/mnt/containers` subvolume is snapshotted.]
+- FR-36 [Must]: If the Tandoor `pg_dump` fails, then `restic-backup.service` shall end in the failed state (the existing `set -eu` behaviour for the paperless and immich dumps). [Superseded by BD-FR-74 (Local backup disk feature): a failed dump fails `db-dump.service`.]
+- FR-81 [Must]: If the Tandoor `pg_dump` fails, then `restic-backup.service` shall create no restic snapshot in that run. [Reversed by BD-FR-75 (Local backup disk feature): btrbk still runs after a failed dump.]
 
 #### Mealie decommission
 - FR-37 [Must]: When the playbook runs against a host that has `/etc/containers/systemd/mealie.container`, the playbook shall leave the host after the run with no `mealie.service` unit.
@@ -172,7 +168,7 @@ Assumptions (non-blocking; upstream facts to verify during implementation, each 
 - FR-42 [Must]: `roles/homepage/templates/services.yaml.j2` shall contain no Mealie entry.
 - FR-43 [Must]: When BR-01 is met, the owner shall delete `/mnt/containers/mealie` from the NAS host with the manual step documented in `roles/tandoor/README.md` (FR-60).
 - FR-44 [Should]: When BR-01 is met, the owner shall delete Mealie's OIDC client (client ID `93041358-e45e-4e44-b838-3c758cfe4681`, callback `https://recipes.de.int.wahlberger.dev/login`) in the Pocket ID admin UI, with the manual step documented in `roles/tandoor/README.md` (FR-61).
-- FR-45 [Should]: No file in `nas-de-int-wahlberger-dev/` other than this REQS.md shall describe Mealie as a service deployed on this host. Covered: README.md, CLAUDE.md, role READMEs, comments in `site.yml`, `vars.yml`, templates, and role task, handler and defaults files, and statements of how many secrets exist. Historical references to rpi-karlsruhe's Mealie in the migration notes are allowed.
+- FR-45 [Should]: No file in `nas-de-int-wahlberger-dev/` other than the files under `reqs/` shall describe Mealie as a service deployed on this host. Covered: README.md, CLAUDE.md, role READMEs, comments in `site.yml`, `vars.yml`, templates, and role task, handler and defaults files, and statements of how many secrets exist. Historical references to rpi-karlsruhe's Mealie in the migration notes are allowed.
 - FR-46 [Must]: No playbook task shall create, modify or delete `/mnt/containers/mealie` or any path below it (Q3).
 
 ### Business Rules
@@ -298,7 +294,7 @@ Scenario Outline AC-05: Image pinned and Renovate-detectable (FR-08, FR-51)
 - And its tag is not `latest`
 - Examples (one test per row): `tandoor_image` (FR-08), `tandoor_db_image` (FR-51)
 
-Scenario AC-06: Secret-bearing files are root-only (FR-09)
+Scenario AC-06: Secret-bearing files are root-only (FR-09) [Amended by BD-CC-03: `restic_backup_staging_dir` is replaced by `db_dump_credentials_dir`.]
 - Given Tandoor and restic_backup are deployed
 - When the operator, as root, lists every file under `/mnt/containers`, `/etc/containers/systemd` and `restic_backup_staging_dir` that contains the value of a Tandoor secret (`grep -rlF`, once per secret), and runs `stat -c '%a %U:%G'` on each
 - Then every listed file shows `600 root:root`
@@ -351,7 +347,7 @@ Scenario Outline AC-12: README documents one operations item (FR-14, FR-53 to FR
 | FR-54 | The statement that the owner creates the household space at the owner's first sign-in, before any other household user signs in |
 | FR-55 | Steps for the owner to invite, by invite link, a user who signed in before the household space existed |
 | FR-56 | The command `manage.py createsuperuser`, run in the `tandoor` container |
-| FR-57 | The rotation steps in the order AC-42 uses: change the role password inside `tandoor-db`, then update `vault_tandoor_db_password`, then run `site.yml --tags tandoor,restic_backup` |
+| FR-57 | The rotation steps in the order AC-42 uses: change the role password inside `tandoor-db`, then update `vault_tandoor_db_password`, then run `site.yml --tags tandoor,restic_backup` [Amended by BD-FR-153: `--tags tandoor,db_dump`.] |
 | FR-58 | The statement that changing `vault_tandoor_secret_key` ends every Tandoor session and leaves recipe data unchanged |
 | FR-59 | The statement that a Postgres major-version upgrade of `tandoor-db` needs a dump and restore |
 | FR-75 | The statement that Renovate does not propose Postgres major-version bumps |
@@ -469,19 +465,19 @@ Scenario AC-28: Role order and tag in site.yml (FR-32, FR-79)
 - Then tandoor tasks appear after caddy tasks and before homepage and restic_backup tasks (FR-32)
 - And `ansible-playbook site.yml --tags tandoor --list-tasks` lists the tandoor role's tasks (FR-79)
 
-Scenario AC-29: Nightly backup contains the Tandoor DB dump and media (FR-33, FR-35, NFR-07)
+Scenario AC-29: Nightly backup contains the Tandoor DB dump and media (FR-33, FR-35, NFR-07) [Superseded by BD-AC-30.]
 - Given a recipe named "AC-29 backup" with an uploaded image exists
 - When the operator runs `systemctl start restic-backup.service` and it completes
 - Then `restic ls latest` lists the Tandoor dump file in `restic_backup_staging_dir` and the image file under Tandoor's media directory
 - And `restic dump latest <dump path> | grep -c "AC-29 backup"` prints a number >= 1
 
-Scenario Outline AC-30: A backup exclusion keeps `<item>` out of the snapshot (FR-34, FR-80)
+Scenario Outline AC-30: A backup exclusion keeps `<item>` out of the snapshot (FR-34, FR-80) [Superseded by BD-AC-35.]
 - Given the backup from AC-29
 - When the operator runs `restic ls latest`
 - Then no listed path is `<path>` or below it
 - Examples (one test per row): Tandoor's raw Postgres data directory, `tandoor_db_data_dir` (default `/mnt/containers/tandoor-db/pgdata`) (FR-34); the Tandoor `pg_dump` credentials file, at the path the implementation chooses (FR-80)
 
-Scenario AC-31: A failed Tandoor dump fails the backup (FR-36, FR-81; error case: dependency failure)
+Scenario AC-31: A failed Tandoor dump fails the backup (FR-36, FR-81; error case: dependency failure) [Superseded by BD-AC-36.]
 - Given `tandoor-db.service` is stopped and the operator notes the ID of the latest restic snapshot
 - When the operator runs `systemctl start restic-backup.service`
 - Then `systemctl is-failed restic-backup.service` prints `failed` (FR-36)
@@ -536,7 +532,7 @@ Scenario AC-37: Mealie Pocket ID client is removed (FR-44, BR-09)
 
 Scenario AC-38: Documentation no longer lists Mealie as deployed (FR-45)
 - Given the repository at the feature commit
-- When the operator runs `grep -rn -i mealie nas-de-int-wahlberger-dev --exclude=REQS.md`
+- When the operator runs `grep -rn -i mealie nas-de-int-wahlberger-dev --exclude-dir=reqs`
 - Then every match is in the rpi-karlsruhe migration notes, or explicitly describes Mealie as removed or replaced
 
 Scenario AC-39: Idempotent second run (NFR-01)
@@ -555,7 +551,7 @@ Scenario AC-41: Host reboot (NFR-05; error case: reset)
 - Then within 300 s after `systemctl is-system-running` returns `running` or `degraded`, `https://recipes.de.int.wahlberger.dev/` returns 200 or 302 with no manual action
 - And the recipes are listed
 
-Scenario AC-42: Documented DB password rotation keeps Tandoor connected (BR-04, FR-57)
+Scenario AC-42: Documented DB password rotation keeps Tandoor connected (BR-04, FR-57) [Amended by BD-FR-153: `--tags tandoor,db_dump`.]
 - Given Tandoor is deployed
 - When the operator follows the README rotation procedure (change the role password inside `tandoor-db`, then update `vault_tandoor_db_password`, then run `site.yml --tags tandoor,restic_backup`)
 - Then within 120 s of the run, `tandoor_url` lists the existing recipes
@@ -615,10 +611,10 @@ Scenario AC-51: REST API accepts a token-authenticated read request (FR-77)
 
 Scenario AC-52: The feature adds no lint suppression (NFR-09)
 - Given the repository at the feature commit
-- When the operator runs `git diff master -- nas-de-int-wahlberger-dev ':(exclude)nas-de-int-wahlberger-dev/REQS.md' | grep -E '^\+.*(noqa|skip_list|warn_list)'` from the repository root
+- When the operator runs `git diff master -- nas-de-int-wahlberger-dev ':(exclude)nas-de-int-wahlberger-dev/reqs' | grep -E '^\+.*(noqa|skip_list|warn_list)'` from the repository root
 - Then the command prints nothing
 
-Scenario AC-53: Backup retention is unchanged (NFR-10)
+Scenario AC-53: Backup retention is unchanged (NFR-10) [Superseded by BD-FR-57 and BD-AC-07.]
 - Given the repository at the feature commit
 - When the operator runs `git diff master -- nas-de-int-wahlberger-dev/roles/restic_backup/defaults/main.yml` and `grep -rn restic_backup_keep_ nas-de-int-wahlberger-dev/inventories` from the repository root
 - Then the diff changes no `restic_backup_keep_*` line
@@ -635,8 +631,8 @@ NFR-03 to NFR-06 are owner-confirmed targets (Q5, 2026-09-27), not measurements.
 - NFR-04: In steady state, after `systemctl restart` of `tandoor.service` or `tandoor-db.service`, the same check passes within 120 s.
 - NFR-05: After a host reboot, the same check passes within 300 s of `systemctl is-system-running` reporting `running` or `degraded`, with no manual action.
 - NFR-06: Measured 10 min after start with no user activity, the combined memory usage of `tandoor` and `tandoor-db` is <= 1 GiB.
-- NFR-07: Tandoor data (database content and media files) has a recovery point objective of <= 24 h (nightly 03:00 run).
-- NFR-10: Snapshots that contain Tandoor data are kept under the existing, unchanged retention (`restic_backup_keep_daily: 7`, `restic_backup_keep_weekly: 4`, `restic_backup_keep_monthly: 6`).
+- NFR-07: Tandoor data (database content and media files) has a recovery point objective of <= 24 h (nightly 03:00 run). [Amended by BD-NFR-05 (Local backup disk feature): still in force, met by the 01:30 btrbk run instead of the 03:00 restic run.]
+- NFR-10: Snapshots that contain Tandoor data are kept under the existing, unchanged retention (`restic_backup_keep_daily: 7`, `restic_backup_keep_weekly: 4`, `restic_backup_keep_monthly: 6`). [Superseded by BD-FR-57 (Local backup disk feature): btrbk target retention `14d 8w 12m 3y`.]
 - NFR-08: The feature adds no host-listening TCP port.
 - NFR-11: The feature changes no firewalld rule.
 

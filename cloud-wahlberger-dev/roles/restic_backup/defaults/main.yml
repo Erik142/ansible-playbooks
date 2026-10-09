@@ -33,9 +33,16 @@ restic_backup_rest_server_username: cloud
 # vault_restic_server_cloud_htpasswd_password exactly.
 restic_backup_rest_server_password: ""
 
-# Retention: 7 daily + 4 weekly + 6 monthly snapshots kept, everything older
-# pruned. Applied every night right after the backup completes. Same
-# defaults as nas-de-int-wahlberger-dev's role.
+# Whether this host applies retention itself after each backup. true: runs
+# `restic forget` with the keep_* values below. false: the target repository
+# is append-only for this client and the NAS applies retention instead; the
+# script then contains no forget/prune step at all (the nightly integrity
+# check still runs).
+restic_backup_forget_enabled: true
+
+# Retention (used only while restic_backup_forget_enabled is true): 7 daily
+# + 4 weekly + 6 monthly snapshots kept, everything older pruned. Applied
+# every night right after the backup completes.
 restic_backup_keep_daily: 7
 restic_backup_keep_weekly: 4
 restic_backup_keep_monthly: 6
@@ -48,10 +55,10 @@ restic_backup_keep_monthly: 6
 # always runs in full every time regardless of this setting.
 restic_backup_check_read_data_subset: "10%"
 
-# Nightly at 03:30 — systemd OnCalendar syntax. Offset half an hour from
-# nas-de-int-wahlberger-dev's 03:00 run so both backups don't hit
-# pi-de-int-wahlberger-dev's REST server at the exact same moment.
-restic_backup_on_calendar: "*-*-* 03:30:00"
+# Nightly at 04:30 — systemd OnCalendar syntax. Avoids the NAS's rebootmgr
+# window (03:00-04:00); a run takes at most 60 minutes, so it ends before
+# the NAS maintenance run at 06:00.
+restic_backup_on_calendar: "*-*-* 04:30:00"
 
 # Emails a backup summary via Resend on every successful run, not just
 # failures (notify_failure already covers those) — reuses notify_failure's
