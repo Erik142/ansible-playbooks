@@ -1,7 +1,7 @@
 ---
 # Default variables for the `uptime_kuma` role.
 
-uptime_kuma_image: docker.io/louislam/uptime-kuma:2.5.5
+uptime_kuma_image: docker.io/louislam/uptime-kuma:2.5.6
 
 # Named Podman volume for persistent data (SQLite DB, uploaded icons) —
 # Podman creates it automatically. Back this up.
@@ -17,7 +17,7 @@ uptime_kuma_data_dir: /opt/podman/uptime-kuma
 uptime_kuma_url: ""
 
 # --- oauth2-proxy (the actual auth gate — see README.md) --------------------
-uptime_kuma_oauth2_proxy_image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.4
+uptime_kuma_oauth2_proxy_image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.5
 uptime_kuma_oauth2_proxy_port: 4180
 
 # OAuth2 client ID issued by Pocket ID when you register the "Uptime Kuma
