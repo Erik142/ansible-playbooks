@@ -223,6 +223,9 @@ jobs:
 
       - name: Render check
         working-directory: nas-de-int-wahlberger-dev
+        env:
+          # openSUSE's own registry avoids Docker Hub's pull limits.
+          RENDER_CHECK_IMAGE: registry.opensuse.org/opensuse/tumbleweed:latest
         run: |
           tests/render-check.sh
           tests/render-check.sh -e backup_disk_hdparm_spindown=120
