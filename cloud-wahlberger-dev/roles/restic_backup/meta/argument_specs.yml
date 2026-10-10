@@ -1,7 +1,7 @@
 ---
 argument_specs:
   main:
-    short_description: Nightly restic backup to pi-de-int-wahlberger-dev.
+    short_description: Nightly restic backup to a restic REST server.
     options:
       restic_backup_paths:
         type: list

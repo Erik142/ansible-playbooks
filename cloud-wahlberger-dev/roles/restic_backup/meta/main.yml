@@ -2,7 +2,7 @@
 galaxy_info:
   role_name: restic_backup
   author: Erik Wahlberger
-  description: Nightly restic backup of /opt/podman to pi-de-int-wahlberger-dev.
+  description: Nightly restic backup of /opt/podman to a restic REST server.
   license: MIT
   min_ansible_version: "2.15"
   platforms:

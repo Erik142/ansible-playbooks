@@ -157,5 +157,12 @@ uptime_kuma_cookie_secret: "{{ vault_uptime_kuma_cookie_secret | default('') }}"
 restic_backup_repo_password: "{{ vault_restic_backup_repo_password | default('') }}"
 
 # restic REST server auth password. SHARED SECRET: must be the exact same
-# value as pi-de-int-wahlberger-dev's vault_restic_server_cloud_htpasswd_password.
+# value as nas-de-int-wahlberger-dev's vault_restic_server_cloud_htpasswd_password
+# (and, until the Pi's repository is retired, pi-de-int-wahlberger-dev's).
 restic_backup_rest_server_password: "{{ vault_restic_backup_rest_server_password | default('') }}"
+
+# Backups go to the NAS's append-only rest-server. The NAS applies retention
+# itself (restic-server-maintenance.timer), so this client never forgets or
+# prunes. See nas-de-int-wahlberger-dev/README.md, "Backups".
+restic_backup_rest_server_host: nas.de.int.wahlberger.dev
+restic_backup_forget_enabled: false
