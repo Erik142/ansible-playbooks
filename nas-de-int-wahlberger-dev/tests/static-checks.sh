@@ -302,8 +302,8 @@ def comment_above(lines, key_re):
     return None
 
 for key, step in (("backup_disk_enabled", "step 3"), ("restic_backup_decommission_enabled", "step 5")):
-    if v.get(key) is not False:
-        errors.append(f"{key} must be false")
+    if not isinstance(v.get(key), bool):
+        errors.append(f"{key} must be a boolean (false until its runbook step, true after the 2026-10-10 cut-over)")
     c = comment_above(lines, rf"{key}:")
     if not c or step not in c:
         errors.append(f"{key} needs a comment naming runbook {step}")

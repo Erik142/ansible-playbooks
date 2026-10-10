@@ -99,7 +99,7 @@ See [backup-overview.md](backup-overview.md#actors). Main actors here: the owner
 - BD-FR-156 [Must]: No file under `inventories/vm/` shall contain a value from the production `vault.yml`.
 
 #### M. Decommission flag
-- BD-FR-157 [Must]: `vars.yml` at the feature commit shall set `restic_backup_decommission_enabled: false`, with a comment naming runbook step 5 as the step that sets it to `true`.
+- BD-FR-157 [Must]: `vars.yml` at the feature commit shall set `restic_backup_decommission_enabled: false`, with a comment naming runbook step 5 as the step that sets it to `true`. After the production cut-over of 2026-10-10 both cut-over flags are `true`; the comments stay and the check only requires a boolean.
 - BD-FR-158 [Must]: While `restic_backup_decommission_enabled` is `false`, a normal run shall report every task of `restic_backup_decommission` as `ok` or `skipped`, whatever the value of `backup_disk_enabled`.
 
 ### Business Rules
@@ -166,7 +166,7 @@ Scenario BD-AC-07 [S]: The render check passes (BD-FR-154, BD-FR-23, BD-FR-27, B
 
 Scenario BD-AC-09 [S]: Vars, vault and flag wiring (BD-FR-17, BD-FR-45, BD-FR-84 to BD-FR-86, BD-FR-109, BD-FR-137 to BD-FR-141, BD-FR-157, BD-BR-09)
 - Given `vars.yml`, `vault.yml.example`, and the decrypted NAS and cloud `vault.yml` files
-- Then `vars.yml` sets `backup_disk_enabled: false` with the step-3 comment (BD-FR-17), and `restic_backup_decommission_enabled: false` with the step-5 comment (BD-FR-157)
+- Then `vars.yml` sets `backup_disk_enabled` with the step-3 comment (BD-FR-17), and `restic_backup_decommission_enabled` with the step-5 comment (BD-FR-157); both are booleans (`false` at the feature commit, `true` after the 2026-10-10 cut-over)
 - And `disk_space_paths` lists `/`, `/mnt/data`, `/mnt/containers` and `/mnt/backup/btrbk` (BD-FR-45)
 - And `grep -nE '^\s*restic_backup_' vars.yml` prints nothing (BD-FR-84)
 - And the NAS `vault.yml` has the two BD-FR-85 keys and the two BD-FR-137 keys, and `vault.yml.example` has placeholders for all four, with the BD-FR-86 and BD-FR-140 comments

@@ -60,7 +60,10 @@
       - "python3{{ ansible_facts.python.version.minor }}-passlib"
       - "python3{{ ansible_facts.python.version.minor }}-bcrypt"
     state: present
+  register: restic_server_passlib
 
+# --check on a first run installs nothing, so there is nothing to verify and
+# community.general.htpasswd (which imports passlib) cannot run either.
 - name: Verify the passlib and bcrypt packages are installed
   ansible.builtin.command:
     argv:
@@ -69,7 +72,7 @@
       - "python3{{ ansible_facts.python.version.minor }}-passlib"
       - "python3{{ ansible_facts.python.version.minor }}-bcrypt"
   changed_when: false
-  check_mode: false
+  when: not ansible_check_mode
 
 # One bcrypt entry per client. The module only rewrites an entry whose password
 # no longer verifies, so a re-run is a no-op. A change restarts rest-server so
@@ -88,6 +91,7 @@
   loop_control:
     label: "{{ item.username }}"
   no_log: true
+  when: not (ansible_check_mode and restic_server_passlib is changed)
   notify: Restart restic-server
 
 # Rendered immediately after the htpasswd tasks; the container role flushes
