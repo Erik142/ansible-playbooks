@@ -28,6 +28,15 @@
       "datasourceTemplate": "docker"
     }
   ],
+  "hostRules": [
+    {
+      "description": "codeberg.org's registry paginates tag lists and sits behind several backends; unthrottled lookups intermittently came back incomplete, so Renovate autoclosed the Forgejo PR and reopened it on the next run. Serialise and slow the requests, and allow a longer timeout.",
+      "matchHost": "codeberg.org",
+      "concurrentRequestLimit": 1,
+      "maxRequestsPerSecond": 2,
+      "timeout": 120000
+    }
+  ],
   "packageRules": [
     {
       "description": "Minor/patch image bumps: grouped, auto-merged once CI passes",
@@ -41,6 +50,11 @@
       "matchDatasources": ["docker"],
       "matchUpdateTypes": ["major"],
       "automerge": false
+    },
+    {
+      "description": "Forgejo: stay on the LTS series. 15.x is supported until 2027-07-15; 16.0 is non-LTS and reaches end of life on 2026-10-29. The only allowed tag is the one already pinned, so no PR is opened until this rule is changed to the next LTS major (see https://forgejo.org/releases/).",
+      "matchPackageNames": ["codeberg.org/forgejo/forgejo"],
+      "allowedVersions": "/^15-rootless$/"
     },
     {
       "description": "Postgres: minor/patch only, no major upgrades (needs a dump/restore)",
