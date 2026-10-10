@@ -52,6 +52,11 @@
       "automerge": false
     },
     {
+      "description": "Forgejo: stay on the LTS series. 15.x is supported until 2027-07-15; 16.0 is non-LTS and reaches end of life on 2026-10-29. The only allowed tag is the one already pinned, so no PR is opened until this rule is changed to the next LTS major (see https://forgejo.org/releases/).",
+      "matchPackageNames": ["codeberg.org/forgejo/forgejo"],
+      "allowedVersions": "/^15-rootless$/"
+    },
+    {
       "description": "Postgres: minor/patch only, no major upgrades (needs a dump/restore)",
       "matchPackageNames": ["docker.io/library/postgres"],
       "matchUpdateTypes": ["major"],
