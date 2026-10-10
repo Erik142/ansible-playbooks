@@ -28,6 +28,15 @@
       "datasourceTemplate": "docker"
     }
   ],
+  "hostRules": [
+    {
+      "description": "codeberg.org's registry paginates tag lists and sits behind several backends; unthrottled lookups intermittently came back incomplete, so Renovate autoclosed the Forgejo PR and reopened it on the next run. Serialise and slow the requests, and allow a longer timeout.",
+      "matchHost": "codeberg.org",
+      "concurrentRequestLimit": 1,
+      "maxRequestsPerSecond": 2,
+      "timeout": 120000
+    }
+  ],
   "packageRules": [
     {
       "description": "Minor/patch image bumps: grouped, auto-merged once CI passes",
