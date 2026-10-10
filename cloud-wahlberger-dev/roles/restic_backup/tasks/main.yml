@@ -8,7 +8,7 @@
       restic_backup_repo_password or restic_backup_rest_server_password is
       empty. Set vault_restic_backup_repo_password and
       vault_restic_backup_rest_server_password in Ansible Vault — the latter
-      must match pi-de-int-wahlberger-dev's
+      must match nas-de-int-wahlberger-dev's
       vault_restic_server_cloud_htpasswd_password exactly. See README.md.
     quiet: true
 
@@ -32,6 +32,8 @@
     owner: root
     group: root
     mode: "0600"
+  # The file holds the REST server and repository passwords: --diff must not print them.
+  diff: false
 
 - name: Create the restic_backup config directory
   ansible.builtin.file:

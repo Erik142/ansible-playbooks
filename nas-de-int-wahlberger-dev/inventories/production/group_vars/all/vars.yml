@@ -46,12 +46,12 @@ disk_space_paths:
   - /mnt/backup/btrbk
 
 # --- Backup disk (backup_disk, db_dump, btrbk roles) -------------------------
-# Off until runbook step 3 (backup disk initialised and backup_disk_uuid set):
+# Enabled in runbook step 3 (backup disk initialised, backup_disk_uuid set);
 # gates backup_disk, db_dump and btrbk in site.yml.
-backup_disk_enabled: false
-# Filesystem UUID printed by backup_disk_init.yml (runbook step 3). Empty on
-# purpose; the backup_disk role fails with a pointer to its README until set.
-backup_disk_uuid: ""
+backup_disk_enabled: true
+# Filesystem UUID printed by backup_disk_init.yml (runbook step 3). The
+# backup_disk role fails with a pointer to its README while this is empty.
+backup_disk_uuid: "80cb7856-915a-42de-b56d-431d17606b70"
 # Newest direct child of each path must be younger than max_age_hours.
 backup_disk_freshness_checks:
   - path: /mnt/backup/btrbk/data
@@ -63,7 +63,7 @@ backup_disk_freshness_checks:
 
 # Removes the old NAS-to-Pi restic job from step 5 of the runbook; the old
 # job is removed from that step on and keeps running until then.
-restic_backup_decommission_enabled: false
+restic_backup_decommission_enabled: true
 
 # --- Firewall -----------------------------------------------------------------
 # Beszel's hub (cloud-wahlberger-dev) connects to this host's beszel_agent

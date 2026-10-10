@@ -1,8 +1,9 @@
 # restic_backup
 
 Nightly [restic](https://restic.net/) backup of this host's `/opt/podman`
-(Pocket ID, FreshRSS, Beszel's hub) to `pi-de-int-wahlberger-dev`'s
-`restic_server` role, via a systemd timer (not orchestrated through
+(Pocket ID, FreshRSS, Beszel's hub) to the append-only restic REST server
+of `nas-de-int-wahlberger-dev` (its `restic_server` role; the host is
+`restic_backup_rest_server_host`), via a systemd timer (not orchestrated through
 Ansible/Semaphore itself — the timer runs independently of whether/when the
 playbook is re-applied). A stopgap until a Hetzner Storage Box (and/or the
 TrueNAS instance in Borås) is added as a further target — see the top-level
@@ -103,11 +104,11 @@ Two secrets, both in this playbook's Vault:
   recover it.
 - `vault_restic_backup_rest_server_password` — the REST server's htpasswd
   password. This is a **shared secret**: it must be the exact same value as
-  `pi-de-int-wahlberger-dev`'s `vault_restic_server_cloud_htpasswd_password`
-  (a *different* Vault key than nas-de-int-wahlberger-dev uses, since each
-  backup client gets its own htpasswd entry — see
-  `roles/restic_server/README.md` on the Pi playbook). Generate it once, put
-  it in both playbooks' Vaults.
+  `nas-de-int-wahlberger-dev`'s `vault_restic_server_cloud_htpasswd_password`
+  (the Pi's playbook uses the same value under the same key while its frozen
+  repository still exists; each backup client gets its own htpasswd entry —
+  see `roles/restic_server/README.md` in the NAS playbook). Generate it once,
+  put it in both playbooks' Vaults.
 
 ## Restoring
 

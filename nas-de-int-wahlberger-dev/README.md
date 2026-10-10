@@ -180,9 +180,10 @@ against nas, cloud or the Pi).
 
 ### Cut-over flags
 
-Both are in `inventories/production/group_vars/all/vars.yml` and are `false`
-at the feature commit, so a normal `site.yml` run changes nothing until the
-owner flips them:
+Both are in `inventories/production/group_vars/all/vars.yml`. They were
+`false` at the feature commit, so a `site.yml` run changed nothing until the
+owner flipped them; both are `true` in production since the cut-over of
+2026-10-10 (a fresh environment starts with them `false`):
 
 | Flag | Set to `true` in | Gates (in `site.yml`) |
 |---|---|---|
@@ -193,9 +194,16 @@ While `restic_backup_decommission_enabled` is `false`, the old restic job
 keeps running unchanged. The Pi stays unchanged throughout; nothing in this
 playbook connects to it.
 
-### Cut-over runbook (production, not yet executed)
+### Cut-over runbook (executed on production on 2026-10-10)
 
 Run from this directory. Each "Do not continue unless" is a hard gate.
+
+`--check` is only partly useful on a first run: units, packages and accounts
+that do not exist yet make some later tasks fail in check mode (for example
+`beszel_agent`, whose checksum fetch is skipped, or the container restart
+handler before the Quadlet exists). Run the steps with `--tags` for the roles
+involved rather than a full `site.yml`: a full run also applies pending OS
+updates and image bumps (`common` runs `zypper dup`).
 
 **Step 0: VM gate.** Do not continue unless every scenario marked `[V]` in
 `reqs/` passes on the VM fixture (`inventories/vm/`) at the commit you deploy
@@ -274,26 +282,28 @@ passes (BD-BR-14).
 ssh cloud sudo systemctl stop restic-backup.timer
 ssh cloud systemctl is-active restic-backup.service      # must print: inactive
 
-# on the Pi: no locks on the repository (RESTIC_PASSWORD = cloud's repo password)
-ssh pi restic -r /mnt/data/restic-repos/cloud list locks  # must print nothing
+# on the Pi: no locks on the repository (an empty locks/ dir needs no password)
+ssh pi sudo ls /mnt/data/restic-repos/cloud/locks | wc -l      # must print: 0
+ssh pi sudo ls /mnt/data/restic-repos/cloud/snapshots | wc -l  # note the count
+ssh pi sudo du -sb /mnt/data/restic-repos/cloud                # note the size
 
-# copy, then fix ownership
-rsync -a --numeric-ids pi:/mnt/data/restic-repos/cloud/ nas:/mnt/data/restic-repos/cloud/
-ssh nas sudo chown -R restic-server: /mnt/data/restic-repos/cloud
+# copy through your workstation (rsync refuses two remote operands), then fix
+# ownership and restart so rest-server relabels the new files (:Z). Do NOT run
+# restorecon: it would remove the container label.
+mkdir -p ~/restic-cloud-stage
+rsync -a --rsync-path="sudo rsync" pi:/mnt/data/restic-repos/cloud/ ~/restic-cloud-stage/
+rsync -a --rsync-path="sudo rsync" ~/restic-cloud-stage/ nas:/mnt/data/restic-repos/cloud/
+rm -rf ~/restic-cloud-stage
+ssh nas 'sudo chown -R restic-server:restic-server /mnt/data/restic-repos/cloud; sudo systemctl restart restic-server.service'
 
-# verify as the service account (password: RESTIC_PASSWORD in /etc/restic-server-maintenance.env)
-ssh nas sudo -u restic-server env RESTIC_REPOSITORY=/mnt/data/restic-repos/cloud RESTIC_PASSWORD=... restic --no-cache check --read-data
-
-# snapshot counts must be equal
-ssh pi restic -r /mnt/data/restic-repos/cloud snapshots --json | jq length
-ssh nas sudo -u restic-server env RESTIC_REPOSITORY=/mnt/data/restic-repos/cloud RESTIC_PASSWORD=... restic --no-cache snapshots --json | jq length
+# verify as the service account; the password comes from the root-only env file
+# and is never typed or printed
+ssh nas 'sudo ls /mnt/data/restic-repos/cloud/snapshots | wc -l; sudo du -sb /mnt/data/restic-repos/cloud'   # equal to the Pi
+ssh nas 'sudo sh -c "set -a; . /etc/restic-server-maintenance.env; set +a; exec runuser -u restic-server --preserve-environment -- restic --no-cache -r /mnt/data/restic-repos/cloud check --read-data"'
 ```
 
-`rsync` refuses two remote operands (verified on the VM: "The source and
-destination cannot both be remote."), so the copy above cannot be started from a
-third machine. Run it on the NAS as root with the destination local
-(`rsync -a --numeric-ids pi:/mnt/data/restic-repos/cloud/ /mnt/data/restic-repos/cloud/`);
-this needs root SSH from the NAS to the Pi so numeric owners survive.
+The number of files in `snapshots/` is the snapshot count. This is the path that
+ran on 2026-10-10 (11 snapshots, 19 449 271 bytes, `no errors were found`).
 
 **Step 7: switch cloud.** Do not continue unless step 6 passed
 (`restic check --read-data` exit 0, equal snapshot counts). In

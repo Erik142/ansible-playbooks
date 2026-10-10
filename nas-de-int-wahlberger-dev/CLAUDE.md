@@ -133,8 +133,9 @@ migrating Paperless-ngx:
   **Only `backup_disk_init.yml` formats the backup disk** (separate
   playbook, never imported by `site.yml`, needs `-e backup_disk_init_confirm=<by-id path>`).
   Restic repositories live on `/mnt/data/restic-repos`, so btrbk covers them.
-- Cut-over flags in `inventories/production/group_vars/all/vars.yml`, both
-  default `false`, applied as `when:` in `site.yml`: `backup_disk_enabled`
+- Cut-over flags in `inventories/production/group_vars/all/vars.yml`
+  (default `false`; both `true` in production since the 2026-10-10 cut-over),
+  applied as `when:` in `site.yml`: `backup_disk_enabled`
   (backup_disk, btrbk, db_dump, restic_server) and
   `restic_backup_decommission_enabled`. Runbook: README "Backups".
 

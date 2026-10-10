@@ -16,6 +16,19 @@
     group: root
     mode: "0700"
 
+# --check on a first run: the directory above is not created, so there is
+# nowhere to download the key and nothing to inspect. The key tasks are then
+# skipped; the real run (which creates the directory) always executes them.
+- name: Look for the key directory
+  ansible.builtin.stat:
+    path: "{{ btrbk_zypper_repo_key_dir }}"
+  register: btrbk_repo_key_dir
+  check_mode: false
+
+- name: Work out whether the key can be inspected
+  ansible.builtin.set_fact:
+    btrbk_repo_key_inspectable: "{{ not ansible_check_mode or btrbk_repo_key_dir.stat.exists }}"
+
 # Read-only download into a private scratch dir; safe to run in --check so
 # the fingerprint assert below has a file to inspect.
 - name: Fetch the repository signing key
@@ -27,6 +40,7 @@
     mode: "0600"
   check_mode: false
   register: btrbk_repo_key
+  when: btrbk_repo_key_inspectable
 
 - name: Read the signing key's primary fingerprint
   ansible.builtin.command:
@@ -40,6 +54,7 @@
   register: btrbk_repo_key_info
   changed_when: false
   check_mode: false
+  when: btrbk_repo_key_inspectable
 
 # A key file with extra keys would let rpm_key import more than the one whose
 # fingerprint was checked: require exactly one primary key and one primary fpr.
@@ -54,6 +69,7 @@
       The file from {{ btrbk_zypper_repo_key_url }} must contain exactly one
       primary key (one pub record); nothing was imported.
     quiet: true
+  when: btrbk_repo_key_inspectable
 
 # The first "fpr" record is the primary key; later ones are subkeys.
 - name: Require the key to match btrbk_zypper_repo_gpg_fingerprint
@@ -70,12 +86,14 @@
       not added. If the key was legitimately rotated, verify the new
       fingerprint out of band and update the variable (see README.md).
     quiet: true
+  when: btrbk_repo_key_inspectable
 
 - name: Import the verified signing key
   ansible.builtin.rpm_key:
     key: "{{ btrbk_repo_key.dest }}"
     fingerprint: "{{ btrbk_zypper_repo_gpg_fingerprint }}"
     state: present
+  when: btrbk_repo_key_inspectable
 
 - name: Add the pinned btrbk repository
   community.general.zypper_repository:
