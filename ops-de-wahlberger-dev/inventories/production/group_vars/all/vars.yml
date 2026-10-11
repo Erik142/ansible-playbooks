@@ -22,8 +22,9 @@ ansible_user: erikwahlberger
 
 # --- Design selector (SH-FR-220) ---------------------------------------------
 # `primary` (Caddy on host networking, Semaphore published on 127.0.0.1) or
-# `bridge_fallback` (both containers on caddy.network). Pull request A3
-# commits the step-3 decision; until then it is `primary`.
+# `bridge_fallback` (both containers on caddy.network). Decided in step 3
+# (pull request A3): `primary`. Measured on the real VM: the firewalld zone gates
+# HTTPS (SH-AC-04) and Caddy sees the real client addresses (SH-AC-51).
 vm_proxy_design: primary
 caddy_design: "{{ vm_proxy_design }}"
 semaphore_design: "{{ vm_proxy_design }}"
@@ -145,21 +146,19 @@ semaphore_require_existing_db: true
 # 172.16.0.0/12, which collides with neither the LAN, ZeroTier, podman's default
 # 10.88.0.0/16 nor Hetzner's public ranges.
 semaphore_network_subnet: 172.29.30.0/24
-# Container UID, read on the Pi in step 3 and set by pull request A3. Empty:
-# the semaphore role fails naming this variable.
-semaphore_uid: ""
+# Container UID of the Pi's Semaphore (`podman exec semaphore id -u`, read in
+# step 3, SH-FR-200), set by pull request A3. Empty would make the semaphore role
+# fail naming this variable.
+semaphore_uid: 1001
 
 # --- Backups (restic_backup role) ------------------------------------------------
 restic_backup_rest_server_host: nas.de.int.wahlberger.dev
 restic_backup_rest_server_port: 8000
 restic_backup_rest_server_username: ops
 restic_backup_forget_enabled: false
-# false until step 4: before the database is copied there is no SQLite file to
-# back up, and true would mail a failure every day. delete in PR A3 (the
-# role default `true` then applies). Delete it in pull request A3, before the
-# step-5 apply; A3 must also update tests/guards.d/vm_vars.yml (the `sameas false`
-# assert) in the same pull request.
-restic_backup_sqlite_required: false
+# restic_backup_sqlite_required: not set, so the role default `true` applies. The
+# stopgap `false` of pull request A was deleted by pull request A3; the role is
+# first applied in step 5, after the database exists (step 4).
 restic_backup_notify_on_success: true
 restic_backup_on_calendar: "*-*-* 05:00:00"
 restic_backup_repo_password: "{{ vault_restic_backup_repo_password | default('') }}"
