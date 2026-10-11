@@ -1,0 +1,12 @@
+{# Rendered by the caddy role (bridge fallback only) to #}
+{# /etc/containers/systemd/caddy.network, shared with Semaphore. #}
+[Unit]
+Description=Caddy reverse-proxy network
+
+[Network]
+Driver=bridge
+{% if caddy_network_subnet | length > 0 %}
+Subnet={{ caddy_network_subnet }}
+{% endif %}
+DNS=1.1.1.1
+DNS=8.8.8.8

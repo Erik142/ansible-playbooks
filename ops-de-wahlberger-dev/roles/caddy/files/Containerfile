@@ -1,0 +1,21 @@
+# The official Caddy image has no DNS provider plugins built in, so it can
+# only complete HTTP-01 (needs inbound port 80 from the public internet).
+# This host has no public inbound port — it's a home NAS reached over
+# ZeroTier/LAN — so it needs DNS-01 instead, which requires a custom build
+# with the Cloudflare module baked in via xcaddy.
+#
+# Everything is pinned (security review F-02): both base images by version
+# and index digest, Caddy itself and the DNS module by version. There is no
+# automatic bumping (Renovate skips this image); to upgrade by hand:
+#   1. Pick the new Caddy release X.Y.Z and the latest caddy-dns/cloudflare tag.
+#   2. Get the digests (docker.io/library/caddy tags X.Y.Z-builder and X.Y.Z):
+#        skopeo inspect --format '{{.Digest}}' docker://docker.io/library/caddy:X.Y.Z
+#   3. Edit the four version/digest strings below (keep the Caddy version in
+#      the two FROM lines and in `xcaddy build vX.Y.Z` identical).
+#   4. Apply the role: the changed Containerfile forces an image rebuild and
+#      restarts Caddy (roles/caddy/tasks/main.yml, `force: caddy_containerfile.changed`).
+FROM docker.io/library/caddy:2.11.7-builder@sha256:b25f47453fa02f7e66c0828b4b1343658808b9000950b6825c4a1cb0c988f5f8 AS builder
+RUN xcaddy build v2.11.7 --with github.com/caddy-dns/cloudflare@v0.2.4
+
+FROM docker.io/library/caddy:2.11.7@sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772
+COPY --from=builder /usr/bin/caddy /usr/bin/caddy

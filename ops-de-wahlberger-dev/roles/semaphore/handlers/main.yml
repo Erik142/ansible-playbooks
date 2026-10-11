@@ -1,0 +1,18 @@
+---
+# daemon_reload: true for the same reason as this repo's other service
+# roles' own restart handlers — this can run before the container role's own
+# restart handler on a first-ever deploy (Ansible runs flushed handlers in
+# definition order, not notification order). See
+# nas-de-int-wahlberger-dev's roles/paperless_ngx/handlers/main.yml for the
+# full explanation.
+#
+# `when: not ansible_check_mode`: handlers also run under --check, and on a
+# fresh VM (first --check of the migration, OP-02) the unit does not exist yet,
+# which makes the systemd module fail with "Could not find the requested
+# service". Nothing is restarted in check mode anyway.
+- name: Restart semaphore
+  ansible.builtin.systemd:
+    name: semaphore.service
+    state: restarted
+    daemon_reload: true
+  when: not ansible_check_mode

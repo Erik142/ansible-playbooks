@@ -1,0 +1,50 @@
+---
+# Default variables for the `caddy` role (ops VM: UI over ZeroTier only).
+
+# `primary` (SH-FR-07, SH-FR-40): host networking, Caddy binds caddy_bind_address
+# itself and proxies to the loopback-published Semaphore port.
+# `bridge_fallback` (SH-FR-186, SH-FR-187): Caddy joins caddy.network (shared
+# with Semaphore), publishes <caddy_bind_address>:443:443 and proxies to the
+# Semaphore container by name. Fed by `vm_proxy_design` (SH-FR-220).
+caddy_design: primary
+
+# Locally built image (see files/Containerfile): the official caddy:2 image
+# has no DNS provider plugins, but DNS-01 needs the caddy-dns/cloudflare module.
+caddy_image: localhost/caddy-cloudflare:2
+
+# Host directory holding the build context, the rendered Caddyfile and Caddy's
+# persistent state. Issued certificates live in <dir>/data: back that up.
+caddy_data_dir: /opt/podman/caddy
+caddy_build_dir: "{{ caddy_data_dir }}/build"
+
+# Fixed IPv4 subnet of caddy.network (bridge fallback only). Production feeds it
+# from semaphore_network_subnet so the fail2ban ignore list and the `from=`
+# allowlist match the subnet Semaphore's self-run SSH comes from (security
+# review F-05). Empty: no Subnet= line (podman picks one; fixture only).
+caddy_network_subnet: ""
+
+# The only address Caddy may listen on (the VM's ZeroTier member IP, `vm_zt_ip`).
+# Empty on purpose: the role fails before any change while it is empty
+# (SH-FR-193), so a missing ZeroTier address can never widen the listener.
+caddy_bind_address: ""
+
+# Client networks that may reach the sites; every other source gets HTTP 403
+# (SH-FR-129). CIDR notation.
+caddy_allowed_sources:
+  - 10.243.0.0/16
+  - 10.10.0.0/16
+
+# Where a site's traffic goes when the site gives no `upstream` of its own.
+caddy_upstream_primary: "127.0.0.1:3000"
+# Used in bridge_fallback instead of any loopback upstream (127.0.0.1 / localhost
+# inside the Caddy container is the container itself, not the host).
+caddy_upstream_fallback: "semaphore:3000"
+
+# Email for Let's Encrypt registration (expiry notices). Empty = no account email.
+caddy_acme_email: ""
+
+# Sites Caddy serves. Each item is a dict:
+#   host:     hostname (DNS-01 needs no public reachability)
+#   upstream: (optional) host:port to reverse_proxy to; default per caddy_design
+#   extra:    (optional) raw Caddy directives inserted into the site block
+caddy_sites: []

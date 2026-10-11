@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: semaphore
+  author: Erik Wahlberger
+  description: Semaphore UI (self-hosted Ansible automation), running as a Podman Quadlet behind Caddy with Pocket ID OIDC login, on the ops VM (openSUSE).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - semaphore
+    - ansible
+    - podman
+
+dependencies: []

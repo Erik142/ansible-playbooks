@@ -1,0 +1,11 @@
+{# Rendered by the semaphore role (primary design only) to #}
+{# /etc/containers/systemd/semaphore.network. #}
+[Unit]
+Description=Semaphore network (fixed subnet)
+
+[Network]
+Driver=bridge
+Subnet={{ semaphore_network_subnet }}
+{% for dns in semaphore_dns_servers %}
+DNS={{ dns }}
+{% endfor %}

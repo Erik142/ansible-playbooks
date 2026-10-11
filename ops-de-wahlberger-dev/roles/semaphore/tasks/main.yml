@@ -1,0 +1,208 @@
+---
+# Order matters: every guard comes first and fails before the first change
+# (SH-FR-210, SH-FR-52). Nothing below creates a database or any -wal/-shm/
+# -journal file (SH-FR-204): the database is placed by the operator in step 4
+# and only ever re-owned and re-moded here.
+
+# Own task, so the failure names semaphore_uid and nothing else (SH-FR-210).
+- name: Require the Semaphore UID before any change
+  ansible.builtin.assert:
+    that:
+      - semaphore_uid | string is match('\\A[1-9][0-9]*\\Z')
+    fail_msg: >-
+      semaphore_uid is empty or not a positive integer. Set it in group_vars
+      to the UID the Semaphore image runs as (read on the Pi with
+      `podman exec semaphore id -u`, pull request A3). Nothing was changed.
+    quiet: true
+
+- name: Validate Semaphore inputs are present
+  ansible.builtin.assert:
+    that:
+      - semaphore_design in ['primary', 'bridge_fallback']
+      - semaphore_design == 'bridge_fallback' or semaphore_network_subnet | length > 0
+      - semaphore_url | length > 0
+      - semaphore_oidc_client_id | length > 0
+      - semaphore_oidc_client_secret | length > 0
+      - semaphore_admin_password | length > 0
+      - semaphore_access_key_encryption | length > 0
+      - semaphore_cookie_hash | length > 0
+      - semaphore_cookie_encryption | length > 0
+    fail_msg: >-
+      Semaphore is not fully configured. semaphore_design must be primary or
+      bridge_fallback; the primary design needs semaphore_network_subnet; set
+      semaphore_url and semaphore_oidc_client_id in group_vars and provide the
+      Vault secrets vault_semaphore_admin_password,
+      vault_semaphore_access_key_encryption, vault_semaphore_cookie_hash,
+      vault_semaphore_cookie_encryption and vault_semaphore_oidc_client_secret.
+      See roles/semaphore/README.md.
+    quiet: true
+
+# The migrated database is the data (SH-E-01). stat works in check mode too.
+- name: Look for the migrated Semaphore database
+  ansible.builtin.stat:
+    path: "{{ semaphore_data_dir }}/data/database.sqlite"
+    get_checksum: false
+  register: semaphore_db
+
+- name: Refuse to start without the migrated database
+  ansible.builtin.assert:
+    that:
+      - not (semaphore_require_existing_db | bool) or semaphore_db.stat.exists
+    fail_msg: >-
+      semaphore_require_existing_db is true and the database
+      {{ semaphore_data_dir }}/data/database.sqlite does not exist. Place the
+      migrated database there (migration step 4); the role never creates an
+      empty one. Nothing was changed and no container was started.
+    quiet: true
+
+# The base directory only carries files that are bind-mounted individually.
+- name: Create the Semaphore base directory
+  ansible.builtin.file:
+    path: "{{ semaphore_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# SH-FR-168 / SH-FR-219: holds database.sqlite. Group root = the container
+# process's primary group (gid 0, SH-A-32).
+- name: Create the Semaphore data directory
+  ansible.builtin.file:
+    path: "{{ semaphore_data_dir }}/data"
+    state: directory
+    owner: "{{ semaphore_uid }}"
+    group: root
+    mode: "0700"
+
+# Only an existing database is touched; the file module with state: file never
+# creates one. The image creates its files 0644 (SH-A-32), so mode and owner
+# are set here (SH-FR-169, SH-FR-207). The SELinux type container_file_t comes
+# from the :Z volume option on the first container start (SH-FR-208); it is
+# not set here, see README.
+- name: Restrict the migrated database to the Semaphore UID
+  ansible.builtin.file:
+    path: "{{ semaphore_data_dir }}/data/database.sqlite"
+    state: file
+    owner: "{{ semaphore_uid }}"
+    group: root
+    mode: "0600"
+  when: semaphore_db.stat.exists
+
+# Deliberately NOT SEMAPHORE_DB_DIALECT/SEMAPHORE_DB/SEMAPHORE_ACCESS_KEY_ENCRYPTION/
+# SEMAPHORE_COOKIE_* env vars: this image's `server` command auto-generates
+# its own config.json (with its own random secrets and its default sqlite
+# path, ignoring those env vars) on first boot and never revisits it once the
+# file exists. Rendering the real config.json ourselves is the only reliable
+# way to control these values.
+#
+# 0600 owned by the Semaphore UID (SH-FR-166, SH-FR-215): the process runs as
+# that user and reads the file through the bind mount. (The Pi uses 0644
+# root:root; here the secrets are not world readable.)
+- name: Render the Semaphore configuration
+  ansible.builtin.template:
+    src: config.json.j2
+    dest: "{{ semaphore_data_dir }}/config.json"
+    owner: "{{ semaphore_uid }}"
+    group: root
+    mode: "0600"
+  no_log: true
+  diff: false
+  notify: Restart semaphore
+
+# OIDC is the one setting this image DOES read fresh from the environment on
+# every boot. Read by podman (root), so root-only (SH-FR-167, SH-FR-216).
+- name: Render the Semaphore environment file
+  ansible.builtin.template:
+    src: semaphore.env.j2
+    dest: "{{ semaphore_data_dir }}/semaphore.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  diff: false
+  notify: Restart semaphore
+
+- name: Deploy the Semaphore network Quadlet (primary design)
+  ansible.builtin.template:
+    src: semaphore.network.j2
+    dest: "{{ semaphore_quadlet_dir }}/semaphore.network"
+    owner: root
+    group: root
+    mode: "0644"
+  when: semaphore_design == 'primary'
+  notify: Restart semaphore
+
+- name: Deploy the Semaphore container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: semaphore
+    container_quadlet_src: semaphore.container.j2
+
+# SEMAPHORE_ADMIN* env vars don't create an admin account under this image's
+# `server` command (see the env template's comment) — create it explicitly
+# and idempotently via Semaphore's own CLI instead, only when absent (the
+# migrated database already holds it, SH-A-14). No dedicated Ansible module
+# exists, so `ansible.builtin.command` is used deliberately.
+#
+# Every `semaphore` CLI invocation runs its own migration check first; on a
+# container that just (re)started that races the server's own migrations
+# ("SQL logic error"), hence the retries. The same retry covers the window where
+# the container is not up yet: right after the Quadlet start `podman exec` can
+# answer "no such container", "container state improper" or "is not running".
+#
+# check_mode: false -> this read-only lookup also runs under --check, so the
+# create task below never reads an undefined result.
+- name: Check whether the Semaphore admin user already exists
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - semaphore
+      - semaphore
+      - users
+      - get
+      - --config
+      - /etc/semaphore/config.json
+      - --login
+      - "{{ semaphore_admin_username }}"
+  register: semaphore_admin_check
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  retries: 10
+  delay: 2
+  vars:
+    semaphore_cli_transient_re: '(?i)SQL logic error|no such container|state improper|is not running'
+  until: "semaphore_admin_check.stderr is not search(semaphore_cli_transient_re)"
+
+# no_log: the password is an argument of the command.
+- name: Create the Semaphore admin user
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - semaphore
+      - semaphore
+      - users
+      - add
+      - --config
+      - /etc/semaphore/config.json
+      - --login
+      - "{{ semaphore_admin_username }}"
+      - --name
+      - "{{ semaphore_admin_name }}"
+      - --email
+      - "{{ semaphore_admin_email }}"
+      - --password
+      - "{{ semaphore_admin_password }}"
+      - --admin
+  when: semaphore_admin_check.rc != 0
+  register: semaphore_admin_create
+  changed_when: true
+  no_log: true
+  retries: 10
+  delay: 2
+  vars:
+    semaphore_cli_transient_re: '(?i)SQL logic error|no such container|state improper|is not running'
+  until: "semaphore_admin_create.rc == 0 or semaphore_admin_create.stderr is not search(semaphore_cli_transient_re)"

@@ -1,0 +1,71 @@
+---
+# Default variables for the `semaphore` role (ops VM copy, T-09).
+
+semaphore_image: docker.io/semaphoreui/semaphore:v2.19.16
+
+# Derived from podman_data_dir, not hardcoded, so it always lands on the same
+# disk as every other service's data.
+semaphore_data_dir: "{{ podman_data_dir }}/semaphore"
+
+# Directory systemd reads Quadlet units from (the network Quadlet goes here;
+# the container Quadlet is placed by the `container` role).
+semaphore_quadlet_dir: /etc/containers/systemd
+
+# Design selector (SH-FR-220), wired from vm_proxy_design in group_vars.
+#   primary         joins semaphore.network (fixed subnet), publishes
+#                   127.0.0.1:3000 only; Caddy runs on host networking.
+#   bridge_fallback joins caddy.network (shared with Caddy), publishes nothing.
+semaphore_design: primary
+
+# REQUIRED in the primary design: IPv4 subnet of semaphore.network (SH-FR-127),
+# set in group_vars. The role fails before any change while it is empty.
+semaphore_network_subnet: ""
+
+# REQUIRED: numeric UID the Semaphore process runs as inside the image
+# (SH-A-32; 1001 for v2.19.16). Empty = the role fails before any change
+# naming this variable (SH-FR-210). Owner of config.json, the data directory
+# and database.sqlite.
+semaphore_uid: ""
+
+# When true (production), the role fails if <semaphore_data_dir>/data/
+# database.sqlite is absent instead of letting Semaphore create an empty one
+# (SH-FR-52, SH-E-01).
+semaphore_require_existing_db: true
+
+# REQUIRED: public https:// URL Semaphore is served on (set in group_vars).
+semaphore_url: ""
+
+# Break-glass local admin, created only if absent (a migrated database already
+# holds it, SH-A-14).
+semaphore_admin_username: erikwahlberger
+semaphore_admin_name: "Erik Wahlberger"
+semaphore_admin_email: "ewahlberger@gmail.com"
+
+# Resolvers for the container (SH-FR-41): the answers must equal `dig @1.1.1.1`.
+semaphore_dns_servers:
+  - 1.1.1.1
+  - 8.8.8.8
+# Names whose `podman exec semaphore getent hosts <name>` must equal
+# `dig +short <name> @1.1.1.1` (SH-AC-16). Rendered into the Quadlet as a
+# comment and asserted by tests/render.d/semaphore.yml. The own name resolves
+# to the public IPv4 because /etc/hosts is not inherited (podman role,
+# podman_base_hosts_file: image).
+semaphore_getent_names:
+  - nas.de.int.wahlberger.dev
+  - cloud.wahlberger.dev
+  - ops.de.wahlberger.dev
+  - github.com
+
+# --- Pocket ID OIDC login -----------------------------------------------------
+semaphore_oidc_provider_name: "Pocket ID"
+# Issuer URL of Pocket ID (SH-FR-202: unchanged from the Pi).
+semaphore_oidc_provider_url: "https://id.wahlberger.dev"
+# REQUIRED: OAuth2 client ID issued by Pocket ID (not secret).
+semaphore_oidc_client_id: ""
+
+# --- Secrets (surfaced from Vault by group_vars; empty = role fails) ------------
+semaphore_oidc_client_secret: ""
+semaphore_admin_password: ""
+semaphore_access_key_encryption: ""
+semaphore_cookie_hash: ""
+semaphore_cookie_encryption: ""

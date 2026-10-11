@@ -1,0 +1,42 @@
+[Unit]
+Description=Caddy reverse proxy
+# After zerotier.service: the bind address only exists once ZeroTier is up. If
+# it is not there yet Caddy exits and Restart=always retries (SH-E-33).
+After=network-online.target zerotier.service{% if caddy_design == 'bridge_fallback' %} caddy-network.service{% endif %}
+
+Wants=network-online.target zerotier.service
+{% if caddy_design == 'bridge_fallback' %}
+Requires=caddy-network.service
+{% endif %}
+# Emails ewahlberger@gmail.com via Resend after 5 consecutive failures —
+# see the notify_failure role.
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=caddy
+Image={{ caddy_image }}
+{% if caddy_design == 'primary' %}
+# Host networking: Caddy sees real client addresses (the remote_ip allow list
+# depends on it, SH-AC-51) and binds caddy_bind_address through default_bind.
+Network=host
+{% else %}
+# Bridge fallback (SH-FR-186/187): shared network with Semaphore, 443 published
+# on the ZeroTier address only.
+Network=caddy.network
+PublishPort={{ caddy_bind_address }}:443:443
+{% endif %}
+# Cloudflare DNS API token for the DNS-01 challenge, rendered to a root-only
+# 0600 file by the caddy role from Ansible Vault.
+EnvironmentFile={{ caddy_data_dir }}/caddy.env
+Volume={{ caddy_data_dir }}/Caddyfile:/etc/caddy/Caddyfile:Z,ro
+Volume={{ caddy_data_dir }}/data:/data:Z
+Volume={{ caddy_data_dir }}/config:/config:Z
+
+[Service]
+Restart=always
+# Without this, repeated bind failures (address not there yet) hit systemd's
+# start limit within seconds and the unit would stay failed.
+RestartSec=10
+
+[Install]
+WantedBy=default.target

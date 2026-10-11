@@ -1,0 +1,72 @@
+---
+# Default variables for the `restic_backup` role (the ops VM's flavour).
+
+# SQLite databases to snapshot with sqlite3 `.backup` before restic runs.
+# Backing up the live file is NOT safe: Semaphore runs in WAL mode, so a plain
+# copy can miss pages that are only in the -wal file (SH-FR-78). Each entry:
+#   src:  database file on the host (read-only access; the -wal/-shm files are
+#         never copied, SQLite merges them into the copy)
+#   name: file name of the consistent copy inside restic_backup_staging_dir
+restic_backup_sqlite_databases:
+  - src: /opt/podman/semaphore/data/database.sqlite
+    name: semaphore.sqlite
+
+# true: a missing source database fails the run (and so mails the owner). A
+# silently skipped database would mean backups that look fine but hold nothing.
+# Set false only on a host where the database does not exist yet.
+restic_backup_sqlite_required: true
+
+# Root-only directory holding the consistent database copies. It is the ONLY
+# path backed up by default: nothing live from the Podman data dir is read by
+# restic, so config.json, *.env files and identity.secret cannot get in.
+restic_backup_staging_dir: /var/lib/restic-backup/staging
+
+# Root-only directory holding just the rendered restic-backup.env file (the
+# repository URL/passwords restic reads via EnvironmentFile=). Not a backup
+# source.
+restic_backup_env_dir: /var/lib/restic-backup
+
+# Paths handed to `restic backup`. Add only paths that hold no secret.
+restic_backup_paths:
+  - "{{ restic_backup_staging_dir }}"
+
+# Defense in depth for SH-FR-80/151/171: keeps secrets out even if someone adds
+# a directory to restic_backup_paths. restic matches a pattern without a
+# leading slash at any depth.
+restic_backup_exclude:
+  - config.json
+  - "*.env"
+  - identity.secret
+  - "*-wal"
+  - "*-shm"
+  - "*-journal"
+  - "*.partial"
+
+# REQUIRED: repository encryption password. Set
+# vault_restic_backup_repo_password in Ansible Vault. Losing this makes
+# every backup permanently unrecoverable: keep a copy outside Vault too
+# (1Password). See README.md.
+restic_backup_repo_password: ""
+
+restic_backup_rest_server_host: nas.de.int.wahlberger.dev
+restic_backup_rest_server_port: 8000
+restic_backup_rest_server_username: ops
+# REQUIRED: set vault_restic_backup_rest_server_password in Ansible Vault. The
+# NAS holds the matching htpasswd entry for `ops`.
+restic_backup_rest_server_password: ""
+
+# Retention belongs to the NAS (append-only repository for this client), so the
+# script has no forget/prune step at all (SH-FR-81). The variable only exists so
+# the inventory can state it; true fails the role.
+restic_backup_forget_enabled: false
+
+# Fraction of the data blobs `restic check` re-reads each run. The single
+# invocation covers SH-FR-82 and SH-FR-152.
+restic_backup_check_read_data_subset: "10%"
+
+# Daily 05:00, system time zone (the common role sets Europe/Berlin).
+restic_backup_on_calendar: "*-*-* 05:00:00"
+
+# Email a summary via Resend after each successful run. Reuses notify_failure's
+# credentials, so notify_failure must run first (it does in site.yml).
+restic_backup_notify_on_success: true
