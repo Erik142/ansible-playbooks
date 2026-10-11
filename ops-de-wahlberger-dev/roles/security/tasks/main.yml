@@ -1,0 +1,24 @@
+---
+# geerlingguy.security (used by cloud-wahlberger-dev) does not target
+# openSUSE, so this role hand-rolls its controls. This is the only host with
+# public SSH (SH-R-01), so sshd, fail2ban, locked passwords and the login email
+# are the preventive/detective controls. Order matters: sshd first (and
+# reloaded before the password locks, see accounts.yml), updates last.
+#
+# import_tasks (static), not include_tasks: the play's role tag (`--tags
+# security`, SH-FR-143) is inherited by statically imported tasks only.
+- name: Harden the SSH daemon
+  ansible.builtin.import_tasks: sshd.yml
+
+- name: Lock account passwords and grant sudo
+  ansible.builtin.import_tasks: accounts.yml
+
+- name: Install fail2ban for sshd
+  ansible.builtin.import_tasks: fail2ban.yml
+
+- name: Email on SSH logins from public addresses
+  ansible.builtin.import_tasks: login_notify.yml
+
+# Owned by T-06 (weekly zypper dup, rebootmgr maint-window).
+- name: Automatic updates and reboot handling
+  ansible.builtin.import_tasks: updates.yml

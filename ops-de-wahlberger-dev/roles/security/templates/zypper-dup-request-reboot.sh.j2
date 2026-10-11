@@ -1,0 +1,42 @@
+#!/bin/sh
+# Rendered by the security role. Do NOT edit on the host: re-run Ansible.
+# Runs as zypper-dup.service's ExecStartPost=, after `zypper dup` succeeded.
+#
+# When zypper says a reboot is needed (exit 102 of `zypper needs-rebooting`),
+# this emails the heads-up (reboot_notify) FIRST and then asks rebootmgr for
+# the reboot. It never reboots by itself: the only reboot-related command is rebootmgrctl.
+# rebootmgrd carries the request out per /etc/rebootmgr/rebootmgr.conf (strategy
+# {{ security_autoupdate_reboot_strategy }}, window {{ security_autoupdate_reboot_window_start }} for {{ security_autoupdate_reboot_window_duration }}). If the upgrade finishes after the window has
+# closed, the request simply stays queued until the next window (PA-8).
+#
+# Always exits 0: patching already succeeded, a failed notification or request
+# must not mark the update job as failed (the next run requests again, and a
+# failed heads-up is sent again because the once-marker is not set).
+set -u
+
+zypper needs-rebooting >/dev/null 2>&1
+RC=$?
+
+# 102 = ZYPPER_EXIT_INF_REBOOT_NEEDED. Anything else (0 = not needed, or a real
+# zypper error) must not request a reboot.
+if [ "$RC" -eq 102 ]; then
+  # Only once per pending reboot (/var/run is tmpfs, so this resets on the
+  # actual reboot); otherwise every weekly run while a reboot is still pending
+  # would email again.
+  if [ ! -f /var/run/reboot-notify-sent ]; then
+    # The marker is set only after reboot-notify.sh exited 0, so a failed
+    # (or impossible) heads-up is retried on the next run.
+    if [ -x /usr/local/bin/reboot-notify.sh ]; then
+      if /usr/local/bin/reboot-notify.sh; then
+        touch /var/run/reboot-notify-sent
+      else
+        echo "reboot-notify.sh failed" >&2
+      fi
+    else
+      echo "reboot-notify.sh is not installed (reboot_notify role); no heads-up email" >&2
+    fi
+  fi
+  rebootmgrctl reboot || echo "rebootmgrctl reboot failed" >&2
+fi
+
+exit 0

@@ -1,0 +1,8 @@
+# Rendered by the security role. Do NOT edit on the host: re-run Ansible.
+# Read by rebootmgr 4.x from /etc/rebootmgr/rebootmgr.conf (not /etc/rebootmgr.conf).
+# window-start is a systemd calendar expression; rebootmgr only carries out a
+# requested reboot inside [window-start, window-start + window-duration].
+[rebootmgr]
+window-start={{ security_autoupdate_reboot_window_start }}
+window-duration={{ security_autoupdate_reboot_window_duration }}
+strategy={{ security_autoupdate_reboot_strategy }}

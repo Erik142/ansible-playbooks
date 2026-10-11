@@ -1,0 +1,21 @@
+{# Rendered by the security role to /etc/systemd/system/ssh-login-notify.service. #}
+[Unit]
+Description=Email on SSH logins from public addresses (SH-FR-125)
+After=sshd.service systemd-journald.service
+OnFailure=notify-failure@%n.service
+
+[Service]
+Type=simple
+# RESEND_API_KEY, NOTIFY_FROM, NOTIFY_TO: written by the notify_failure role.
+EnvironmentFile=/etc/notify-failure/notify-failure.env
+Environment="SSH_LOGIN_NOTIFY_IGNORE={{ security_ssh_login_notify_ignore | unique | join(',') }}"
+ExecStart=/usr/bin/python3 /usr/local/bin/ssh-login-notify.py
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
