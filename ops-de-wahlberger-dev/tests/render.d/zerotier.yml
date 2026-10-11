@@ -9,3 +9,12 @@ render_items:
     asserts:
       - '^Network=host$'
       - '^Exec=8056c2e21cc5c789$'
+  # The modules-load.d file must be exactly "tun": the container cannot load the
+  # module itself under SELinux enforcing (see roles/zerotier/README.md). lookup(file)
+  # strips the newline; tests/guards.d/zerotier_tun.yml checks the exact bytes.
+  - role: zerotier
+    src: zerotier-tun.conf.j2
+    dest: zerotier-tun.conf
+    kind: text
+    asserts:
+      - '\Atun\Z'

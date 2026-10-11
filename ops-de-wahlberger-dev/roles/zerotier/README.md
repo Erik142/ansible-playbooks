@@ -54,3 +54,22 @@ in this role could (or should) bypass. After the first deploy:
 See `defaults/main.yml`. `zerotier_network_id` is required — the 16-character
 network ID, not secret, but membership always needs separate authorization
 regardless of who knows it.
+
+## The `tun` kernel module (SELinux)
+
+ZeroTier needs `/dev/net/tun`. That node is static, but its driver is the
+`tun` kernel module, which is not loaded until something asks for it. When
+the *container* asks, the kernel requests the module (`char-major-10-200`) on
+its behalf and SELinux (enforcing, `container_t`) denies it
+(`avc: denied { module_request }`). ZeroTier then logs "could not open
+TUN/TAP" and has no interface, while `zerotier.service` stays `active`
+because systemd only sees a running container.
+
+The role therefore loads the module on the host: it writes
+`/etc/modules-load.d/zerotier-tun.conf` (content `tun`, loaded at every boot)
+and runs `modprobe tun` right away, both before the Quadlet is deployed and
+the unit (re)started, so the first start on a fresh host works. Both are
+check-mode safe and idempotent. `zerotier_load_tun_module: false` skips them.
+
+Monitoring note: do not rely on the unit state. Check for the interface
+(`ip -br link | grep -E '^zt'`) or `zerotier-cli listnetworks` instead.

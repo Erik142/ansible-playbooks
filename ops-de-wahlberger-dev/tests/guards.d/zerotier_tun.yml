@@ -1,0 +1,55 @@
+---
+# Guard test: the host must load the `tun` kernel module itself, because under
+# SELinux enforcing the zerotier container may not request it (AVC
+# module_request, kmod char-major-10-200) and ZeroTier then has no interface
+# while zerotier.service still reads "active". Static, no host:
+#   ansible-playbook -i localhost, tests/guards.d/zerotier_tun.yml
+# 1. /etc/modules-load.d/zerotier-tun.conf is rendered from a template whose
+#    content is EXACTLY "tun\n" (the render check only sees it newline-trimmed).
+# 2. The tasks write it and modprobe tun BEFORE the container include, so the
+#    first start on a fresh host already finds the module.
+- name: Guard test zerotier loads the tun module on the host
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    zg_role: "{{ playbook_dir }}/../../roles/zerotier"
+    zg_tasks: "{{ lookup('ansible.builtin.file', zg_role ~ '/tasks/main.yml') | from_yaml }}"
+    zg_template_dests: >-
+      {%- set r = [] -%}
+      {%- for t in zg_tasks if 'ansible.builtin.template' in t -%}
+      {%- set _ = r.append(t['ansible.builtin.template'].dest) -%}
+      {%- endfor -%}
+      {{ r }}
+    zg_modprobe_names: >-
+      {%- set r = [] -%}
+      {%- for t in zg_tasks if 'community.general.modprobe' in t -%}
+      {%- set _ = r.append(t['community.general.modprobe'].name) -%}
+      {%- endfor -%}
+      {{ r }}
+    zg_names: "{{ zg_tasks | map(attribute='name') | list }}"
+  tasks:
+    - name: Read the template bytes
+      ansible.builtin.slurp:
+        src: "{{ zg_role }}/templates/zerotier-tun.conf.j2"
+      register: zg_tpl
+
+    - name: The module-load file is exactly "tun"
+      ansible.builtin.assert:
+        that: (zg_tpl.content | b64decode) == "tun\n"
+        fail_msg: zerotier-tun.conf.j2 must contain exactly "tun" and a newline
+        quiet: true
+
+    - name: The file task targets modules-load.d
+      ansible.builtin.assert:
+        that:
+          - "'/etc/modules-load.d/zerotier-tun.conf' in zg_template_dests"
+          - zg_modprobe_names == ['tun']
+        quiet: true
+
+    - name: Both come before the container is deployed
+      ansible.builtin.assert:
+        that:
+          - zg_names.index('Load the tun module at boot') < zg_names.index('Deploy the ZeroTier container')
+          - zg_names.index('Load the tun module now') < zg_names.index('Deploy the ZeroTier container')
+        quiet: true

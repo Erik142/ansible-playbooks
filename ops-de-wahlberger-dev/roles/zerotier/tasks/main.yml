@@ -17,6 +17,29 @@
     group: root
     mode: "0700"
 
+# The container opens /dev/net/tun, a static device node whose driver is the
+# `tun` kernel module. Unloaded, the open makes the kernel request the module
+# (char-major-10-200) on behalf of the container, which SELinux denies
+# (container_t, AVC module_request): ZeroTier then runs without an interface
+# while the service still reads "active". Loading it on the HOST, before the
+# container starts, avoids the request entirely. Both tasks come before the
+# container include, whose flush_handlers is what (re)starts the unit, so the
+# first start on a fresh host already finds the module.
+- name: Load the tun module at boot
+  ansible.builtin.template:
+    src: zerotier-tun.conf.j2
+    dest: /etc/modules-load.d/zerotier-tun.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: zerotier_load_tun_module | bool
+
+- name: Load the tun module now
+  community.general.modprobe:
+    name: tun
+    state: present
+  when: zerotier_load_tun_module | bool
+
 - name: Deploy the ZeroTier container
   ansible.builtin.include_role:
     name: container

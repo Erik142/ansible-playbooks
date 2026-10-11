@@ -23,6 +23,7 @@ tests/vm/scenarios/s50-label-updates.sh       # ls -Z, zypper exit 103, rebootmg
 tests/vm/scenarios/s30-fallback.sh            # LAST: switches to the bridge fallback (changes the guest)
 tests/vm/make-bare.sh                         # once: 'bare' snapshot = clean minus podman/firewalld/snapper/... (a genuinely fresh host)
 tests/vm/scenarios/s05-fresh-check.sh         # whole role set on 'bare': --check --diff, apply, apply, apply (resets to 'bare')
+tests/vm/scenarios/s06-zerotier-tun.sh       # tun module preloaded; setenforce 1 proof that the container starts (resets to 'bare')
 tests/vm/down.sh                              # graceful poweroff   (--destroy: delete disk, --purge: also images)
 ```
 
@@ -50,7 +51,7 @@ never read; the dummy secrets are plain variables in `inventories/vm`.
 ## Deviations and limits
 
 - The image is built, not downloaded (no Tumbleweed aarch64 cloud image exists); the Leap 16.0 cloud image is only the bootstrap host.
-- `selinux=0` of the NAS fixture is replaced by permissive SELinux (this fixture needs `container_file_t`). Enforcing mode is **not** tested.
+- `selinux=0` of the NAS fixture is replaced by permissive SELinux (this fixture needs `container_file_t`). Enforcing mode is only exercised by `s06-zerotier-tun.sh` (restorecon, then `setenforce 1` at runtime, back to permissive at the end); everything else runs permissive.
 - `s00-apply.sh` applies `security, firewall, podman, caddy, semaphore` (`--tags`). The OP-02 rehearsal (first `--check --diff`, apply, second apply, check on the applied host) of the **whole** `site.yml` also works: `tests/vm/ans.sh ansible-playbook site.yml --skip-tags cloudflare_dns -e zerotier_network_id=deadbeefdeadbeef [--check --diff]`. `cloudflare_dns` is skipped because it calls the real Cloudflare API (hosts blackholed, no real token); `zerotier_network_id` is a dummy so the fixture never asks to join the real network; `ssh_authorized_keys_user` is `fixture`. `notify_failure` is applied but cannot send (Resend blackholed).
 - `vm_zt_iface=zt0` is a veth, not a ZeroTier TAP; real ZeroTier creates its interface when `zerotier-one` joins, later than this fixture does.
 - Traffic from the host to its own ZeroTier address uses `lo` and never meets a zone rule. All client tests therefore run inside `ztpeer`.
