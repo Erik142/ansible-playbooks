@@ -1,7 +1,6 @@
 # PR A: Semaphore to Hetzner, step 0 (new VM directory, no-op key hardening, Renovate freeze)
 
-Draft written 2026-10-11 by T-19. Nothing is committed yet; the file lists below
-come from `git status --porcelain` on the working tree.
+Written 2026-10-11 (T-19). The file lists below come from the branch diff against master.
 
 ## Summary
 
@@ -83,13 +82,13 @@ the workstation only; the Pi does not apply it. Rollback: revert PR A.
 1. AC-44 no-op property: merge is deploy for nas and cloud because the Pi's Semaphore applies `master`. Before merging, read the Molecule output (`molecule test` in `nas-de-int-wahlberger-dev` and `cloud-wahlberger-dev`; for cloud, with the Galaxy prerun disabled if the TLS error recurs) and confirm the `ssh_authorized_keys` converge and idempotence steps report `changed=0` with the empty revoked list.
 2. Optionally run `--check --diff` of the nas and cloud playbooks with `--tags ssh_authorized_keys`: expect 0 changed.
 3. Step-0 items OP-00a/b: Vault item, FR-163/164/165 checks, AC-17 hash comparison (also with plain `ansible-vault view ... | sha256sum`), AC-52 `config.json` hash, Pi image tag.
-4. Make the cloud `restic_backup` host default edit (deviation 3), if it is to ship in this PR.
+4. Cloud `restic_backup` host default edit (deviation 3): done on 2026-10-11 (commit `fix(cloud): point restic_backup at the NAS rest server`). Check that the cloud REST password equals the NAS's: `ops-de-wahlberger-dev/tools/vault-pair-compare.sh --cloud-nas`.
 5. Fill in the baseline below.
 
 ## Open before merge (added by Erik)
 
 - "Before" rule set: the text of Central's current rule set (OP-00b, SH-FR-33) was added by Erik on 2026-10-11 to `ops-de-wahlberger-dev/docs/zerotier-flow-rules.md`, section "Before": the verbatim Central default rule set (no custom rules).
-- Step-0 baseline (SH-FR-213), date and time: every Beszel system and every Uptime Kuma monitor that is up. TODO.
+- Step-0 baseline (SH-FR-213), date and time: every Beszel system and every Uptime Kuma monitor that is up. **Not recorded before merge (AC-65 unmet at merge, decided by Erik on 2026-10-11); record it at step 0 before any live change.**
 
 ## CI caveats
 
