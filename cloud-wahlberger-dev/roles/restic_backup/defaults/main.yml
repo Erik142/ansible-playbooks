@@ -25,11 +25,11 @@ restic_backup_staging_dir: /var/lib/restic-backup
 # (e.g. 1Password), not just inside it. See README.md.
 restic_backup_repo_password: ""
 
-restic_backup_rest_server_host: pi.de.int.wahlberger.dev
+restic_backup_rest_server_host: nas.de.int.wahlberger.dev
 restic_backup_rest_server_port: 8000
 restic_backup_rest_server_username: cloud
 # REQUIRED: set vault_restic_backup_rest_server_password in Ansible Vault —
-# a SHARED SECRET that must match pi-de-int-wahlberger-dev's
+# a SHARED SECRET that must match nas-de-int-wahlberger-dev's
 # vault_restic_server_cloud_htpasswd_password exactly.
 restic_backup_rest_server_password: ""
 
