@@ -1,0 +1,37 @@
+---
+# Registers the security role's rendered files (T-05). The sshd directives are
+# lineinfile edits, not templates: Molecule's verify-security.yml asserts them
+# with `sshd -T`.
+render_items:
+  - role: security
+    src: jail.local.j2
+    dest: security-jail.local
+    kind: text
+    vars:
+      security_fail2ban_ignoreip:
+        - 10.0.8.0/24
+        - 10.10.0.0/16
+        - 10.243.0.0/16
+        - 203.0.113.7
+    asserts:
+      - '^ignoreip = 127\.0\.0\.0/8 10\.0\.8\.0/24 10\.10\.0\.0/16 10\.243\.0\.0/16 203\.0\.113\.7$'
+      - '^banaction = nftables-multiport$'
+      - '^maxretry = 5$'
+      - '^findtime = 600$'
+      - '^bantime = 3600$'
+      - '^backend = systemd$'
+  - role: security
+    src: ssh-login-notify.service.j2
+    dest: ssh-login-notify.service
+    kind: systemd-unit
+    vars:
+      security_ssh_login_notify_ignore:
+        - 127.0.0.0/8
+        - 10.243.0.0/16
+    asserts:
+      - '^Environment="SSH_LOGIN_NOTIFY_IGNORE=127\.0\.0\.0/8,10\.243\.0\.0/16"$'
+      - '^EnvironmentFile=/etc/notify-failure/notify-failure\.env$'
+      - '^OnFailure=notify-failure@%n\.service$'
+  - src: roles/security/files/ssh-login-notify.py
+    dest: ssh-login-notify.py
+    kind: python-script

@@ -1,0 +1,219 @@
+---
+# Guard test for QA T-05 F-3 / T-06: `--check` on a FRESH host passes for the
+# `security` and `disk_space` roles (OP-02 runs `--check --diff` first, and on a
+# fresh host the packages and units those roles enable were only simulated).
+# Run from the playbook directory (needs Docker; the nested run reaches the
+# container with the community.docker.docker connection):
+#   ansible-playbook -i localhost, tests/guards.d/security_check_mode.yml
+# Exit 0 = pass. Environment: GUARD_CHECK_IMAGE (default
+# molecule_local/opensuse/tumbleweed:latest, built from molecule/default/
+# Dockerfile.j2 when missing).
+#
+# How it works: a fresh privileged openSUSE Tumbleweed container with systemd as
+# PID 1 (same shape as the Molecule instance) is started, the REAL roles are
+# run against it with `ansible-playbook --check --diff` and the production
+# vars.yml, and the test asserts that (a) the run succeeded, (b) it did
+# simulate changes (so an accidentally empty run cannot pass) and (c) nothing
+# was actually changed in the container.
+#
+# Network: the container keeps Docker's default network ON, deliberately.
+# community.general.zypper's check mode runs `zypper install --dry-run`, which
+# needs the repository metadata from the openSUSE mirrors (same traffic as
+# render-check.sh). Nothing else is contacted: no API, no ACME.
+- name: Guard test that --check passes on a fresh host for security and disk_space
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    gc_ops_dir: "{{ playbook_dir }}/../.."
+    gc_image: "{{ lookup('ansible.builtin.env', 'GUARD_CHECK_IMAGE') | default('molecule_local/opensuse/tumbleweed:latest', true) }}"
+    gc_ansible_playbook: "{{ ansible_playbook_python | dirname }}/ansible-playbook"
+    # Files that a real (non-check) run of these two roles creates. In a fresh
+    # container none of them may exist after the --check run.
+    gc_must_stay_absent:
+      - /usr/local/bin/disk-space-check.sh
+      - /etc/systemd/system/disk-space-check.service
+      - /etc/systemd/system/disk-space-check.timer
+      - /etc/fail2ban/jail.local
+      - /etc/ssh/sshd_config
+      - /etc/systemd/system/zypper-dup.service
+      - /etc/systemd/system/zypper-dup.timer
+      - /etc/systemd/system/ssh-login-notify.service
+  tasks:
+    # A play var would be re-templated (a new random number) on every use.
+    - name: Pick the container name once
+      ansible.builtin.set_fact:
+        gc_cname: "t06b-check-mode-{{ 99999 | random }}"
+
+    - name: Require Docker
+      ansible.builtin.command: docker info
+      register: gc_docker
+      changed_when: false
+      failed_when: gc_docker.rc != 0
+      check_mode: false
+
+    - name: Run the check-mode proof
+      block:
+        - name: Create a scratch directory
+          ansible.builtin.tempfile:
+            state: directory
+            prefix: sec-checkmode.
+          register: gc_tmp
+
+        - name: Build the container image when it is not present locally
+          ansible.builtin.shell:
+            cmd: |
+              set -eu
+              if docker image inspect "$GC_IMAGE" >/dev/null 2>&1; then echo present; exit 0; fi
+              sed 's#^FROM .*#FROM opensuse/tumbleweed:latest#' "{{ gc_ops_dir }}/molecule/default/Dockerfile.j2" >"$GC_TMP/Dockerfile"
+              docker build -t "$GC_IMAGE" -f "$GC_TMP/Dockerfile" "$GC_TMP"
+              echo built
+            executable: /bin/sh
+          environment:
+            GC_IMAGE: "{{ gc_image }}"
+            GC_TMP: "{{ gc_tmp.path }}"
+          register: gc_build
+          changed_when: "'built' in gc_build.stdout"
+
+        - name: Start a fresh systemd container
+          ansible.builtin.command:
+            argv:
+              - docker
+              - run
+              - -d
+              - --name
+              - "{{ gc_cname }}"
+              - --privileged
+              - --cgroupns
+              - host
+              - -v
+              - /sys/fs/cgroup:/sys/fs/cgroup:rw
+              - --tmpfs
+              - /run
+              - --tmpfs
+              - /run/lock
+              - "{{ gc_image }}"
+              - /usr/lib/systemd/systemd
+          changed_when: true
+
+        - name: Wait until systemd in the container is up
+          ansible.builtin.shell:
+            cmd: |
+              for i in $(seq 1 60); do
+                st=$(docker exec "{{ gc_cname }}" systemctl is-system-running 2>/dev/null || true)
+                if [ "$st" = running ] || [ "$st" = degraded ]; then
+                  # Ansible needs a writable ~/.ansible/tmp; right after boot it may not be.
+                  docker exec "{{ gc_cname }}" sh -c 'mkdir -p ~/.ansible/tmp && test -w ~/.ansible/tmp' && exit 0
+                fi
+                sleep 1
+              done
+              exit 1
+            executable: /bin/sh
+          changed_when: false
+
+        - name: Write the nested inventory, config and playbook
+          ansible.builtin.copy:
+            dest: "{{ gc_tmp.path }}/{{ item.name }}"
+            mode: "0644"
+            content: "{{ item.content }}"
+          loop_control:
+            label: "{{ item.name }}"
+          loop:
+            - name: inventory.yml
+              content: |
+                all:
+                  hosts:
+                    {{ gc_cname }}:
+                      ansible_connection: community.docker.docker
+                      ansible_python_interpreter: /usr/bin/python3
+            - name: ansible.cfg
+              content: |
+                [defaults]
+                roles_path = {{ gc_ops_dir | realpath }}/roles
+                retry_files_enabled = false
+                localhost_warning = false
+                host_key_checking = false
+                nocolor = true
+            - name: play.yml
+              content: |
+                ---
+                - name: Nested --check run on a fresh host
+                  hosts: all
+                  become: true
+                  gather_facts: true
+                  vars_files:
+                    - {{ gc_ops_dir | realpath }}/inventories/production/group_vars/all/vars.yml
+                  vars:
+                    notify_failure_resend_api_key: check-mode-fake-key-never-used
+                  roles:
+                    - role: disk_space
+                    - role: security
+
+        # The vault password file is never read: vars.yml references vault_*
+        # with default(''), and the nested ansible.cfg has no inventory with
+        # encrypted files. ANSIBLE_VAULT_PASSWORD_FILE from the caller is
+        # passed through untouched.
+        - name: Run both roles with --check --diff against the fresh container
+          ansible.builtin.command:
+            argv:
+              - "{{ gc_ansible_playbook }}"
+              - -i
+              - "{{ gc_tmp.path }}/inventory.yml"
+              - "{{ gc_tmp.path }}/play.yml"
+              - --check
+              - --diff
+              # vars.yml sets ansible_user for the real VM; the container has root only.
+              - -e
+              - ansible_user=root
+          environment:
+            ANSIBLE_CONFIG: "{{ gc_tmp.path }}/ansible.cfg"
+          register: gc_run
+          changed_when: false
+          failed_when: false
+
+        - name: Look for each file the roles would create
+          ansible.builtin.command:
+            argv: [docker, exec, "{{ gc_cname }}", test, -e, "{{ item }}"]
+          register: gc_exists
+          changed_when: false
+          failed_when: false
+          loop: "{{ gc_must_stay_absent }}"
+
+        - name: Is fail2ban installed in the container?
+          ansible.builtin.command:
+            argv: [docker, exec, "{{ gc_cname }}", rpm, -q, fail2ban]
+          register: gc_f2b
+          changed_when: false
+          failed_when: false
+
+        - name: Assert --check passed, simulated changes, and changed nothing
+          ansible.builtin.assert:
+            that:
+              - gc_run.rc == 0
+              - gc_run.stdout is regex('failed=0\s')
+              - gc_run.stdout is regex('unreachable=0\s')
+              # Not a vacuous run: roles were applied and reported changes.
+              - gc_run.stdout is not regex('changed=0\s')
+              - "'TASK [security : Enable and start sshd]' in gc_run.stdout"
+              - "'TASK [disk_space : Enable and start the disk space check timer]' in gc_run.stdout"
+              - gc_exists.results | selectattr('rc', 'equalto', 0) | map(attribute='item') | list == []
+              - gc_f2b.rc != 0
+            fail_msg: >-
+              --check on a fresh host: rc={{ gc_run.rc }}; files that exist afterwards:
+              {{ gc_exists.results | selectattr('rc', 'equalto', 0) | map(attribute='item') | list }};
+              fail2ban installed: {{ gc_f2b.rc == 0 }}; output tail:
+              {{ (gc_run.stdout_lines | default([]) | reject('equalto', '') | list)[-15:] }}
+              {{ (gc_run.stderr_lines | default([]))[-5:] }}
+            quiet: true
+      always:
+        - name: Remove the container
+          ansible.builtin.command:
+            argv: [docker, rm, -f, "{{ gc_cname }}"]
+          changed_when: true
+          failed_when: false
+
+        - name: Remove the scratch directory
+          ansible.builtin.file:
+            path: "{{ gc_tmp.path }}"
+            state: absent
+          when: gc_tmp is defined and gc_tmp.path is defined

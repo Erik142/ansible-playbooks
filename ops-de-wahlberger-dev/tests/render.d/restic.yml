@@ -1,0 +1,78 @@
+---
+# Registers the restic_backup role's rendered files (T-11, SH-AC-30). Every
+# value comes from the role defaults and the production vars.yml; only the two
+# Vault-backed passwords are set here because the Vault is absent at render time.
+# The secrets below are fixed placeholders, not credentials.
+#
+# Regex helpers (the assert stage uses multiline search):
+#   NOT_CONTAINS  \A(?![\s\S]*WORD)  then  [\s\S]*\Z
+_restic_vars: &restic_vars
+  restic_backup_repo_password: render-check-repo-pw
+  restic_backup_rest_server_password: render-check-rest-pw
+  # Pin the role default: production vars.yml temporarily sets this to false (until step 4).
+  restic_backup_sqlite_required: true
+
+render_items:
+  - role: restic_backup
+    src: restic-backup.timer.j2
+    dest: restic-backup.timer
+    kind: systemd-unit
+    vars: *restic_vars
+    asserts:
+      - '^OnCalendar=\*-\*-\* 05:00:00$'
+      - '^Persistent=true$'
+      - '^WantedBy=timers\.target$'
+  - role: restic_backup
+    src: restic-backup.service.j2
+    dest: restic-backup.service
+    kind: systemd-unit
+    vars: *restic_vars
+    asserts:
+      - '^OnFailure=notify-failure-immediate@%n\.service$'
+      - '^Type=oneshot$'
+      - '^Environment=HOME=/root$'
+      - '^EnvironmentFile=/var/lib/restic-backup/restic-backup\.env$'
+      - '^ExecStart=/usr/local/bin/restic-backup\.sh$'
+  - role: restic_backup
+    src: restic-backup.env.j2
+    dest: restic-backup.env
+    kind: text
+    vars: *restic_vars
+    asserts:
+      - '^RESTIC_REPOSITORY=rest:http://ops:render-check-rest-pw@nas\.de\.int\.wahlberger\.dev:8000/ops/$'
+      - '^RESTIC_PASSWORD=render-check-repo-pw$'
+  - role: restic_backup
+    src: restic-backup.sh.j2
+    dest: restic-backup.sh
+    kind: text
+    vars: *restic_vars
+    asserts:
+      # SH-FR-81: no forget and no prune anywhere, comments included.
+      - '\A(?![\s\S]*(forget|prune))[\s\S]*\Z'
+      # SH-FR-82/152, PA-10: exactly one check, with the 10% subset.
+      - '\A(?:(?!restic check)[\s\S])*restic check --read-data-subset=10%(?:(?!restic check)[\s\S])*\Z'
+      # SH-FR-78: consistent copy via sqlite3 .backup of the Semaphore database.
+      - '^  sqlite3 -readonly "\$src" "\.timeout 30000" "\.backup ''\$tmp''"$'
+      - '^copy_sqlite /opt/podman/semaphore/data/database\.sqlite /var/lib/restic-backup/staging/semaphore\.sqlite$'
+      # Only the staging directory is backed up (no live Podman path), then the excludes.
+      - '^if ! BACKUP_OUTPUT="\$\(restic backup \\\n  /var/lib/restic-backup/staging \\\n(  --exclude [^\n]+ \\\n)+  2>&1\)"; then$'
+      # SH-FR-80/151/171: config.json, every *.env (incl. the restic env file) and identity.secret.
+      - "^  --exclude config\\.json \\\\$"
+      - "^  --exclude '\\*\\.env' \\\\$"
+      - "^  --exclude identity\\.secret \\\\$"
+      # SQLite side files never reach a backup.
+      - "^  --exclude '\\*-wal' \\\\$"
+      - "^  --exclude '\\*-shm' \\\\$"
+      # The staged copy is integrity-checked before it replaces the previous one.
+      - "PRAGMA integrity_check"
+  # Optional database absent: skipped with a message instead of failing.
+  - role: restic_backup
+    src: restic-backup.sh.j2
+    dest: restic-backup-optional.sh
+    kind: text
+    vars:
+      <<: *restic_vars
+      restic_backup_sqlite_required: false
+    asserts:
+      - '^if \[ -f /opt/podman/semaphore/data/database\.sqlite \]; then$'
+      - 'restic_backup_sqlite_required is false'

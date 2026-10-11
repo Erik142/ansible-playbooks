@@ -1,0 +1,106 @@
+---
+# Registers the caddy role's templates (T-08; SH-AC-51 render side, SH-AC-61
+# Quadlet side). Both designs are rendered in the same run through item vars.
+# With `render-check.sh -e caddy_design=bridge_fallback` (T-08's other
+# invocation) every item renders as the fallback, so the primary items skip
+# their asserts (skip_asserts_when_extra) and the fallback items still pass.
+#
+# Negative checks use `(?s)\A(?!.*<pattern>)` : "the pattern occurs nowhere".
+# Fixture ZeroTier address 10.243.0.7 is set per item (vars.yml leaves
+# vm_zt_ip empty until pull request A2).
+render_items:
+  - role: caddy
+    src: caddy.container.j2
+    dest: caddy-primary.container
+    kind: quadlet
+    vars: {caddy_design: primary, vm_zt_ip: 10.243.0.7}
+    skip_asserts_when_extra: caddy_design
+    asserts:
+      - '^Network=host$'
+      - '(?s)\A(?!.*^PublishPort=)'
+      - '(?s)\A(?!.*^Network=caddy\.network)'
+      - '(?s)\A(?!.*caddy-network\.service)'
+      - '^Restart=always$'
+      - '^RestartSec=10$'
+      - '^OnFailure=notify-failure@%n\.service$'
+      - '^After=.*\bzerotier\.service\b'
+      - '^EnvironmentFile=/opt/podman/caddy/caddy\.env$'
+      - '^Volume=/opt/podman/caddy/Caddyfile:/etc/caddy/Caddyfile:Z,ro$'
+
+  - role: caddy
+    src: Caddyfile.j2
+    dest: Caddyfile-primary
+    kind: text
+    vars: {caddy_design: primary, vm_zt_ip: 10.243.0.7}
+    skip_asserts_when_extra: caddy_design
+    asserts:
+      - '^\s+admin off$'
+      - '^\s+auto_https disable_redirects$'
+      - '^\s+default_bind 10\.243\.0\.7$'
+      - '(?s)\A(?!.*default_bind.*default_bind)'
+      - '^\s+acme_dns cloudflare \{env\.CLOUDFLARE_API_TOKEN\}$'
+      - '^semaphore\.de\.int\.wahlberger\.dev \{$'
+      - '^\s+@denied not remote_ip 10\.243\.0\.0/16 10\.10\.0\.0/16$'
+      - '^\s+respond @denied 403$'
+      - '^\s+reverse_proxy 127\.0\.0\.1:3000$'
+      - '(?s)^\s+log \{.*^\s+output stdout.*^\s+format json'
+      - '(?s)\A(?!.*(:80\b|http_port|admin on|auto_https off|default_bind 0\.0\.0\.0|semaphore:3000))'
+
+  # The fallback container names `Network=caddy.network`, so the generator needs
+  # that file beside it: the role renders templates/caddy.network.j2.
+  - role: caddy
+    src: caddy.network.j2
+    dest: caddy.network
+    kind: quadlet
+    vars: {caddy_network_subnet: 172.29.30.0/24}
+    asserts:
+      - '^Subnet=172\.29\.30\.0/24$'
+      - '^Driver=bridge$'
+      - '^DNS=1\.1\.1\.1$'
+
+  - role: caddy
+    src: caddy.container.j2
+    dest: caddy-fallback.container
+    kind: quadlet
+    vars: {caddy_design: bridge_fallback, vm_zt_ip: 10.243.0.7}
+    asserts:
+      - '^Network=caddy\.network$'
+      - '^PublishPort=10\.243\.0\.7:443:443$'
+      - '(?s)\A(?!.*^PublishPort=.*^PublishPort=)'
+      - '(?s)\A(?!.*^Network=host)'
+      - '^Requires=caddy-network\.service$'
+      - '^Restart=always$'
+      - '^OnFailure=notify-failure@%n\.service$'
+      - '^After=.*\bzerotier\.service\b'
+
+  - role: caddy
+    src: Caddyfile.j2
+    dest: Caddyfile-fallback
+    kind: text
+    vars: {caddy_design: bridge_fallback, vm_zt_ip: 10.243.0.7}
+    asserts:
+      - '^\s+admin off$'
+      - '^\s+auto_https disable_redirects$'
+      - '^\s+@denied not remote_ip 10\.243\.0\.0/16 10\.10\.0\.0/16$'
+      - '^\s+respond @denied 403$'
+      - '^\s+reverse_proxy semaphore:3000$'
+      - '^\s+format json$'
+      # default_bind is the container's own network namespace here: the VM's
+      # ZeroTier address does not exist in it, so binding it would fail.
+      - '(?s)\A(?!.*(default_bind|:80\b|http_port|admin on|auto_https off|127\.0\.0\.1:3000))'
+
+  # A site without its own upstream gets the design default.
+  - role: caddy
+    src: Caddyfile.j2
+    dest: Caddyfile-default-upstream
+    kind: text
+    vars:
+      caddy_design: primary
+      vm_zt_ip: 10.243.0.7
+      caddy_allowed_sources: [192.168.1.0/24]
+      caddy_sites: [{host: other.example.test}]
+    skip_asserts_when_extra: caddy_design
+    asserts:
+      - '^other\.example\.test \{$'
+      - '^\s+reverse_proxy 127\.0\.0\.1:3000$'
+      - '^\s+@denied not remote_ip 192\.168\.1\.0/24$'

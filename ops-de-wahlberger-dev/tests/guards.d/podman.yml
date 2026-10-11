@@ -1,0 +1,43 @@
+---
+# Guard test for the podman role's mountpoint assert (T-02b).
+#   ansible-playbook -i localhost, tests/guards.d/podman.yml
+# Runs the role's real tasks/verify_mount.yml with fixture mount facts; no host,
+# no container, no network.
+- name: Guard test podman mountpoint assert
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    gt_file: "{{ playbook_dir }}/../../roles/podman/tasks/verify_mount.yml"
+    gt_dir: /opt/podman
+  tasks:
+    - name: Case 1 - required, not a mountpoint -> must fail
+      block:
+        - name: Run the assert
+          ansible.builtin.include_tasks: "{{ gt_file }}"
+          vars:
+            podman_data_dir: "{{ gt_dir }}"
+            podman_require_mountpoint: true
+            ansible_facts: {mounts: [{mount: /}]}
+        - name: Unreachable if the assert passed
+          ansible.builtin.fail:
+            msg: "case 1: assert did not fail on a non-mountpoint"
+      rescue:
+        - name: Check it was the mountpoint assert that failed
+          ansible.builtin.assert:
+            that: "'is not a mountpoint' in ansible_failed_result.msg | default('')"
+            quiet: true
+
+    - name: Case 2 - required and mounted -> passes
+      ansible.builtin.include_tasks: "{{ gt_file }}"
+      vars:
+        podman_data_dir: "{{ gt_dir }}"
+        podman_require_mountpoint: true
+        ansible_facts: {mounts: [{mount: /opt/podman}]}
+
+    - name: Case 3 - not required, not a mountpoint -> skipped
+      ansible.builtin.include_tasks: "{{ gt_file }}"
+      vars:
+        podman_data_dir: "{{ gt_dir }}"
+        podman_require_mountpoint: false
+        ansible_facts: {mounts: [{mount: /}]}

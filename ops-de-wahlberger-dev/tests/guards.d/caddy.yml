@@ -1,0 +1,260 @@
+---
+# Guard test for the `caddy` role (T-08; SH-AC-62 caddy half, SH-FR-193,
+# SH-FR-129, SH-FR-167, SH-FR-21/144). Run from the playbook directory:
+#   ansible-playbook -i localhost, tests/guards.d/caddy.yml
+# (`-i localhost,` keeps the production inventory and its Vault out of it.)
+# Exit 0 = every case passed. tests/guard-tests.sh (T-14) runs this file for
+# `guard-tests.sh caddy`. Separate from the cloudflare_dns guard (PA-6): the
+# two roles are exercised in two separate runs, as AC-62 asks.
+#
+# How it works: the role is run for real by a nested `ansible-playbook` with
+# `--tags caddy` (what the owner runs in AC-62) on localhost, with the REAL
+# production group_vars/all/vars.yml as extra vars (so a wiring drift between
+# vars.yml and the role is caught) and caddy_data_dir pointed at a scratch
+# directory. The input guards sit before every task that changes something, so
+# each failing case must leave that directory absent. The valid-input control
+# runs only the guard tasks (`--tags caddy_guard`): the later tasks need
+# podman and root. Nothing touches a host, the network or a Vault.
+- name: Guard test caddy (empty vm_zt_ip and input validation)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    cg_ops_dir: "{{ playbook_dir }}/../.."
+    cg_ip: 10.243.0.7
+    cg_token: test-token-do-not-leak
+    # Failure cases: guard text that must appear in the failed assert's own
+    # msg (not in the task name, which also contains the variable names).
+    cg_fail_cases:
+      - name: production vars as shipped (vm_zt_ip empty, no token) -> AC-62
+        vars: {}
+        msg: '"msg": "vm_zt_ip is empty or not an IPv4 address'
+      - name: vm_zt_ip empty, token present
+        vars: {vm_zt_ip: "", cloudflare_dns_api_token: "{{ cg_token }}"}
+        msg: '"msg": "vm_zt_ip is empty or not an IPv4 address'
+      - name: vm_zt_ip null
+        vars: {vm_zt_ip: null, cloudflare_dns_api_token: "{{ cg_token }}"}
+        msg: '"msg": "vm_zt_ip is empty or not an IPv4 address'
+      - name: bind address with a trailing newline
+        vars: {vm_zt_ip: "10.243.0.7\n", cloudflare_dns_api_token: "{{ cg_token }}"}
+        msg: '"msg": "vm_zt_ip is empty or not an IPv4 address'
+      - name: bind address that would inject Caddyfile directives
+        vars: {vm_zt_ip: "10.243.0.7\nadmin on", cloudflare_dns_api_token: "{{ cg_token }}"}
+        msg: '"msg": "vm_zt_ip is empty or not an IPv4 address'
+      - name: octet out of range
+        vars: {vm_zt_ip: "256.1.1.1", cloudflare_dns_api_token: "{{ cg_token }}"}
+        msg: '"msg": "vm_zt_ip is empty or not an IPv4 address'
+      - name: wildcard address would listen on every interface (SH-FR-07)
+        vars: {vm_zt_ip: "0.0.0.0", cloudflare_dns_api_token: "{{ cg_token }}"}
+        msg: '"msg": "vm_zt_ip is empty or not an IPv4 address'
+      - name: IPv6 address
+        vars: {vm_zt_ip: "fd00::1", cloudflare_dns_api_token: "{{ cg_token }}"}
+        msg: '"msg": "vm_zt_ip is empty or not an IPv4 address'
+      - name: unknown design
+        vars: {vm_zt_ip: "{{ cg_ip }}", cloudflare_dns_api_token: "{{ cg_token }}", caddy_design: sideways}
+        # Rejected by the role's argument_specs (choices) before the tasks run.
+        msg: 'value of caddy_design must be one of: primary, bridge_fallback'
+      - name: empty allow list (an empty remote_ip matcher is invalid)
+        vars: {vm_zt_ip: "{{ cg_ip }}", cloudflare_dns_api_token: "{{ cg_token }}", caddy_allowed_sources: []}
+        msg: '"msg": "caddy_design (from vm_proxy_design) must be'
+      - name: allow list entry that would inject Caddyfile syntax
+        vars: {vm_zt_ip: "{{ cg_ip }}", cloudflare_dns_api_token: "{{ cg_token }}", caddy_allowed_sources: ["10.0.0.0/8 }"]}
+        msg: '"msg": "caddy_design (from vm_proxy_design) must be'
+      - name: allow list entry with a trailing newline
+        vars: {vm_zt_ip: "{{ cg_ip }}", cloudflare_dns_api_token: "{{ cg_token }}", caddy_allowed_sources: ["10.0.0.0/8\n"]}
+        msg: '"msg": "caddy_design (from vm_proxy_design) must be'
+      - name: valid address but empty Cloudflare token
+        vars: {vm_zt_ip: "{{ cg_ip }}"}
+        msg: '"msg": "cloudflare_dns_api_token is empty'
+    cg_pass_cases:
+      - {name: primary, vars: {vm_zt_ip: "{{ cg_ip }}"}}
+      - {name: bridge_fallback, vars: {vm_zt_ip: "{{ cg_ip }}", caddy_design: bridge_fallback}}
+  tasks:
+    - name: Create the scratch directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: caddy-guard-
+      register: cg_tmp
+
+    - name: Run the cases and assert
+      block:
+        - name: Write a private ansible.cfg (keeps the repo's vault lookup and fact cache out)
+          ansible.builtin.copy:
+            dest: "{{ cg_tmp.path }}/ansible.cfg"
+            mode: "0644"
+            content: |
+              [defaults]
+              inventory = localhost,
+              retry_files_enabled = false
+              localhost_warning = false
+
+        - name: Write the inner playbook (runs the real role as site.yml does)
+          ansible.builtin.copy:
+            dest: "{{ cg_tmp.path }}/inner.yml"
+            mode: "0644"
+            content: |
+              - hosts: localhost
+                connection: local
+                gather_facts: false
+                roles:
+                  - role: caddy
+                    tags: [caddy]
+
+        - name: Write each case's variables
+          ansible.builtin.copy:
+            dest: "{{ cg_tmp.path }}/case{{ idx }}.vars.json"
+            content: "{{ item.vars | to_json }}"
+            mode: "0644"
+          loop: "{{ cg_fail_cases + cg_pass_cases }}"
+          loop_control:
+            label: "{{ item.name }}"
+            index_var: idx
+
+        - name: Run the role for each failure case with --tags caddy
+          ansible.builtin.command:
+            argv:
+              - "{{ ansible_playbook_python | dirname }}/ansible-playbook"
+              - "{{ cg_tmp.path }}/inner.yml"
+              - -i
+              - localhost,
+              - --tags
+              - caddy
+              - -e
+              - "@{{ cg_ops_dir }}/inventories/production/group_vars/all/vars.yml"
+              - -e
+              - "@{{ cg_tmp.path }}/case{{ idx }}.vars.json"
+              - -e
+              - "caddy_data_dir={{ cg_tmp.path }}/data{{ idx }}"
+              - -e
+              - "ansible_python_interpreter={{ ansible_playbook_python }}"
+          environment:
+            ANSIBLE_CONFIG: "{{ cg_tmp.path }}/ansible.cfg"
+            ANSIBLE_ROLES_PATH: "{{ cg_ops_dir }}/roles"
+            ANSIBLE_NOCOLOR: "1"
+            ANSIBLE_LOCALHOST_WARNING: "false"
+          register: cg_fail_runs
+          failed_when: false
+          changed_when: false
+          loop: "{{ cg_fail_cases }}"
+          loop_control:
+            label: "{{ item.name }}"
+            index_var: idx
+
+        - name: Run the guard tasks only for each valid-input control
+          ansible.builtin.command:
+            argv:
+              - "{{ ansible_playbook_python | dirname }}/ansible-playbook"
+              - "{{ cg_tmp.path }}/inner.yml"
+              - -i
+              - localhost,
+              - --tags
+              - caddy_guard
+              - -e
+              - "@{{ cg_ops_dir }}/inventories/production/group_vars/all/vars.yml"
+              - -e
+              - "@{{ cg_tmp.path }}/case{{ cg_fail_cases | length + idx }}.vars.json"
+              - -e
+              - "caddy_data_dir={{ cg_tmp.path }}/data-pass{{ idx }}"
+              - -e
+              - "ansible_python_interpreter={{ ansible_playbook_python }}"
+          environment:
+            ANSIBLE_CONFIG: "{{ cg_tmp.path }}/ansible.cfg"
+            ANSIBLE_ROLES_PATH: "{{ cg_ops_dir }}/roles"
+            ANSIBLE_NOCOLOR: "1"
+            ANSIBLE_LOCALHOST_WARNING: "false"
+          register: cg_pass_runs
+          failed_when: false
+          changed_when: false
+          loop: "{{ cg_pass_cases }}"
+          loop_control:
+            label: "{{ item.name }}"
+            index_var: idx
+
+        - name: Check whether a failing case left its data directory behind
+          ansible.builtin.stat:
+            path: "{{ cg_tmp.path }}/data{{ idx }}"
+          register: cg_leftovers
+          loop: "{{ cg_fail_cases }}"
+          loop_control:
+            label: "{{ item.name }}"
+            index_var: idx
+
+        # The task file is read as text (not parsed) so the {{ }} in it stay inert.
+        - name: Read the role's task file and README for the static checks
+          ansible.builtin.set_fact:
+            cg_tasks_raw: "{{ lookup('ansible.builtin.file', cg_ops_dir ~ '/roles/caddy/tasks/main.yml') }}"
+            cg_readme: "{{ lookup('ansible.builtin.file', cg_ops_dir ~ '/roles/caddy/README.md') }}"
+
+        - name: Assert every failure case fails with the intended guard message and changes nothing
+          ansible.builtin.assert:
+            that:
+              - item.0.rc != 0
+              - item.1.msg in (item.0.stdout ~ item.0.stderr)
+              - not item.2.stat.exists
+              - cg_token not in (item.0.stdout ~ item.0.stderr)
+            fail_msg: "{{ item.1.name }}: rc={{ item.0.rc }} exists={{ item.2.stat.exists }} out={{ item.0.stdout }}{{ item.0.stderr }}"
+            quiet: true
+          loop: "{{ cg_fail_runs.results | zip(cg_fail_cases, cg_leftovers.results) | list }}"
+          loop_control:
+            label: "{{ item.1.name }}"
+
+        - name: Assert valid inputs pass the guard tasks in both designs
+          ansible.builtin.assert:
+            that:
+              - item.rc == 0
+              - "'failed=0' in item.stdout"
+            fail_msg: "{{ item.item.name }}: {{ item.stdout }}{{ item.stderr }}"
+            quiet: true
+          loop: "{{ cg_pass_runs.results }}"
+          loop_control:
+            label: "{{ item.item.name }}"
+
+        - name: Split the task file into one text block per task
+          ansible.builtin.set_fact:
+            cg_blocks: "{{ ('\n' ~ cg_tasks_raw) | split('\n- name: ') | select | list }}"
+
+        - name: Assert the first task of the role is the vm_zt_ip guard (it precedes every change, SH-FR-193)
+          ansible.builtin.assert:
+            that:
+              - cg_blocks[1] is search('^Require the ZeroTier bind address')
+              - cg_blocks[1] is search('ansible\.builtin\.assert')
+              - cg_blocks[1] is search('caddy_bind_address')
+              - cg_blocks[1] is search('fail_msg:\s*>-\s*vm_zt_ip is empty')
+            fail_msg: "first task block: {{ cg_blocks[1] }}"
+            quiet: true
+
+        - name: Pick the caddy.env task
+          ansible.builtin.set_fact:
+            cg_env_task: "{{ cg_blocks | select('search', '^Render the Caddy environment file') | list }}"
+
+        - name: Assert caddy.env is root-only, 0600, and the task hides the token (SH-FR-167)
+          ansible.builtin.assert:
+            that:
+              - cg_env_task | length == 1
+              - cg_env_task[0] is search('src:\s+caddy\.env\.j2')
+              - cg_env_task[0] is search('dest:\s+"\{\{ caddy_data_dir \}\}/caddy\.env"')
+              - cg_env_task[0] is search('(?m)^    mode:\s+"0600"$')
+              - cg_env_task[0] is search('(?m)^    owner:\s+root$')
+              - cg_env_task[0] is search('(?m)^    group:\s+root$')
+              - cg_env_task[0] is search('(?m)^  no_log:\s+true$')
+            fail_msg: "caddy.env task: {{ cg_env_task }}"
+            quiet: true
+
+        - name: Assert the README states the boot-order behaviour (SH-E-33)
+          ansible.builtin.assert:
+            that:
+              - cg_readme is search('Restart=always')
+              - cg_readme is search('(?i)systemd')
+              - cg_readme is search('vm_zt_ip')
+            fail_msg: roles/caddy/README.md must explain that systemd retries a bind failure before the ZeroTier address exists
+            quiet: true
+
+        - name: Report
+          ansible.builtin.debug:
+            msg: "caddy guard tests: {{ cg_fail_cases | length }} failure cases, {{ cg_pass_cases | length }} valid controls, static checks passed"
+
+      always:
+        - name: Remove the scratch directory
+          ansible.builtin.file:
+            path: "{{ cg_tmp.path }}"
+            state: absent

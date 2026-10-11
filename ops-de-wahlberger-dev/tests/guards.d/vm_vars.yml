@@ -1,0 +1,155 @@
+---
+# Guard test for the production VM variables (T-12): the SH-FR-124 fail2ban
+# ignore list, the Semaphore subnet (SH-FR-127), the design/enabled flags that
+# must hold until later pull requests, and the Beszel hub key.
+#   ansible-playbook -i localhost, tests/guards.d/vm_vars.yml
+# Reads only the plaintext vars.yml files; no vault, no host, no network. Values
+# that later pull requests fill in (vm_zt_ip, vm_zt_iface, semaphore_uid,
+# vm_proxy_design) are checked for "empty or well-formed", so this stays valid.
+# Values that later pull requests FLIP are stage-aware. The stage comes from the
+# environment (STATIC_CHECKS_STAGE: A (default; PR A .. C), D or E), never from a
+# file, because the pull requests A3, C and E are forbidden to edit tests/
+# (tests/pr-boundaries.sh). tests/static-checks.sh exports it.
+- name: Guard test VM group_vars
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/../../inventories/production/group_vars/all/vars.yml"
+  vars:
+    gt_repo: "{{ playbook_dir }}/../../.."
+    gt_example: "{{ playbook_dir }}/../../inventories/production/group_vars/all/vault.yml.example"
+    gt_nas_vars: "{{ gt_repo }}/nas-de-int-wahlberger-dev/inventories/production/group_vars/all/vars.yml"
+    gt_cloud_vars: "{{ gt_repo }}/cloud-wahlberger-dev/inventories/production/group_vars/all/vars.yml"
+    gt_roles: "{{ playbook_dir }}/../../roles"
+    gt_stage: "{{ lookup('ansible.builtin.env', 'STATIC_CHECKS_STAGE') | default('A', true) }}"
+    gt_subnet_re: '^(10|172|192)\.[0-9]{1,3}\.[0-9]{1,3}\.0/24$'
+    gt_expected_ignore:
+      - 127.0.0.0/8
+      - "{{ semaphore_network_subnet }}"
+      - 10.10.0.0/16
+      - 10.243.0.0/16
+      - "{{ cloud_public_ip }}"
+  tasks:
+    - name: SH-FR-124 - fail2ban ignores exactly loopback, semaphore subnet, LAN, ZeroTier, cloud public IPv4
+      ansible.builtin.assert:
+        that:
+          - security_fail2ban_ignoreip | sort == gt_expected_ignore | sort
+          - security_fail2ban_ignoreip | unique | length == security_fail2ban_ignoreip | length
+          - cloud_public_ip is match('^[0-9]{1,3}(\.[0-9]{1,3}){3}$')
+          - not (cloud_public_ip is match('^(10|127|192\.168)\.|^172\.(1[6-9]|2[0-9]|3[01])\.'))
+        quiet: true
+
+    - name: SH-FR-127 - semaphore subnet is a private /24 outside 10.10/16 and 10.243/16
+      ansible.builtin.assert:
+        that:
+          - semaphore_network_subnet is match(gt_subnet_re)
+          - not (semaphore_network_subnet is match('^10\.(10|243)\.'))
+          - not (semaphore_network_subnet is match('^10\.(88|89)\.'))
+        quiet: true
+
+    - name: The stage is one of A, D, E
+      ansible.builtin.assert:
+        that: gt_stage in ['A', 'D', 'E']
+        fail_msg: STATIC_CHECKS_STAGE must be A, D or E (got '{{ gt_stage }}')
+        quiet: true
+
+    # PR D flips the DNS cutover (BR-16); the CNAME toggle follows it.
+    - name: The DNS cutover flag matches the stage (false until PR D, true from D)
+      ansible.builtin.assert:
+        that:
+          - semaphore_dns_cutover_enabled is sameas (gt_stage in ['D', 'E'])
+          - cloudflare_dns_cnames_enabled == semaphore_dns_cutover_enabled
+        quiet: true
+
+    # restic_backup_sqlite_required: false is deleted by PR A3 (the role default
+    # then applies), so "absent or false" is the PR A value that stays valid.
+    - name: Design and enabled flags hold their values
+      ansible.builtin.assert:
+        that:
+          - vm_proxy_design in ['primary', 'bridge_fallback']
+          - caddy_design == vm_proxy_design
+          - semaphore_design == vm_proxy_design
+          - semaphore_require_existing_db is sameas true
+          - podman_require_mountpoint is sameas false
+          - restic_backup_forget_enabled is sameas false
+          - (restic_backup_sqlite_required | default(false)) is sameas false
+          - security_fail2ban_enabled is sameas true
+          - disk_space_threshold_percent == 85
+          - semaphore_url == 'https://semaphore.de.int.wahlberger.dev'
+          - semaphore_oidc_client_id == '63093482-d2cc-4c77-89df-9f6ff78b160e'
+        quiet: true
+
+    - name: Values filled in by later pull requests are empty or well-formed
+      ansible.builtin.assert:
+        that:
+          - vm_zt_ip is match('^$|^10\.243\.[0-9]{1,3}\.[0-9]{1,3}$')
+          - vm_zt_iface is match('^$|^[A-Za-z0-9_.-]{1,15}$')
+          - semaphore_uid | string is match('^$|^[1-9][0-9]*$')
+          - cloud_zt_ip is match('^$|^10\.243\.[0-9]{1,3}\.[0-9]{1,3}$')
+          - firewall_cloud_zt_ip == cloud_zt_ip
+          - firewall_zerotier_interface == vm_zt_iface
+        quiet: true
+
+    # PR C adds the new key (from=...), PR C-R would move it to the revoked list.
+    # So: the personal key exactly once, every other entry is the new key, and a
+    # revoked entry can only be the new key.
+    - name: SH-BR-10 / SH-FR-62 - authorized keys are the personal key plus at most the new key
+      vars:
+        gt_personal: "{{ ssh_authorized_keys_list | select('search', ' erikwahlberger@personal$') | list }}"
+        gt_new_re: ' semaphore-automation@ops\.de\.wahlberger\.dev$'
+      ansible.builtin.assert:
+        that:
+          - gt_personal | length == 1
+          - gt_personal[0] is match('^ssh-ed25519 ')
+          - ssh_authorized_keys_list | reject('search', ' erikwahlberger@personal$') | select('search', gt_new_re) | list | length
+            == ssh_authorized_keys_list | length - 1
+          - ssh_authorized_keys_revoked | reject('search', gt_new_re) | list == []
+        quiet: true
+
+    - name: Beszel hub key equals the one on nas and cloud
+      ansible.builtin.assert:
+        that:
+          - beszel_agent_hub_key == (lookup('ansible.builtin.file', gt_nas_vars) | from_yaml).beszel_agent_hub_key
+          - beszel_agent_hub_key == (lookup('ansible.builtin.file', gt_cloud_vars) | from_yaml).beszel_agent_hub_key
+        quiet: true
+
+    - name: Every vault_* name that vars.yml uses is listed (empty) in vault.yml.example
+      vars:
+        gt_vars_file: "{{ playbook_dir }}/../../inventories/production/group_vars/all/vars.yml"
+        gt_used: "{{ lookup('ansible.builtin.file', gt_vars_file) | regex_findall('vault_[a-z0-9_]+') | unique | sort }}"
+        gt_listed: "{{ lookup('ansible.builtin.file', gt_example) | regex_findall('(?m)^(vault_[a-z0-9_]+): \"\"$') | sort }}"
+      ansible.builtin.assert:
+        that:
+          - gt_used | length == 9
+          - gt_used == gt_listed
+        quiet: true
+
+    # The restic_backup, caddy and zerotier role defaults still spell /opt/podman
+    # out (the roles are not restructured). They must stay on the same tree as
+    # podman_data_dir, or a backup/Caddy/ZeroTier data dir would silently leave
+    # the directory the podman role prepares.
+    - name: Hardcoded /opt/podman role defaults equal the podman_data_dir-derived paths
+      vars:
+        # Jinja delimiters are neutralised so the parsed defaults are data.
+        gt_caddy: >-
+          {{ lookup('ansible.builtin.file', gt_roles ~ '/caddy/defaults/main.yml')
+          | regex_replace('\{\{', '[[') | regex_replace('\{%', '[%') | from_yaml }}
+        gt_zerotier: >-
+          {{ lookup('ansible.builtin.file', gt_roles ~ '/zerotier/defaults/main.yml')
+          | regex_replace('\{\{', '[[') | regex_replace('\{%', '[%') | from_yaml }}
+        gt_restic: >-
+          {{ lookup('ansible.builtin.file', gt_roles ~ '/restic_backup/defaults/main.yml')
+          | regex_replace('\{\{', '[[') | regex_replace('\{%', '[%') | from_yaml }}
+      ansible.builtin.assert:
+        that:
+          - gt_caddy.caddy_data_dir == podman_data_dir ~ '/caddy'
+          - caddy_data_dir == podman_data_dir ~ '/caddy'
+          - gt_zerotier.zerotier_data_dir == podman_data_dir ~ '/zerotier'
+          - gt_restic.restic_backup_sqlite_databases | map(attribute='src') | list
+            == [podman_data_dir ~ '/semaphore/data/database.sqlite']
+        fail_msg: >-
+          A role default under /opt/podman no longer equals the path derived from
+          podman_data_dir ({{ podman_data_dir }}): caddy_data_dir, zerotier_data_dir
+          and the restic_backup SQLite source must follow it.
+        quiet: true

@@ -1,0 +1,102 @@
+---
+# Registers the semaphore role's rendered files (T-09; SH-FR-41, SH-FR-130,
+# SH-FR-186, SH-FR-127, SH-FR-21/144, SH-AC-61 Quadlet side).
+#
+# The primary Quadlets are `quadlet` items: the container stage runs podman's
+# generator on them and verifies the generated service. The generator names the
+# output after the file's basename, so semaphore.network is verified through
+# semaphore.service (the container's); the network unit itself is covered by
+# the generator accepting `Network=semaphore.network` for the container.
+#
+# Both designs are rendered by default (the fallback item sets semaphore_design
+# in its own vars). Passing `-e semaphore_design=bridge_fallback` to
+# render-check.sh overrides the primary item too (extra vars always win); it
+# then needs caddy.network beside the container, see the note below.
+render_items:
+  - role: semaphore
+    src: semaphore.container.j2
+    dest: semaphore.container
+    kind: quadlet
+    vars:
+      semaphore_design: primary
+      semaphore_network_subnet: 172.29.30.0/24
+    skip_asserts_when_extra: semaphore_design
+    asserts:
+      - '^Network=semaphore\.network$'
+      - '^PublishPort=127\.0\.0\.1:3000:3000$'
+      - '^Requires=semaphore-network\.service$'
+      - '^After=network-online\.target semaphore-network\.service$'
+      - '^# Design: primary\.'
+      - '^DNS=1\.1\.1\.1$'
+      - '^DNS=8\.8\.8\.8$'
+      - '^OnFailure=notify-failure@%n\.service$'
+      - '^Restart=always$'
+      - '^ContainerName=semaphore$'
+      - '^Image=docker\.io/semaphoreui/semaphore:v2\.19\.16$'
+      - '^Volume=/opt/podman/semaphore/config\.json:/etc/semaphore/config\.json:Z$'
+      - '^Volume=/opt/podman/semaphore/data:/var/lib/semaphore:Z$'
+      - '^EnvironmentFile=/opt/podman/semaphore/semaphore\.env$'
+      # SH-FR-41 / SH-AC-16: the names whose in-container resolution is compared with dig @1.1.1.1.
+      - '^# .*: nas\.de\.int\.wahlberger\.dev cloud\.wahlberger\.dev ops\.de\.wahlberger\.dev github\.com$'
+      # Primary publishes exactly one port.
+      - '(?s)\A(?:(?!PublishPort=).)*PublishPort=127\.0\.0\.1:3000:3000\n(?:(?!PublishPort=).)*\Z'
+  - role: semaphore
+    src: semaphore.network.j2
+    dest: semaphore.network
+    kind: quadlet
+    vars:
+      semaphore_network_subnet: 172.29.30.0/24
+    asserts:
+      - '^Driver=bridge$'
+      - '^Subnet=172\.29\.30\.0/24$'
+      - '^DNS=1\.1\.1\.1$'
+      - '^DNS=8\.8\.8\.8$'
+  # Fallback design (SH-FR-186, SH-AC-61): caddy.network, nothing published.
+  # Needs caddy.network beside it for the generator: registered in caddy.yml.
+  - role: semaphore
+    src: semaphore.container.j2
+    dest: semaphore-fallback.container
+    kind: quadlet
+    vars:
+      semaphore_design: bridge_fallback
+    asserts:
+      - '^Network=caddy\.network$'
+      - '^Requires=caddy-network\.service$'
+      - '^After=network-online\.target caddy-network\.service$'
+      - '^# Design: bridge_fallback\.'
+      - '^DNS=1\.1\.1\.1$'
+      - '^DNS=8\.8\.8\.8$'
+      - '^OnFailure=notify-failure@%n\.service$'
+      - '^Restart=always$'
+      - '(?sm)\A(?:(?!^PublishPort=)(?!^Network=semaphore\.network).)*\Z'
+  - role: semaphore
+    src: semaphore.env.j2
+    dest: semaphore.env
+    kind: text
+    vars:
+      semaphore_oidc_client_id: 63093482-d2cc-4c77-89df-9f6ff78b160e
+      semaphore_oidc_client_secret: 'dummy"secret\with-specials'
+      semaphore_url: https://semaphore.de.int.wahlberger.dev
+    asserts:
+      - '^SEMAPHORE_OIDC_PROVIDERS=\{"pocketid": \{'
+      - '"client_id": "63093482-d2cc-4c77-89df-9f6ff78b160e"'
+      - '"provider_url": "https://id\.wahlberger\.dev"'
+      - '"redirect_url": "https://semaphore\.de\.int\.wahlberger\.dev/api/auth/oidc/pocketid/redirect/"'
+      # Special characters in a secret are JSON-escaped, not injected.
+      - '"client_secret": "dummy\\"secret\\\\with-specials"'
+      # Only the OIDC variable lives in the env file.
+      - '(?s)\A(?:(?!SEMAPHORE_(?:DB|ADMIN|COOKIE|ACCESS)).)*\Z'
+  - role: semaphore
+    src: config.json.j2
+    dest: semaphore-config.json
+    kind: text
+    vars:
+      semaphore_cookie_hash: hash-dummy
+      semaphore_cookie_encryption: enc-dummy
+      semaphore_access_key_encryption: key-dummy
+    asserts:
+      - '"host": "/var/lib/semaphore/database\.sqlite"'
+      - '"dialect": "sqlite"'
+      - '"cookie_hash": "hash-dummy"'
+      - '"cookie_encryption": "enc-dummy"'
+      - '"access_key_encryption": "key-dummy"'
