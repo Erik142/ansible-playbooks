@@ -1,0 +1,13 @@
+---
+argument_specs:
+  main:
+    short_description: Email a heads-up as soon as a rebootmgr-triggered reboot is needed.
+    description:
+      - A script, called directly by the security role's
+        zypper-dup-request-reboot.sh, that emails, reusing notify_failure's
+        Resend credentials, only when `zypper needs-rebooting` reports
+        exit code 102 — i.e. this reboot is actually because of a pending
+        kernel/library update (rebootmgr, driven by the security role), not
+        an ordinary manual one. Its own notification class, not a failure
+        alert. No variables of its own; see README.md.
+    options: {}

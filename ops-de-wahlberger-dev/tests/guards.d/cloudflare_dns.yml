@@ -1,0 +1,385 @@
+---
+# Guard test for the cloudflare_dns role (T-10; SH-AC-14 render/idempotence half,
+# SH-AC-62 cloudflare_dns half, SH-FR-36/37/38/131/193, SH-CC-08).
+#
+# Run from the playbook directory (no host, no network, no Cloudflare):
+#   ansible-playbook -i localhost, tests/guards.d/cloudflare_dns.yml
+# (`-i localhost,` keeps the production inventory and its Vault out of it.)
+# Exit 0 = every case passed. tests/guard-tests.sh (T-14) runs this file for
+# `guard-tests.sh cloudflare_dns`. The caddy guard lives in its own file and
+# its own run (PA-6); nothing here touches the caddy role.
+#
+# How it works: the role is run for real by a nested `ansible-playbook`
+# against a throwaway inventory, with `community.general` shadowed by a stub
+# collection that only contains `cloudflare_dns`. The stub validates its
+# arguments like the real module, appends one JSON line per call to a log
+# and never opens a socket. Each case then asserts the nested run's exit
+# code, its output, and the EXACT list of calls the role made. Variables come
+# from the real production vars.yml, so a drift between the role and the
+# production wiring (cutover flag -> cnames flag, extra A records) is caught
+# too. The host name is the production one (inventory_hostname is asserted).
+- name: Guard test cloudflare_dns (stubbed Cloudflare API)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    gt_ops_dir: "{{ playbook_dir }}/../.."
+    gt_host: ops.de.wahlberger.dev
+    gt_public_ip: 203.0.113.10
+    gt_zt_ip: 10.243.0.5
+    gt_token: test-token-do-not-leak
+    gt_extra_record: ops.de.int.wahlberger.dev
+    gt_cname_host: semaphore.de.int.wahlberger.dev
+    gt_zone: wahlberger.dev
+    # Expected module calls, built once so the cases read as deltas.
+    gt_call_host:
+      record: "{{ gt_host }}"
+      type: A
+      value: "{{ gt_public_ip }}"
+      zone: "{{ gt_zone }}"
+      proxied: false
+      state: present
+      check_mode: false
+    gt_call_extra:
+      record: "{{ gt_extra_record }}"
+      type: A
+      value: "{{ gt_zt_ip }}"
+      zone: "{{ gt_zone }}"
+      proxied: false
+      state: present
+      check_mode: false
+    gt_call_cname:
+      record: "{{ gt_cname_host }}"
+      type: CNAME
+      value: "{{ gt_extra_record }}"
+      zone: "{{ gt_zone }}"
+      proxied: false
+      state: present
+      check_mode: false
+    gt_first_task: "Ensure this host's own A record exists in Cloudflare"
+    gt_cases:
+      - name: cutover off -> host A + extra A, no CNAME (FR-36, FR-131, FR-37)
+        vars: { vm_zt_ip: "{{ gt_zt_ip }}" }
+        rc: 0
+        calls:
+          - "{{ gt_call_host }}"
+          - "{{ gt_call_extra }}"
+        output_has: ["failed=0"]
+        output_lacks: ["(item={{ gt_cname_host }})", "{{ gt_token }}"]
+      - name: cutover on -> host A + extra A + CNAME to the ZeroTier name (FR-38)
+        vars: { vm_zt_ip: "{{ gt_zt_ip }}", semaphore_dns_cutover_enabled: true }
+        rc: 0
+        calls:
+          - "{{ gt_call_host }}"
+          - "{{ gt_call_extra }}"
+          - "{{ gt_call_cname }}"
+        output_has: ["failed=0"]
+        output_lacks: ["{{ gt_token }}"]
+      - name: cutover on, check mode -> same calls, flagged as check mode
+        vars: { vm_zt_ip: "{{ gt_zt_ip }}", semaphore_dns_cutover_enabled: true }
+        check: true
+        rc: 0
+        calls:
+          - "{{ gt_call_host | combine({'check_mode': true}) }}"
+          - "{{ gt_call_extra | combine({'check_mode': true}) }}"
+          - "{{ gt_call_cname | combine({'check_mode': true}) }}"
+        output_has: ["failed=0"]
+        output_lacks: ["{{ gt_token }}"]
+      - name: custom cname target and cnames flag set directly -> CNAME follows the target
+        vars:
+          vm_zt_ip: "{{ gt_zt_ip }}"
+          cloudflare_dns_cnames_enabled: true
+          cloudflare_dns_cname_target: other-target.wahlberger.dev
+        rc: 0
+        calls:
+          - "{{ gt_call_host }}"
+          - "{{ gt_call_extra }}"
+          - "{{ gt_call_cname | combine({'value': 'other-target.wahlberger.dev'}) }}"
+        output_has: ["failed=0"]
+        output_lacks: ["{{ gt_token }}"]
+      - name: two caddy sites and cutover on -> one CNAME each
+        vars:
+          vm_zt_ip: "{{ gt_zt_ip }}"
+          semaphore_dns_cutover_enabled: true
+          caddy_sites:
+            - { host: semaphore.de.int.wahlberger.dev, upstream: "127.0.0.1:3000" }
+            - { host: second.de.int.wahlberger.dev, upstream: "127.0.0.1:4000" }
+        rc: 0
+        calls:
+          - "{{ gt_call_host }}"
+          - "{{ gt_call_extra }}"
+          - "{{ gt_call_cname }}"
+          - "{{ gt_call_cname | combine({'record': 'second.de.int.wahlberger.dev'}) }}"
+        output_has: ["failed=0"]
+        output_lacks: ["{{ gt_token }}"]
+      # --- guards: each must fail before the first Cloudflare call (no calls, first task never starts)
+      - name: vm_zt_ip empty -> fails naming vm_zt_ip, nothing created (FR-193, AC-62)
+        vars: { vm_zt_ip: "" }
+        rc: 2
+        calls: []
+        output_has: ["vm_zt_ip is empty. Set it to the VM's ZeroTier member IP"]
+        output_lacks: ["{{ gt_first_task }}", "{{ gt_token }}"]
+      - name: vm_zt_ip empty and token empty -> still names vm_zt_ip (guard is token independent)
+        vars: { vm_zt_ip: "", cloudflare_dns_api_token: "" }
+        rc: 2
+        calls: []
+        output_has: ["vm_zt_ip is empty. Set it to the VM's ZeroTier member IP"]
+        output_lacks: ["{{ gt_first_task }}", "{{ gt_token }}"]
+      - name: vm_zt_ip empty with cutover on -> still no record, CNAME included
+        vars: { vm_zt_ip: "", semaphore_dns_cutover_enabled: true }
+        rc: 2
+        calls: []
+        output_has: ["vm_zt_ip is empty. Set it to the VM's ZeroTier member IP"]
+        output_lacks: ["{{ gt_first_task }}", "{{ gt_token }}"]
+      - name: empty extra A record list -> fails, nothing created (CC-08)
+        vars: { vm_zt_ip: "{{ gt_zt_ip }}", cloudflare_dns_extra_a_records: [] }
+        rc: 2
+        calls: []
+        output_has: ["cloudflare_dns_extra_a_records must be a non-empty list"]
+        output_lacks: ["{{ gt_first_task }}", "{{ gt_token }}"]
+      - name: extra A record with an empty value -> fails, nothing created
+        vars:
+          vm_zt_ip: "{{ gt_zt_ip }}"
+          cloudflare_dns_extra_a_records:
+            - { record: "{{ gt_extra_record }}", value: "" }
+        rc: 2
+        calls: []
+        output_has: ["entries all have a non-empty record and value"]
+        output_lacks: ["{{ gt_first_task }}", "{{ gt_token }}"]
+      - name: extra A record with an empty name -> fails, nothing created
+        vars:
+          vm_zt_ip: "{{ gt_zt_ip }}"
+          cloudflare_dns_extra_a_records:
+            - { record: "", value: "{{ gt_zt_ip }}" }
+        rc: 2
+        calls: []
+        output_has: ["entries all have a non-empty record and value"]
+        output_lacks: ["{{ gt_first_task }}", "{{ gt_token }}"]
+      - name: API token empty -> fails naming the Vault secret, nothing created
+        vars: { vm_zt_ip: "{{ gt_zt_ip }}", cloudflare_dns_api_token: "" }
+        rc: 2
+        calls: []
+        output_has: ["cloudflare_dns_api_token must be non-empty", "vault_cloudflare_dns_api_token"]
+        output_lacks: ["{{ gt_first_task }}"]
+  tasks:
+    - name: Run the cases against a stubbed Cloudflare module
+      block:
+        - name: Create a scratch directory
+          ansible.builtin.tempfile:
+            state: directory
+            prefix: cf-guard.
+          register: gt_tmp
+
+        - name: Create the stub collection and inventory directories
+          ansible.builtin.file:
+            path: "{{ gt_tmp.path }}/{{ item }}"
+            state: directory
+            mode: "0755"
+          loop:
+            - collections/ansible_collections/community/general/plugins/modules
+            - logs
+            - vars
+
+        # Same argument contract as the real module (types, choices, the
+        # state=present requirement), minus the HTTP call. Never logs the token.
+        - name: Write the stub community.general.cloudflare_dns module
+          ansible.builtin.copy:
+            dest: "{{ gt_tmp.path }}/collections/ansible_collections/community/general/plugins/modules/cloudflare_dns.py"
+            mode: "0644"
+            content: |
+              #!/usr/bin/python
+              from __future__ import absolute_import, division, print_function
+              __metaclass__ = type
+
+              import json
+              import os
+
+              from ansible.module_utils.basic import AnsibleModule
+
+
+              def main():
+                  module = AnsibleModule(
+                      argument_spec=dict(
+                          api_token=dict(type="str", required=True, no_log=True),
+                          zone=dict(type="str", required=True),
+                          record=dict(type="str", default="@"),
+                          type=dict(type="str", choices=["A", "AAAA", "CNAME", "TXT"]),
+                          value=dict(type="list", elements="str"),
+                          proxied=dict(type="bool", default=False),
+                          solo=dict(type="bool", default=False),
+                          state=dict(type="str", default="present", choices=["present", "absent"]),
+                      ),
+                      required_if=[("state", "present", ["type", "value"])],
+                      supports_check_mode=True,
+                  )
+                  p = module.params
+                  call = dict(
+                      record=p["record"], type=p["type"], value=p["value"][0],
+                      zone=p["zone"], proxied=p["proxied"], state=p["state"],
+                      check_mode=module.check_mode,
+                  )
+                  if p["solo"]:
+                      call["solo"] = True
+                  with open(os.environ["CF_STUB_LOG"], "a") as log:
+                      log.write(json.dumps(call, sort_keys=True) + "\n")
+                  module.exit_json(changed=True, **call)
+
+
+              if __name__ == "__main__":
+                  main()
+
+        - name: Write the nested inventory, config and playbook
+          ansible.builtin.copy:
+            dest: "{{ gt_tmp.path }}/{{ item.name }}"
+            mode: "0644"
+            content: "{{ item.content }}"
+          loop_control:
+            label: "{{ item.name }}"
+          loop:
+            - name: inventory.ini
+              content: |
+                {{ gt_host }} ansible_connection=local ansible_python_interpreter={{ ansible_playbook_python }}
+            - name: ansible.cfg
+              content: |
+                [defaults]
+                collections_path = {{ gt_tmp.path }}/collections
+                roles_path = {{ gt_ops_dir }}/roles
+                retry_files_enabled = false
+                localhost_warning = false
+                host_key_checking = false
+            # ansible_facts is injected the way the setup module would, so the
+            # role's DEFAULT cloudflare_dns_ip (the gathered IPv4) is exercised.
+            - name: play.yml
+              content: |
+                ---
+                - name: Nested cloudflare_dns run
+                  hosts: all
+                  gather_facts: false
+                  vars_files:
+                    - {{ gt_ops_dir }}/inventories/production/group_vars/all/vars.yml
+                    - {{ gt_tmp.path }}/vars/case.json
+                  pre_tasks:
+                    - name: Provide the gathered facts the role defaults read
+                      ansible.builtin.set_fact:
+                        ansible_facts:
+                          default_ipv4:
+                            address: {{ gt_public_ip }}
+                  roles:
+                    - role: cloudflare_dns
+
+        # Per case: variables file (token set unless the case overrides it),
+        # empty log, nested run. Never stops on a non-zero exit: the
+        # assertions below judge it.
+        - name: Write the case variables
+          ansible.builtin.copy:
+            dest: "{{ gt_tmp.path }}/vars/case-{{ idx }}.json"
+            mode: "0600"
+            content: "{{ ({'cloudflare_dns_api_token': gt_token} | combine(item.vars)) | to_nice_json }}"
+          loop: "{{ gt_cases }}"
+          loop_control:
+            index_var: idx
+            label: "{{ item.name }}"
+
+        - name: Run the nested playbook once per case
+          ansible.builtin.shell:
+            cmd: >-
+              : > "$CF_STUB_LOG" &&
+              cp "{{ gt_tmp.path }}/vars/case-{{ idx }}.json" "{{ gt_tmp.path }}/vars/case.json" &&
+              "{{ ansible_playbook_python | dirname }}/ansible-playbook"
+              -i "{{ gt_tmp.path }}/inventory.ini" "{{ gt_tmp.path }}/play.yml"
+              {{ '--check' if item.check | default(false) else '' }} 2>&1
+            chdir: "{{ gt_tmp.path }}"
+            executable: /bin/sh
+          environment:
+            ANSIBLE_CONFIG: "{{ gt_tmp.path }}/ansible.cfg"
+            ANSIBLE_NOCOLOR: "1"
+            ANSIBLE_FORCE_COLOR: "0"
+            CF_STUB_LOG: "{{ gt_tmp.path }}/logs/case-{{ idx }}.jsonl"
+            # Belt and braces: the real module is shadowed, but should it ever
+            # run, it cannot reach the network.
+            HTTPS_PROXY: http://127.0.0.1:9
+            https_proxy: http://127.0.0.1:9
+          register: gt_runs
+          changed_when: false
+          failed_when: false
+          loop: "{{ gt_cases }}"
+          loop_control:
+            index_var: idx
+            label: "{{ item.name }}"
+
+        - name: Read the call logs
+          ansible.builtin.slurp:
+            src: "{{ gt_tmp.path }}/logs/case-{{ idx }}.jsonl"
+          register: gt_logs
+          loop: "{{ gt_cases }}"
+          loop_control:
+            index_var: idx
+            label: "{{ item.name }}"
+
+        # rc: 0 for a clean run; 2 for a failed task (ansible-playbook's code for it).
+        - name: Assert exit code, output and the exact calls per case
+          ansible.builtin.assert:
+            that:
+              - gt_runs.results[idx].rc == item.rc
+              - gt_calls == item.calls
+              - item.output_has | reject('in', gt_out) | list | length == 0
+              - item.output_lacks | select('in', gt_out) | list | length == 0
+            fail_msg: "{{ item.name }}: rc={{ gt_runs.results[idx].rc }} calls={{ gt_calls }} output={{ gt_out }}"
+            success_msg: "{{ item.name }}"
+            quiet: true
+          vars:
+            gt_out: "{{ gt_runs.results[idx].stdout }}"
+            gt_calls: "{{ (gt_logs.results[idx].content | b64decode).splitlines() | map('from_json') | list }}"
+          loop: "{{ gt_cases }}"
+          loop_control:
+            index_var: idx
+            label: "{{ item.name }}"
+
+        - name: Assert the nested runs used the production host name
+          ansible.builtin.assert:
+            that: gt_host in item.stdout
+            quiet: true
+          loop: "{{ gt_runs.results }}"
+          loop_control:
+            label: "{{ item.item.name }}"
+
+        # SH-FR-37 / "never deletes": no absent state, no solo, anywhere in the role.
+        - name: Create the control directory
+          ansible.builtin.file:
+            path: "{{ gt_tmp.path }}/control"
+            state: directory
+            mode: "0755"
+
+        - name: Seed a control file that contains a deletion
+          ansible.builtin.copy:
+            dest: "{{ gt_tmp.path }}/control/seeded.yml"
+            mode: "0644"
+            content: |
+              - name: seeded defect
+                state: absent
+                solo: true
+
+        - name: Find deleting tasks in the role and in the control file
+          ansible.builtin.find:
+            paths: "{{ item }}"
+            recurse: true
+            patterns: ["*.yml"]
+            contains: '^\s*(state:\s*absent|solo:\s*(true|yes))\b'
+          register: gt_scan
+          loop:
+            - "{{ gt_ops_dir }}/roles/cloudflare_dns"
+            - "{{ gt_tmp.path }}/control"
+
+        - name: Assert the role never deletes and the scan can see a deletion
+          ansible.builtin.assert:
+            that:
+              - gt_scan.results[0].matched == 0
+              - gt_scan.results[1].matched == 1
+            fail_msg: "role matches={{ gt_scan.results[0].matched }} (want 0), control matches={{ gt_scan.results[1].matched }} (want 1)"
+            quiet: true
+      always:
+        - name: Remove the scratch directory
+          ansible.builtin.file:
+            path: "{{ gt_tmp.path }}"
+            state: absent
+          when: gt_tmp is defined and gt_tmp.path is defined

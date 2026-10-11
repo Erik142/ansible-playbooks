@@ -1,0 +1,111 @@
+---
+- name: Validate restic_backup inputs
+  ansible.builtin.assert:
+    that:
+      - restic_backup_repo_password | length > 0
+      - restic_backup_rest_server_password | length > 0
+    fail_msg: >-
+      restic_backup_repo_password or restic_backup_rest_server_password is
+      empty. Set vault_restic_backup_repo_password and
+      vault_restic_backup_rest_server_password in Ansible Vault. See README.md.
+    quiet: true
+  no_log: true
+
+- name: Refuse retention on this host (the NAS applies it)
+  ansible.builtin.assert:
+    that: not (restic_backup_forget_enabled | bool)
+    fail_msg: >-
+      restic_backup_forget_enabled is true, but this role never runs restic
+      forget or prune (SH-FR-81): the repository is append-only for this host
+      and the NAS applies retention. Set it to false.
+    quiet: true
+
+- name: Install restic, sqlite3 and the success-email tools
+  community.general.zypper:
+    name:
+      - restic
+      - sqlite3
+      - jq
+      - curl
+    state: present
+
+- name: Create the restic_backup env directory
+  ansible.builtin.file:
+    path: "{{ restic_backup_env_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Create the staging directory for the database copies
+  ansible.builtin.file:
+    path: "{{ restic_backup_staging_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Render the restic environment file
+  ansible.builtin.template:
+    src: restic-backup.env.j2
+    dest: "{{ restic_backup_env_dir }}/restic-backup.env"
+    owner: root
+    group: root
+    mode: "0600"
+  # The file holds the REST server and repository passwords.
+  no_log: true
+  diff: false
+
+- name: Create the restic_backup config directory
+  ansible.builtin.file:
+    path: /etc/restic-backup
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy the success email HTML template
+  ansible.builtin.copy:
+    src: success-email-template.html
+    dest: /etc/restic-backup/success-email-template.html
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy the backup script
+  ansible.builtin.template:
+    src: restic-backup.sh.j2
+    dest: /usr/local/bin/restic-backup.sh
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Deploy the systemd service unit
+  ansible.builtin.template:
+    src: restic-backup.service.j2
+    dest: /etc/systemd/system/restic-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy the systemd timer unit
+  ansible.builtin.template:
+    src: restic-backup.timer.j2
+    dest: /etc/systemd/system/restic-backup.timer
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enable and start the backup timer
+  ansible.builtin.systemd:
+    name: restic-backup.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  register: restic_backup_timer
+  # --check on a fresh host: the timer unit does not exist yet because the
+  # template task above only simulated creating it. Only that exact miss is
+  # tolerated, and only in check mode; a real run still fails.
+  failed_when:
+    - restic_backup_timer is failed
+    - not (ansible_check_mode and (restic_backup_timer.msg | default('')) is search('Could not find the requested service'))

@@ -1,0 +1,8 @@
+---
+# Internal helpers (not meant to be overridden). A key line is
+# `[options ]<type> <base64-body>[ comment]`; options such as from="..." may
+# precede the type. The optional prefix is exactly ONE options token (quoted
+# strings may contain spaces), so a comment that itself contains `ssh-`, `sk-`
+# or `ecdsa-sha2-` cannot be mistaken for the key type.
+ssh_authorized_keys_body_regex: '^(?:(?:[^\s"]|"[^"]*")+\s+)?(?:ssh-\S+|ecdsa-sha2-\S+|sk-\S+)\s+(\S+)'
+ssh_authorized_keys_comment_regex: '^(?:(?:[^\s"]|"[^"]*")+\s+)?(?:ssh-\S+|ecdsa-sha2-\S+|sk-\S+)\s+\S+\s*(.*)$'

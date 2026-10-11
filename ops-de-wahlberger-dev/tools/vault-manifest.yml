@@ -1,0 +1,23 @@
+---
+# Where each VM vault key comes from (read by tools/populate-vault.sh).
+#   <playbook>:<key>        copy the value of <key> from that playbook's Vault
+#                           (pi = pi-de-int-wahlberger-dev, cloud = cloud-wahlberger-dev,
+#                           nas = nas-de-int-wahlberger-dev), byte for byte
+#   generate:alnum32        32 random [A-Za-z0-9] characters, drawn locally
+# The key set must equal group_vars/all/vault.yml.example and the vault_* names
+# that group_vars/all/vars.yml references (tests/tools/test_populate_vault.py).
+
+# SH-FR-43, 44, 146, 46, 201: Semaphore's own secrets, equal to the Pi's.
+vault_semaphore_access_key_encryption: pi:vault_semaphore_access_key_encryption
+vault_semaphore_cookie_hash: pi:vault_semaphore_cookie_hash
+vault_semaphore_cookie_encryption: pi:vault_semaphore_cookie_encryption
+vault_semaphore_admin_password: pi:vault_semaphore_admin_password
+vault_semaphore_oidc_client_secret: pi:vault_semaphore_oidc_client_secret
+
+# SH-FR-147, 148: the Cloudflare zone token and the Resend key, equal to the Pi's.
+vault_cloudflare_dns_api_token: pi:vault_cloudflare_dns_api_token
+vault_notify_failure_resend_api_key: pi:vault_notify_failure_resend_api_key
+
+# SH-BR-09: new values; T-20 copies both into the NAS vault.
+vault_restic_backup_repo_password: generate:alnum32
+vault_restic_backup_rest_server_password: generate:alnum32

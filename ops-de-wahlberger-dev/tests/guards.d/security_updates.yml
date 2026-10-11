@@ -1,0 +1,162 @@
+---
+# Guard test for T-06 (`common_upgrade` is honoured). Run: ansible-playbook tests/guards.d/security_updates.yml
+#
+# The `common` role must leave the full `zypper` upgrade out when
+# common_upgrade=false (the weekly zypper-dup.timer of the `security` role is
+# then the only updater) and still upgrade with the default. The test takes the
+# REAL upgrade task out of roles/common/tasks/main.yml and runs it in a nested
+# playbook against a stub `community.general.zypper` module that records its
+# arguments. Touches no host.
+- name: Guard test that common_upgrade is honoured
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    cu_ops_dir: "{{ playbook_dir }}/../.."
+    cu_scenarios:
+      - {name: default, vars: {}, upgrades: true}
+      - {name: explicit_true, vars: {common_upgrade: true}, upgrades: true}
+      - {name: false, vars: {common_upgrade: false}, upgrades: false}
+      - {name: string_false, vars: {common_upgrade: "false"}, upgrades: false}
+  tasks:
+    - name: Find the upgrade task in the common role
+      ansible.builtin.set_fact:
+        cu_task: "{{ cu_task | default([]) + [item] }}"
+      loop: "{{ lookup('ansible.builtin.file', cu_ops_dir ~ '/roles/common/tasks/main.yml') | from_yaml }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when:
+        - "'community.general.zypper' in item"
+        - item['community.general.zypper'].name == '*'
+
+    - name: Assert there is exactly one upgrade task
+      ansible.builtin.assert:
+        that: cu_task | default([]) | length == 1
+        fail_msg: "expected one zypper name='*' task in roles/common/tasks/main.yml, found {{ cu_task | default([]) | length }}"
+        quiet: true
+
+    - name: Create the scratch directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: cu-guard-
+      register: cu_tmp
+
+    - name: Run the scenarios and assert
+      block:
+        - name: Create the stub collection directory
+          ansible.builtin.file:
+            path: "{{ cu_tmp.path }}/collections/ansible_collections/community/general/plugins/modules"
+            state: directory
+            mode: "0755"
+
+        - name: Install the stub zypper module
+          ansible.builtin.copy:
+            dest: "{{ cu_tmp.path }}/collections/ansible_collections/community/general/plugins/modules/zypper.py"
+            mode: "0644"
+            content: |
+              from ansible.module_utils.basic import AnsibleModule
+              import json
+              import os
+
+
+              def main():
+                  module = AnsibleModule(
+                      argument_spec=dict(
+                          name=dict(type="list", elements="str"), state=dict(), update_cache=dict(type="bool"),
+                      ),
+                      supports_check_mode=True,
+                  )
+                  with open(os.environ["CU_STUB_LOG"], "a") as log:
+                      log.write(json.dumps(module.params, sort_keys=True) + "\n")
+                  module.exit_json(changed=False)
+
+
+              main()
+
+        - name: Install the stub collection metadata
+          ansible.builtin.copy:
+            dest: "{{ cu_tmp.path }}/collections/ansible_collections/community/general/MANIFEST.json"
+            mode: "0644"
+            content: '{"collection_info": {"namespace": "community", "name": "general", "version": "0.0.0"}, "format": 1}'
+
+        - name: Write a private ansible.cfg (keeps the repo's vault lookup out)
+          ansible.builtin.copy:
+            dest: "{{ cu_tmp.path }}/ansible.cfg"
+            mode: "0644"
+            content: |
+              [defaults]
+              inventory = localhost,
+              retry_files_enabled = false
+              localhost_warning = false
+
+        - name: Write the inner playbook (the role's own task and defaults)
+          ansible.builtin.copy:
+            dest: "{{ cu_tmp.path }}/inner.yml"
+            mode: "0644"
+            content: |
+              - hosts: localhost
+                connection: local
+                gather_facts: false
+                vars_files:
+                  - {{ cu_ops_dir }}/roles/common/defaults/main.yml
+                tasks: {{ cu_task | to_json }}
+
+        - name: Write each scenario's variables
+          ansible.builtin.copy:
+            dest: "{{ cu_tmp.path }}/{{ item.name }}.vars.json"
+            content: "{{ item.vars | to_json }}"
+            mode: "0644"
+          loop: "{{ cu_scenarios }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+        - name: Run the task once per scenario
+          ansible.builtin.command:
+            argv:
+              - "{{ ansible_playbook_python | dirname }}/ansible-playbook"
+              - "{{ cu_tmp.path }}/inner.yml"
+              - -i
+              - localhost,
+              - -e
+              - "@{{ cu_tmp.path }}/{{ item.name }}.vars.json"
+              - -e
+              - "ansible_python_interpreter={{ ansible_playbook_python }}"
+          environment:
+            ANSIBLE_CONFIG: "{{ cu_tmp.path }}/ansible.cfg"
+            ANSIBLE_COLLECTIONS_PATH: "{{ cu_tmp.path }}/collections:{{ lookup('ansible.builtin.config', 'COLLECTIONS_PATHS') | join(':') }}"
+            ANSIBLE_NOCOLOR: "1"
+            CU_STUB_LOG: "{{ cu_tmp.path }}/{{ item.name }}.jsonl"
+          register: cu_runs
+          failed_when: false
+          changed_when: false
+          loop: "{{ cu_scenarios }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+        - name: Read the recorded module calls
+          ansible.builtin.slurp:
+            src: "{{ cu_tmp.path }}/{{ item.name }}.jsonl"
+          register: cu_logs
+          failed_when: false
+          loop: "{{ cu_scenarios }}"
+          loop_control:
+            label: "{{ item.name }}"
+
+        - name: Assert the upgrade runs exactly when common_upgrade is true
+          ansible.builtin.assert:
+            that:
+              - item.0.rc == 0
+              - (item.1.content | default('') | b64decode | length > 0) == item.0.item.upgrades
+              # Quoted on purpose: an unquoted `": "` inside makes YAML parse a mapping, which
+              # ansible-core 2.19+ rejects ("Conditional expressions must be strings").
+              - "not item.0.item.upgrades or (item.1.content | b64decode) is search('\\[.\\*.\\]')"
+            fail_msg: "{{ item.0.item.name }}: rc={{ item.0.rc }} upgrade-call-recorded={{ item.1.content is defined }} {{ item.0.stdout }}{{ item.0.stderr }}"
+            quiet: true
+          loop: "{{ cu_runs.results | zip(cu_logs.results) | list }}"
+          loop_control:
+            label: "{{ item.0.item.name }}"
+      always:
+        - name: Remove the scratch directory
+          ansible.builtin.file:
+            path: "{{ cu_tmp.path }}"
+            state: absent

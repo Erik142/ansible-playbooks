@@ -215,3 +215,55 @@ jobs:
           # The render check ran in the previous step.
           STATIC_CHECKS_SKIP_RENDER: "1"
         run: tests/static-checks.sh
+
+  # Static gate of the Semaphore-to-Hetzner VM (ops-de-wahlberger-dev/tests/):
+  # the render check (templates verified in a disposable Tumbleweed container;
+  # the runner has docker) and static-checks.sh (lint triplet, syntax-check,
+  # grep/diff/parse scenarios, pytest tests/unit). The decrypted-vault checks
+  # print SKIPPED here by design (the vault password is a dummy). Full history
+  # is needed for the merge-base diffs.
+  ops-static:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Install Ansible tooling
+        run: pip install "ansible-core==2.20.8" ansible-lint yamllint pytest
+
+      - name: Provide a dummy vault password (CI never decrypts real secrets)
+        run: |
+          echo "ci-cannot-decrypt-this-is-expected" > "$RUNNER_TEMP/dummy-vault-pass"
+          echo "ANSIBLE_VAULT_PASSWORD_FILE=$RUNNER_TEMP/dummy-vault-pass" >> "$GITHUB_ENV"
+
+      - name: Install collection requirements
+        working-directory: ops-de-wahlberger-dev
+        run: ansible-galaxy collection install -r requirements.yml
+
+      # Test-only: the container guards (SH-GUARDS-C, e.g. security_check_mode)
+      # talk to their throwaway container via the community.docker.docker
+      # connection plugin. Not in requirements.yml: the playbook itself never
+      # uses it, so the production collection set stays unchanged.
+      - name: Install collections used only by the container guards
+        run: ansible-galaxy collection install "community.docker:>=5.4.0"
+
+      - name: Render check
+        working-directory: ops-de-wahlberger-dev
+        env:
+          # openSUSE's own registry avoids Docker Hub's pull limits.
+          RENDER_CHECK_IMAGE: registry.opensuse.org/opensuse/tumbleweed:latest
+        run: tests/render-check.sh
+
+      - name: Static checks
+        working-directory: ops-de-wahlberger-dev
+        env:
+          # The render check ran in the previous step.
+          STATIC_CHECKS_SKIP_RENDER: "1"
+        run: tests/static-checks.sh

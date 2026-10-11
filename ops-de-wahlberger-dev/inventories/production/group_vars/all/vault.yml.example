@@ -1,0 +1,35 @@
+# EXAMPLE Vault contents. Copy the structure, NOT values: every value is empty
+# on purpose.
+#
+# This file is a committed, plaintext template. The REAL file is the encrypted
+# sibling `vault.yml` (same directory). On the workstation, Erik builds it with
+# `tools/populate-vault.sh` (see tools/README.md): seven values are COPIED from
+# the Pi's Vault, two are GENERATED locally. Nothing is typed by hand.
+#
+# Every key below is referenced from vars.yml under a friendly (non-vault_)
+# name. If you add a key to vars.yml, add it here AND to tools/vault-manifest.yml
+# (tests/tools/test_populate_vault.py checks the three agree).
+
+# --- Copied verbatim from the Pi's Vault (SH-FR-43/44/46/146/147/148/201) -----
+# Cloudflare DNS API token (Zone:DNS:Edit on wahlberger.dev).
+vault_cloudflare_dns_api_token: ""
+# Semaphore secrets. The access key encryption value MUST equal the Pi's, or
+# the migrated database's stored credentials cannot be decrypted (SH-C-05,
+# SH-E-02).
+vault_semaphore_admin_password: ""
+vault_semaphore_access_key_encryption: ""
+vault_semaphore_cookie_hash: ""
+vault_semaphore_cookie_encryption: ""
+vault_semaphore_oidc_client_secret: ""
+# Resend API key for failure notification emails (same key as the Pi).
+vault_notify_failure_resend_api_key: ""
+
+# --- Generated locally (32 alphanumeric characters each, URL-safe) -------------
+# restic credentials for this VM's repository `ops` on the NAS (SH-BR-09). The
+# REST password goes into a rest:http://user:PASSWORD@host URL unescaped, so it
+# must stay [A-Za-z0-9]. T-20 later copies both into the NAS vault
+# (vault_restic_server_ops_htpasswd_password / _repo_password). Keep a copy of
+# the repository password outside Vault too: losing it makes the repository
+# unrecoverable.
+vault_restic_backup_repo_password: ""
+vault_restic_backup_rest_server_password: ""

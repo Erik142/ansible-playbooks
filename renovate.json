@@ -76,6 +76,16 @@
       "description": "Caddy upgrades skipped for now (incl. the locally built caddy-cloudflare image)",
       "matchPackageNames": ["docker.io/library/caddy", "localhost/caddy-cloudflare"],
       "enabled": false
+    },
+    {
+      "description": "Semaphore migration (SH-FR-160): the Pi directory is frozen until PR E removes it, so no update PR touches it. Removed by PR E.",
+      "matchFileNames": ["pi-de-int-wahlberger-dev/**"],
+      "enabled": false
+    },
+    {
+      "description": "Semaphore migration (SH-FR-161): the VM's Semaphore image must stay on the Pi's tag until cutover, so the VM role default is not bumped. Removed by PR D.",
+      "matchFileNames": ["ops-de-wahlberger-dev/roles/semaphore/defaults/main.yml"],
+      "enabled": false
     }
   ]
 }

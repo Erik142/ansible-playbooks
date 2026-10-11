@@ -1,0 +1,178 @@
+---
+# Variables applied to every host in the production inventory.
+#
+# group_vars/all/ is a *directory* (not a single file) on purpose: it lets a
+# plaintext `vars.yml` sit next to an encrypted `vault.yml`, so secrets and
+# non-secrets live side by side without mixing.
+#
+# Production state (T-12, pull request A): every key of the spec's Inputs table
+# has its production value. Values that only exist after a live step stay empty
+# on purpose and the roles that need them fail with a message naming the
+# variable instead of guessing:
+#   cloud_zt_ip   pull request A2, read from ZeroTier Central at OP-02; set together
+#                 with vm_zt_iface (the firewall role fails otherwise). The spec
+#                 Inputs table says "PR A": documented deviation (PLAN.md carry-over)
+#   vm_zt_ip      pull request A2
+#   vm_zt_iface   pull request A2 (read on the VM in step 3)
+#   semaphore_uid pull request A3 (read on the Pi in step 3)
+
+# --- Connection -------------------------------------------------------------
+# SSH login user. Privilege escalation (become) is turned on in site.yml.
+ansible_user: erikwahlberger
+
+# --- Design selector (SH-FR-220) ---------------------------------------------
+# `primary` (Caddy on host networking, Semaphore published on 127.0.0.1) or
+# `bridge_fallback` (both containers on caddy.network). Pull request A3
+# commits the step-3 decision; until then it is `primary`.
+vm_proxy_design: primary
+caddy_design: "{{ vm_proxy_design }}"
+semaphore_design: "{{ vm_proxy_design }}"
+
+# --- ZeroTier ------------------------------------------------------------------
+zerotier_network_id: "8056c2e21cc5c789"
+# This VM's member IP in Central (10.243.0.0/16). Empty in pull request A; set
+# in pull request A2. Caddy and cloudflare_dns fail while it is empty.
+vm_zt_ip: ""
+# Interface name of the ZeroTier device on the VM, read in step 3 (`ip -br
+# link`) and set in pull request A2. Empty: the firewall skips the zone.
+vm_zt_iface: ""
+# cloud-wahlberger-dev's ZeroTier member IP (Beszel hub source), a required
+# placeholder: the real value comes from ZeroTier Central at OP-02 and is not in
+# any repository file. While vm_zt_iface is empty the firewall role skips the
+# ZeroTier zone and never reads it; once vm_zt_iface is set, an empty value
+# makes the firewall role fail before any change, naming firewall_cloud_zt_ip.
+cloud_zt_ip: ""
+# cloud-wahlberger-dev's public IPv4 (A record cloud.wahlberger.dev, a public
+# DNS fact, not a secret). fail2ban never bans it (SH-FR-124).
+cloud_public_ip: "49.13.141.178"
+
+# --- Hardening (security role) -----------------------------------------------
+security_ssh_permit_root_login: "no"
+security_ssh_password_authentication: "no"
+security_ssh_allow_users:
+  - erikwahlberger
+security_fail2ban_enabled: true
+security_fail2ban_findtime: 600
+# SH-FR-124: loopback, the Semaphore container subnet, the home LAN, the
+# ZeroTier network and cloud's public IPv4. tests/guards.d/vm_vars.yml checks
+# this list; 127.0.0.0/8 is also always added by the security role.
+security_fail2ban_ignoreip:
+  - 127.0.0.0/8
+  - "{{ semaphore_network_subnet }}"
+  - 10.10.0.0/16
+  - 10.243.0.0/16
+  - "{{ cloud_public_ip }}"
+security_ssh_login_notify_enabled: true
+security_snapper_enabled: true
+security_autoupdate_enabled: true
+security_autoupdate_reboot: true
+# Passwordless sudo for Semaphore's unattended playbook runs against this host.
+security_sudoers_passwordless:
+  - erikwahlberger
+
+# --- SSH access (ssh_authorized_keys role) ----------------------------------
+# Entries are full authorized_keys lines (options such as from= are allowed).
+# Public keys, so plaintext. Steps 0 to 5: the personal key only (SH-BR-10,
+# SH-FR-62); the new automation key joins in pull request C.
+ssh_authorized_keys_list:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJSKdeHoK+WkyBI69OSZqn0sVqZPPDRs082S/IVoOeSu erikwahlberger@personal"
+# Keys listed here are removed from the host; set by pull request E.
+ssh_authorized_keys_revoked: []
+
+# --- Containers / disk space ---------------------------------------------------
+podman_data_dir: /opt/podman
+# The VM has no separate data mount: /opt/podman lives on the root filesystem.
+podman_require_mountpoint: false
+podman_image_prune_enabled: true
+disk_space_paths:
+  - /
+# SH-FR-20: email the owner when / reaches 85 % used.
+disk_space_threshold_percent: 85
+
+# --- Failure notifications -------------------------------------------------
+# Failures of one unit within notify_failure_crash_window_seconds before the
+# owner is emailed (role default; stated so the threshold is visible here).
+notify_failure_crash_threshold: 5
+
+# --- Firewall -----------------------------------------------------------------
+# Public zone: ssh only (SH-CC-15). T-07 adds the ZeroTier zone.
+firewall_allowed_services:
+  - ssh
+firewall_zerotier_interface: "{{ vm_zt_iface }}"
+# Beszel hub source for 45876/tcp in the ZeroTier zone. Empty (and unused) until
+# cloud_zt_ip is known; see the note at cloud_zt_ip.
+firewall_cloud_zt_ip: "{{ cloud_zt_ip }}"
+
+# --- Monitoring ----------------------------------------------------------------
+beszel_agent_port: 45876
+beszel_agent_hub_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKz/U0NWhnhm19QvVrNu6sVuXiEPVdoPCrGMC8MzTNdH"
+
+# --- DNS (cloudflare_dns role) -------------------------------------------------
+# `cloudflare_dns_ip` keeps the role default (the VM's public IPv4, SH-A-19).
+cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token | default('') }}"
+cloudflare_dns_extra_a_records:
+  - record: ops.de.int.wahlberger.dev
+    value: "{{ vm_zt_ip }}"
+cloudflare_dns_cname_target: ops.de.int.wahlberger.dev
+# False until pull request D: the semaphore CNAME stays on the Pi until then.
+semaphore_dns_cutover_enabled: false
+cloudflare_dns_cnames_enabled: "{{ semaphore_dns_cutover_enabled }}"
+
+# --- Reverse proxy (caddy role) -------------------------------------------------
+caddy_data_dir: /opt/podman/caddy
+caddy_acme_email: "ewahlberger@gmail.com"
+caddy_bind_address: "{{ vm_zt_ip }}"
+# Bridge fallback: caddy.network gets the same fixed subnet as semaphore.network,
+# so the fail2ban ignore list and the `from=` check still match (F-05).
+caddy_network_subnet: "{{ semaphore_network_subnet }}"
+caddy_allowed_sources:
+  - 10.243.0.0/16
+  - 10.10.0.0/16
+caddy_sites:
+  - host: semaphore.de.int.wahlberger.dev
+    upstream: "127.0.0.1:3000"
+
+# --- Semaphore UI ---------------------------------------------------------------
+semaphore_url: "https://semaphore.de.int.wahlberger.dev"
+semaphore_oidc_client_id: "63093482-d2cc-4c77-89df-9f6ff78b160e"
+# Production refuses to create an empty database (SH-E-01).
+semaphore_require_existing_db: true
+# semaphore_image is deliberately not pinned here: the role default
+# (roles/semaphore/defaults/main.yml) is the tag running on the Pi at step 4
+# (SH-E-04). Only override it here if the Pi's tag moves before the cutover.
+# Fixed bridge subnet for semaphore.network (SH-FR-127); outside 10.10.0.0/16
+# and 10.243.0.0/16 (checked by tests/guards.d/vm_vars.yml). 172.29.30.0/24 is in
+# 172.16.0.0/12, which collides with neither the LAN, ZeroTier, podman's default
+# 10.88.0.0/16 nor Hetzner's public ranges.
+semaphore_network_subnet: 172.29.30.0/24
+# Container UID, read on the Pi in step 3 and set by pull request A3. Empty:
+# the semaphore role fails naming this variable.
+semaphore_uid: ""
+
+# --- Backups (restic_backup role) ------------------------------------------------
+restic_backup_rest_server_host: nas.de.int.wahlberger.dev
+restic_backup_rest_server_port: 8000
+restic_backup_rest_server_username: ops
+restic_backup_forget_enabled: false
+# false until step 4: before the database is copied there is no SQLite file to
+# back up, and true would mail a failure every day. delete in PR A3 (the
+# role default `true` then applies). Delete it in pull request A3, before the
+# step-5 apply; A3 must also update tests/guards.d/vm_vars.yml (the `sameas false`
+# assert) in the same pull request.
+restic_backup_sqlite_required: false
+restic_backup_notify_on_success: true
+restic_backup_on_calendar: "*-*-* 05:00:00"
+restic_backup_repo_password: "{{ vault_restic_backup_repo_password | default('') }}"
+restic_backup_rest_server_password: "{{ vault_restic_backup_rest_server_password | default('') }}"
+
+# --- Secrets (Ansible Vault) ---------------------------------------------------------
+# Never put secrets in plaintext. They live in the encrypted sibling
+# `vault.yml`, each with a `vault_` prefix, surfaced here under a friendly
+# name; `| default('')` keeps roles failing with a clear assert when the Vault
+# is absent. The scaffold is `vault.yml.example`.
+semaphore_admin_password: "{{ vault_semaphore_admin_password | default('') }}"
+semaphore_access_key_encryption: "{{ vault_semaphore_access_key_encryption | default('') }}"
+semaphore_cookie_hash: "{{ vault_semaphore_cookie_hash | default('') }}"
+semaphore_cookie_encryption: "{{ vault_semaphore_cookie_encryption | default('') }}"
+semaphore_oidc_client_secret: "{{ vault_semaphore_oidc_client_secret | default('') }}"
+notify_failure_resend_api_key: "{{ vault_notify_failure_resend_api_key | default('') }}"

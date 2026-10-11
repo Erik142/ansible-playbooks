@@ -1,0 +1,63 @@
+---
+argument_specs:
+  main:
+    short_description: Host firewall via firewalld, public zone ssh only, ZeroTier zone by interface name.
+    description:
+      - Installs and enables firewalld, allows only the given services in the
+        public zone, and enables masquerading so Podman's published container
+        ports keep working.
+      - When firewall_zerotier_interface is set, binds that interface by name
+        to the ZeroTier zone, which allows ssh and https and accepts the Beszel
+        agent port from one cloud address only. Makes permanent plus runtime
+        changes only; firewalld itself is never bounced.
+    options:
+      firewall_zone:
+        type: str
+        required: false
+        description: firewalld zone of the public interface.
+      firewall_allowed_services:
+        type: list
+        elements: str
+        required: false
+        description: Predefined firewalld services the public zone allows inbound. Default is ssh only.
+      firewall_public_removed_services:
+        type: list
+        elements: str
+        required: false
+        description: Services removed from the public zone if present (entries also in firewall_allowed_services are kept).
+      firewall_allowed_ports:
+        type: list
+        elements: str
+        required: false
+        description: "Ports (as port/proto strings, e.g. '9993/udp') to allow inbound in the public zone."
+      firewall_rich_rules:
+        type: list
+        elements: str
+        required: false
+        description: firewalld rich rules (full rule strings) applied to firewall_zone. Default is an empty list.
+      firewall_zerotier_interface:
+        type: str
+        required: false
+        description: >-
+          ZeroTier interface name (vm_zt_iface). Empty skips the ZeroTier zone
+          binding and rules with a message naming vm_zt_iface.
+      firewall_zerotier_zone:
+        type: str
+        required: false
+        description: Name of the zone the ZeroTier interface is bound to.
+      firewall_zerotier_services:
+        type: list
+        elements: str
+        required: false
+        description: Services the ZeroTier zone allows. Default is ssh and https.
+      firewall_zerotier_agent_port:
+        type: int
+        required: false
+        description: Beszel agent TCP port allowed in the ZeroTier zone from firewall_cloud_zt_ip only.
+      firewall_cloud_zt_ip:
+        type: str
+        required: false
+        description: >-
+          cloud-wahlberger-dev's ZeroTier member IPv4 address (cloud_zt_ip).
+          Required (the role fails before any change if it is not an IPv4
+          address) whenever firewall_zerotier_interface is set.

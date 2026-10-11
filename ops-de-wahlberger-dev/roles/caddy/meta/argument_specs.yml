@@ -1,0 +1,75 @@
+---
+argument_specs:
+  main:
+    short_description: Caddy reverse proxy bound to the VM's ZeroTier address, 403 outside the allowed networks.
+    description:
+      - Primary design runs Caddy on host networking and binds caddy_bind_address
+        (default_bind). The bridge fallback joins caddy.network and publishes
+        caddy_bind_address:443:443. Both serve HTTPS only (no port 80), have no
+        admin endpoint and answer 403 to clients outside caddy_allowed_sources.
+      - Fails before any change while caddy_bind_address (vm_zt_ip) is empty.
+    options:
+      caddy_design:
+        type: str
+        required: false
+        choices: [primary, bridge_fallback]
+        description: Network design, from vm_proxy_design.
+      caddy_image:
+        type: str
+        required: false
+        description: Locally built Caddy image tag (with the Cloudflare DNS module).
+      caddy_data_dir:
+        type: path
+        required: false
+        description: Host directory for the Caddyfile, caddy.env and Caddy state (certs).
+      caddy_build_dir:
+        type: path
+        required: false
+        description: Host directory holding the Containerfile build context.
+      caddy_network_subnet:
+        type: str
+        required: false
+        description: >-
+          IPv4 subnet of caddy.network (bridge fallback only). Production sets it to
+          semaphore_network_subnet. Empty omits the Subnet= line.
+      caddy_bind_address:
+        type: str
+        required: false
+        description: >-
+          IPv4 address Caddy listens on (vm_zt_ip). Empty (the default) makes the
+          role fail before any change, naming vm_zt_ip.
+      caddy_allowed_sources:
+        type: list
+        elements: str
+        required: false
+        description: IPv4 CIDR ranges allowed to reach the sites; all other clients get 403. Must not be empty.
+      caddy_upstream_primary:
+        type: str
+        required: false
+        description: Upstream (host:port) of a site that sets none, in the primary design.
+      caddy_upstream_fallback:
+        type: str
+        required: false
+        description: Upstream used instead of any loopback upstream in the bridge fallback.
+      caddy_acme_email:
+        type: str
+        required: false
+        description: Email for Let's Encrypt registration (optional).
+      caddy_sites:
+        type: list
+        elements: dict
+        required: false
+        description: Sites to serve.
+        options:
+          host:
+            type: str
+            required: true
+            description: Hostname to serve.
+          upstream:
+            type: str
+            required: false
+            description: host:port to reverse_proxy to (default per caddy_design).
+          extra:
+            type: str
+            required: false
+            description: Optional raw Caddy directives for the site block.

@@ -1,0 +1,14 @@
+{# Rendered by the security role to /etc/fail2ban/jail.local. #}
+# Rendered by Ansible. Do NOT edit on the host.
+[DEFAULT]
+# SH-FR-124: never ban these. 127.0.0.0/8 first, then the configured list.
+ignoreip = {{ (['127.0.0.0/8'] + security_fail2ban_ignoreip) | unique | join(' ') }}
+# SH-FR-211: an nftables ban action, no firewalld rich rule in the public zone.
+banaction = {{ security_fail2ban_banaction }}
+
+[sshd]
+enabled = true
+backend = systemd
+findtime = {{ security_fail2ban_findtime }}
+bantime = {{ security_fail2ban_bantime }}
+maxretry = {{ security_fail2ban_maxretry }}

@@ -1,0 +1,37 @@
+---
+# Default variables for the `podman` role.
+
+# Packages providing Podman, the Docker-compat CLI, and Quadlet support.
+podman_packages:
+  - podman
+  - podman-docker
+
+# Root directory for persistent container (bind-mount) data. Expected to be a
+# separately mounted disk on this host — see the top-level README's "Data
+# layout" section.
+podman_data_dir: /mnt/containers
+
+# Fail unless podman_data_dir is an actual mountpoint. Set false on hosts with
+# no separate data mount (e.g. the Hetzner VM keeps /opt/podman on the root fs).
+podman_require_mountpoint: true
+
+# Directory systemd reads Quadlet unit files from (system-wide / rootful).
+podman_quadlet_dir: /etc/containers/systemd
+
+# Enable podman.socket so tools that speak the Docker-compatible API work.
+podman_enable_socket: true
+
+# Periodically prune images no container uses, so replaced image versions
+# (e.g. after a Renovate bump) don't fill the disk.
+podman_image_prune_enabled: true
+# systemd OnCalendar expression for the prune timer.
+podman_image_prune_on_calendar: weekly
+# Only prune images created more than this long ago (podman `until` filter),
+# leaving a rollback window for the previous version.
+podman_image_prune_min_age: 168h
+
+# containers.conf `base_hosts_file`: what seeds each container's /etc/hosts.
+# "" = copy the host's (Podman's default; breaks containers that resolve the
+# host's own FQDN whenever the host maps it to 127.0.1.1), "image" = the
+# image's own, "none" = empty.
+podman_base_hosts_file: image

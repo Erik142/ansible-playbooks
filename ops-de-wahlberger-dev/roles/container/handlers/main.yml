@@ -1,0 +1,8 @@
+---
+- name: Restart the container service
+  ansible.builtin.systemd:
+    name: "{{ container_name }}.service"
+    state: restarted
+    daemon_reload: true
+  # A fresh VM under --check has no unit yet (the Quadlet task only simulated).
+  when: not ansible_check_mode

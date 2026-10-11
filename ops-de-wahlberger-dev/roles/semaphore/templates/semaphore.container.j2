@@ -1,0 +1,42 @@
+{% set _net = 'semaphore' if semaphore_design == 'primary' else 'caddy' %}
+[Unit]
+Description=Semaphore UI (Ansible automation)
+After=network-online.target {{ _net }}-network.service
+Wants=network-online.target
+Requires={{ _net }}-network.service
+# Emails ewahlberger@gmail.com via Resend after 5 consecutive failures —
+# see the notify_failure role. %n form because Restart=always (SH-FR-144).
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=semaphore
+Image={{ semaphore_image }}
+# Design: {{ semaphore_design }}. primary = semaphore.network (fixed subnet {{ semaphore_network_subnet }}),
+# port 3000 on 127.0.0.1 only. bridge_fallback = caddy.network, no published port.
+Network={{ _net }}.network
+{% if semaphore_design == 'primary' %}
+PublishPort=127.0.0.1:3000:3000
+{% endif %}
+# Resolvers (SH-FR-41). Inside the container these names must resolve like
+# `dig @{{ semaphore_dns_servers | first }}`: {{ semaphore_getent_names | join(' ') }}
+{% for dns in semaphore_dns_servers %}
+DNS={{ dns }}
+{% endfor %}
+# Mounted as a single file, not a directory: config.json.j2 IS Semaphore's
+# real config (secrets included) — nothing here is auto-generated. See
+# tasks/main.yml for why env vars alone don't work for this.
+# :Z relabels the mount to container_file_t (SH-FR-208), recursively for the
+# data directory, so database.sqlite carries the label after the first start.
+Volume={{ semaphore_data_dir }}/config.json:/etc/semaphore/config.json:Z
+# The actual database path config.json declares — must be persisted here
+# too, or every restart silently starts from an empty database.
+Volume={{ semaphore_data_dir }}/data:/var/lib/semaphore:Z
+# OIDC config comes from this root-only file, rendered by the semaphore role
+# from Ansible Vault.
+EnvironmentFile={{ semaphore_data_dir }}/semaphore.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

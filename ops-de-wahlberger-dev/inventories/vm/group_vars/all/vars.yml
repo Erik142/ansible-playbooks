@@ -1,0 +1,62 @@
+---
+# Fixture overrides (T-16). Everything here is fake or a RFC 5737 documentation
+# address. The production vars.yml is NOT loaded: tests/vm/gen-prod-vars.py
+# writes its non-secret keys, minus the keys below, to a scratch file passed as
+# extra vars, and production vault.yml is never read.
+
+# --- Connection ------------------------------------------------------------------
+ansible_user: fixture
+
+# --- ZeroTier stand-ins (never a real ZeroTier address) -----------------------------
+# zt0 is a veth pair created by the fixture (provision-guest.sh); 198.51.100.0/24
+# is TEST-NET-2. The client end lives in network namespace `ztpeer`.
+vm_zt_ip: 198.51.100.10
+vm_zt_iface: zt0
+cloud_zt_ip: 198.51.100.99
+cloud_public_ip: 192.0.2.99
+
+# --- Hardening ------------------------------------------------------------------
+# The fixture user is the only login (production: erikwahlberger).
+security_ssh_allow_users:
+  - fixture
+security_sudoers_passwordless:
+  - fixture
+# ssh_authorized_keys: the production user does not exist on the fixture.
+ssh_authorized_keys_user: fixture
+# Resend is never contacted from the fixture.
+security_ssh_login_notify_enabled: false
+# Containers only: no separate data mount on the fixture, as on the VM.
+podman_require_mountpoint: false
+
+# --- Caddy: no ACME, no Cloudflare ----------------------------------------------------
+# `tls internal` makes Caddy issue from its own local CA, so it never contacts
+# Let's Encrypt or Cloudflare. The host name does not exist anywhere.
+caddy_acme_email: ""
+caddy_allowed_sources:
+  - 198.51.100.0/24
+  - 10.243.0.0/16
+  - 10.10.0.0/16
+caddy_sites:
+  - host: semaphore.fixture.invalid
+    upstream: "127.0.0.1:3000"
+    extra: "tls internal"
+
+# --- Semaphore ---------------------------------------------------------------------
+semaphore_uid: 1001
+semaphore_url: "https://semaphore.fixture.invalid"
+semaphore_oidc_provider_url: "https://oidc.fixture.invalid"
+semaphore_oidc_client_id: "fixture-client-id"
+
+# --- Throwaway secrets (fake, not derived from anything real) -----------------------------
+# The Cloudflare module of Caddy validates the token shape (40 characters) when it
+# loads, even with `tls internal`; the value is a fake and is never sent anywhere.
+# Production reads these from vault.yml through `vault_*`; here they are plain.
+vault_semaphore_admin_password: "fixture-admin-not-a-secret"
+vault_semaphore_access_key_encryption: "Zml4dHVyZS1ub3QtYS1zZWNyZXQtMzItYnl0ZXMhISE="
+vault_semaphore_cookie_hash: "Zml4dHVyZS1ub3QtYS1zZWNyZXQtMzItYnl0ZXMhISE="
+vault_semaphore_cookie_encryption: "Zml4dHVyZS1ub3QtYS1zZWNyZXQtMzItYnl0ZXMhISE="
+vault_semaphore_oidc_client_secret: "fixture-oidc-not-a-secret"
+vault_cloudflare_dns_api_token: "fixturedummytokenneversentxxxxxxxxxxxxxx"
+vault_notify_failure_resend_api_key: "re_fixture_dummy_never_sent"
+vault_restic_backup_repo_password: "fixture-restic-not-a-secret"
+vault_restic_backup_rest_server_password: "fixture-rest-not-a-secret"

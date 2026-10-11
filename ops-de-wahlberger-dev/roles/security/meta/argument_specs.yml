@@ -1,0 +1,107 @@
+---
+argument_specs:
+  main:
+    short_description: Public-SSH hardening, fail2ban, locked passwords, login email, and automatic patching.
+    description:
+      - Hardens sshd for a host with public SSH (key-only, AllowUsers, validated
+        with `sshd -t` and reloaded, never restarted), locks every account
+        password, installs fail2ban with an nftables ban action, emails on
+        SSH logins from public addresses, and schedules the weekly zypper dup with rebootmgr and snapper.
+    options:
+      security_ssh_permit_root_login:
+        type: str
+        required: false
+        description: sshd_config PermitRootLogin value.
+      security_ssh_password_authentication:
+        type: str
+        required: false
+        description: sshd_config PasswordAuthentication value.
+      security_ssh_allow_users:
+        type: list
+        elements: str
+        required: false
+        description: Users allowed to log in over SSH (AllowUsers). Must not be empty.
+      security_ssh_max_auth_tries:
+        type: int
+        required: false
+        description: sshd MaxAuthTries.
+      security_ssh_login_grace_time:
+        type: int
+        required: false
+        description: sshd LoginGraceTime in seconds.
+      security_ssh_extra_directives:
+        type: list
+        elements: str
+        required: false
+        description: Extra "Keyword value" sshd directives, validated with sshd -t like the fixed ones.
+      security_ssh_login_notify_enabled:
+        type: bool
+        required: false
+        description: Email when an SSH login succeeds from a source outside the ignore list.
+      security_ssh_login_notify_ignore:
+        type: list
+        elements: str
+        required: false
+        description: Networks that never trigger the login email. Defaults to loopback plus security_fail2ban_ignoreip.
+      security_fail2ban_findtime:
+        type: int
+        required: false
+        description: Window in seconds in which maxretry failures cause a ban.
+      security_fail2ban_ignoreip:
+        type: list
+        elements: str
+        required: false
+        description: Networks fail2ban never bans (127.0.0.0/8 is always added).
+      security_fail2ban_banaction:
+        type: str
+        required: false
+        description: fail2ban ban action. Must not be a firewalld rich-rule action.
+      security_fail2ban_enabled:
+        type: bool
+        required: false
+        description: Whether to install and enable fail2ban for sshd.
+      security_fail2ban_bantime:
+        type: int
+        required: false
+        description: Seconds an IP stays banned after too many failed logins.
+      security_fail2ban_maxretry:
+        type: int
+        required: false
+        description: Failed login attempts allowed before a ban.
+      security_autoupdate_enabled:
+        type: bool
+        required: false
+        description: Whether to schedule the weekly zypper dup.
+      security_autoupdate_on_calendar:
+        type: str
+        required: false
+        description: systemd OnCalendar expression for the zypper-dup timer.
+      security_autoupdate_reboot:
+        type: bool
+        required: false
+        description: Ask rebootmgr for a reboot after the dup when zypper says one is needed; rebootmgr performs it in the window.
+      security_autoupdate_reboot_window_start:
+        type: str
+        required: false
+        description: rebootmgr window-start, a systemd calendar expression such as "Sun 04:00".
+      security_autoupdate_reboot_window_duration:
+        type: str
+        required: false
+        description: rebootmgr window-duration (e.g. "1h").
+      security_autoupdate_reboot_strategy:
+        type: str
+        required: false
+        description: rebootmgr strategy (maint-window/best-effort/instantly/off).
+      security_snapper_enabled:
+        type: bool
+        required: false
+        description: Install snapper and snapper-zypp-plugin so zypper transactions get btrfs pre/post snapshots.
+      security_snapper_force_resolution:
+        type: bool
+        required: false
+        description: Pass --force-resolution to zypper when installing snapper. Defaults to true in containers only.
+      security_sudoers_passwordless:
+        type: list
+        elements: str
+        required: false
+        description: Usernames granted passwordless sudo via /etc/sudoers.d drop-ins.

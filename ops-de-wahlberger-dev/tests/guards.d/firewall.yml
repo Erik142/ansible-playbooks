@@ -1,0 +1,92 @@
+---
+# Guard test for the `firewall` role (T-16 defect 1, R6 / OP-02): on a fresh
+# host `--check --diff` only simulates creating the ZeroTier zone, so every
+# task that needs the zone to exist (INVALID_ZONE otherwise) must be gated by
+# `firewall_zerotier_zone_ready`, and that fact must stay defined and keep
+# depending on `ansible_check_mode`. Run from the playbook directory:
+#   ansible-playbook -i localhost, tests/guards.d/firewall.yml
+# (tests/guard-tests.sh firewall does that hermetically.) Static: it reads
+# roles/firewall/tasks/zerotier.yml; nothing touches a host or a Vault.
+# The fixture proves the behaviour (tests/vm/RESULTS.md); this stops the gate
+# from being removed or a new zone task from being added without it.
+- name: Guard test firewall (zone-dependent tasks are gated on firewall_zerotier_zone_ready)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    fg_file: "{{ playbook_dir }}/../../roles/firewall/tasks/zerotier.yml"
+    # Jinja delimiters are neutralised so the parsed role file is data, not
+    # templated again when this variable is resolved.
+    fg_tasks: >-
+      {{ lookup('ansible.builtin.file', fg_file)
+         | regex_replace('\{\{', '[[') | regex_replace('\{%', '[%') | from_yaml }}
+    fg_main_file: "{{ playbook_dir }}/../../roles/firewall/tasks/main.yml"
+    fg_main_tasks: >-
+      {{ lookup('ansible.builtin.file', fg_main_file)
+         | regex_replace('\{\{', '[[') | regex_replace('\{%', '[%') | from_yaml }}
+    fg_main_firewalld_tasks: >-
+      {% set r = [] %}{% for t in fg_main_tasks if 'ansible.posix.firewalld' in t %}{% set _ = r.append(t) %}{% endfor %}{{ r }}
+    fg_main_service_tasks: >-
+      {% set r = [] %}{% for t in fg_main_tasks if 'ansible.builtin.systemd' in t %}{% set _ = r.append(t) %}{% endfor %}{{ r }}
+    # Tasks that may use the zone without the gate: the one that creates it.
+    fg_ungated_ok: ["Create the ZeroTier zone in the permanent configuration"]
+    # Dotted module names cannot go through selectattr (dots mean nesting), so
+    # the two lists are built with a loop.
+    fg_fact_tasks: >-
+      {% set r = [] %}{% for t in fg_tasks if 'ansible.builtin.set_fact' in t
+      and 'firewall_zerotier_zone_ready' in t['ansible.builtin.set_fact'] %}{% set _ = r.append(t['ansible.builtin.set_fact']) %}{% endfor %}{{ r }}
+    fg_zone_tasks: >-
+      {% set r = [] %}{% for t in fg_tasks if 'ansible.posix.firewalld' in t
+      and t.name not in fg_ungated_ok %}{% set _ = r.append(t) %}{% endfor %}{{ r }}
+  tasks:
+    # --check on a fresh host: firewalld is only simulated-installed (code review PR A, item 2).
+    - name: The enable/start task tolerates the missing unit in check mode only
+      ansible.builtin.assert:
+        that:
+          - fg_main_service_tasks | length == 1
+          - "'Could not find the requested service' in (fg_main_service_tasks[0].failed_when | string)"
+          - "'ansible_check_mode' in (fg_main_service_tasks[0].failed_when | string)"
+        quiet: true
+
+    - name: Every ansible.posix.firewalld task of main.yml is skipped when firewalld is not usable
+      ansible.builtin.assert:
+        that:
+          - fg_main_firewalld_tasks | length >= 5
+          - "'firewall_firewalld_usable' in (item.when | default('') | string)"
+        fail_msg: "{{ item.name }} runs without `when: firewall_firewalld_usable | bool`; --check on a fresh host fails (module cannot import firewalld)"
+        quiet: true
+      loop: "{{ fg_main_firewalld_tasks }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: The readiness fact is defined exactly once
+      ansible.builtin.assert:
+        that: fg_fact_tasks | length == 1
+        fail_msg: firewall_zerotier_zone_ready must be set by exactly one set_fact task in roles/firewall/tasks/zerotier.yml
+        quiet: true
+
+    - name: The readiness fact depends on check mode (a real run is always ready)
+      ansible.builtin.assert:
+        that:
+          - "'ansible_check_mode' in (fg_fact_tasks[0].firewall_zerotier_zone_ready | string)"
+          - "'firewall_known_permanent_zones' in (fg_fact_tasks[0].firewall_zerotier_zone_ready | string)"
+        fail_msg: firewall_zerotier_zone_ready must be true outside check mode and, in check mode, only when the permanent configuration already holds the zone
+        quiet: true
+
+    - name: There are zone-dependent tasks to check
+      ansible.builtin.assert:
+        that: fg_zone_tasks | length >= 3
+        fail_msg: expected the three ZeroTier-zone tasks (services, Beszel rich rule, interface binding) besides the zone creation
+        quiet: true
+
+    - name: Every zone-dependent task is gated on the readiness fact
+      ansible.builtin.assert:
+        that: "'firewall_zerotier_zone_ready' in (item.when | default('') | string)"
+        fail_msg: >-
+          {{ item.name }} uses the ZeroTier zone but has no
+          `when: firewall_zerotier_zone_ready | bool`; on a fresh host --check
+          fails with INVALID_ZONE
+        quiet: true
+      loop: "{{ fg_zone_tasks }}"
+      loop_control:
+        label: "{{ item.name }}"

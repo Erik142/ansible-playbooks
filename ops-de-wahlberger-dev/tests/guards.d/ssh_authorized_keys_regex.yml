@@ -1,0 +1,41 @@
+---
+# Guard test for the key-line regexes of the ssh_authorized_keys role (code
+# review PR A, item 1). A comment that itself contains `ssh-`, `sk-` or
+# `ecdsa-sha2-` once made the body regex pick the wrong token
+# (`ssh-ed25519 AAAA my ssh-thing x` -> body `x`), which defeats the
+# "key in both lists" check. Runs the regexes of ALL three role copies (nas,
+# cloud, ops) against the reproducers; nothing touches a host or a Vault.
+#   ansible-playbook -i localhost, tests/guards.d/ssh_authorized_keys_regex.yml
+- name: Guard test ssh_authorized_keys body and comment regexes
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    gt_repo: "{{ playbook_dir }}/../../.."
+    gt_vars_files:
+      - "{{ gt_repo }}/nas-de-int-wahlberger-dev/roles/ssh_authorized_keys/vars/main.yml"
+      - "{{ gt_repo }}/cloud-wahlberger-dev/roles/ssh_authorized_keys/vars/main.yml"
+      - "{{ gt_repo }}/ops-de-wahlberger-dev/roles/ssh_authorized_keys/vars/main.yml"
+    # [line, expected body, expected comment]
+    gt_cases:
+      - ['ssh-ed25519 AAAA my ssh-thing x', AAAA, 'my ssh-thing x']
+      - ['ssh-ed25519 AAAA a sk-x ecdsa-sha2-y z', AAAA, 'a sk-x ecdsa-sha2-y z']
+      - ['ssh-ed25519 AAAA', AAAA, '']
+      - ['ssh-ed25519 AAA c', AAA, c]
+      - ['from="1.2.3.4",no-pty ssh-ed25519 AAA c', AAA, c]
+      - ['from="1.2.3.4, 5.6.7.8" ssh-ed25519 AAA c ssh-y', AAA, 'c ssh-y']
+      - ['no-pty sk-ssh-ed25519@openssh.com AAA my ecdsa-sha2-x y', AAA, 'my ecdsa-sha2-x y']
+      - ['ecdsa-sha2-nistp256 AAA c', AAA, c]
+  tasks:
+    - name: Body and comment of every reproducer, against every role copy
+      ansible.builtin.assert:
+        that:
+          - (item.0[0] | regex_findall(gt_regexes.ssh_authorized_keys_body_regex) | first | default('NOMATCH')) == item.0[1]
+          - (item.0[0] | regex_findall(gt_regexes.ssh_authorized_keys_comment_regex) | first | default('NOMATCH')) == item.0[2]
+        fail_msg: "{{ item.1 }}: wrong body or comment for '{{ item.0[0] }}'"
+        quiet: true
+      vars:
+        gt_regexes: "{{ lookup('ansible.builtin.file', item.1) | from_yaml }}"
+      loop: "{{ gt_cases | product(gt_vars_files) | list }}"
+      loop_control:
+        label: "{{ item.1 | dirname | dirname | dirname | dirname | basename }}: {{ item.0[0] }}"

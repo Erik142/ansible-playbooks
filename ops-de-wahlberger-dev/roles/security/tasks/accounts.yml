@@ -1,0 +1,34 @@
+---
+# SH-FR-122: no account has a usable password; SH-FR-18: passwordless sudo.
+#
+# Locking depends on sshd running with `UsePAM yes` (set in sshd.yml): without
+# PAM, OpenSSH refuses even public-key logins for an account whose shadow
+# field starts with "!". sshd.yml reloads sshd before this file runs.
+- name: Read the shadow database
+  ansible.builtin.getent:
+    database: shadow
+  # getent only reads; it must also run under --check so the next task can
+  # report what it would lock.
+  check_mode: false
+
+# `usermod -L` prepends "!" to the existing hash (and turns an empty field into
+# "!"), so an account locked here can be unlocked again with `usermod -U`.
+- name: Lock every account that still has a usable password
+  ansible.builtin.user:
+    name: "{{ item.key }}"
+    password_lock: true
+  loop: "{{ ansible_facts.getent_shadow | dict2items | rejectattr('value.0', 'match', '^[!*]') | list }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+# Needed for Semaphore UI's unattended playbook runs: it cannot type a sudo
+# password. A separate 0440 drop-in per user.
+- name: Grant configured users passwordless sudo
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/90-{{ item }}-nopasswd"
+    content: "{{ item }} ALL=(ALL) NOPASSWD: ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+  loop: "{{ security_sudoers_passwordless }}"

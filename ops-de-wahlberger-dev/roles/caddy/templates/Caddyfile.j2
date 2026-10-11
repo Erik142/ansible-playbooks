@@ -1,0 +1,39 @@
+{# Rendered by Ansible from caddy_* variables; do not edit on the host. #}
+{# Global options validated in spike A-33 (docs/spikes/A-33-caddy-global-options.md). #}
+{
+    # No admin endpoint (SH-FR-184) and no port-80 listener: DNS-01 needs none,
+    # and disabling the redirects removes the implicit port 80 socket (SH-FR-183).
+    admin off
+    auto_https disable_redirects
+{% if caddy_design == 'primary' %}
+    # Host networking: bind the ZeroTier address only (SH-FR-07). The start
+    # fails while the address does not exist yet; systemd restarts it (SH-E-33).
+    default_bind {{ caddy_bind_address }}
+{% endif %}
+{% if caddy_acme_email | length > 0 %}
+    email {{ caddy_acme_email }}
+{% endif %}
+    # DNS-01 via Cloudflare. The token comes from caddy.env, never written here.
+    acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+}
+{% for site in caddy_sites %}
+{% set upstream = site.upstream | default(caddy_upstream_primary, true) %}
+{% if caddy_design == 'bridge_fallback' and upstream is match('^(127\\.0\\.0\\.1|localhost):') %}
+{% set upstream = caddy_upstream_fallback %}
+{% endif %}
+
+{{ site.host }} {
+    # One access-log line per request, with the client address (SH-FR-196).
+    log {
+        output stdout
+        format json
+    }
+    # Anything outside the allow list gets 403 (SH-FR-129).
+    @denied not remote_ip {{ caddy_allowed_sources | join(' ') }}
+    respond @denied 403
+    reverse_proxy {{ upstream }}
+{% if site.extra | default("", true) | length > 0 %}
+    {{ site.extra }}
+{% endif %}
+}
+{% endfor %}

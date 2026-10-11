@@ -1,0 +1,17 @@
+{# Rendered by the security role to /etc/systemd/system/zypper-dup.service. #}
+[Unit]
+Description=Weekly zypper dup (Tumbleweed distribution upgrade)
+Wants=network-online.target
+After=network-online.target
+OnFailure=notify-failure-immediate@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/zypper --non-interactive dup --auto-agree-with-licenses
+# 102 = ZYPPER_EXIT_INF_REBOOT_NEEDED: the upgrade worked and wants a reboot.
+SuccessExitStatus=102
+{% if security_autoupdate_reboot | bool %}
+# Only after a successful run. The script only asks rebootmgr for a reboot, so
+# the reboot waits for the maintenance window.
+ExecStartPost=/usr/local/bin/zypper-dup-request-reboot.sh
+{% endif %}

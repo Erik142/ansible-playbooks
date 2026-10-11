@@ -1,0 +1,331 @@
+---
+# Task-level guard test for the restic_backup role (QA T-11 TI-4): the REAL
+# role tasks are run as root in a disposable container and the result is read
+# back from the file system:
+#   - restic-backup.env really is mode 0600 root:root (it holds the REST server
+#     and repository passwords), its directory 0700, the staging directory 0700,
+#     the backup script 0700, and the passwords never show up in the output;
+#   - restic_backup_forget_enabled=true is refused by the role BEFORE any change
+#     (SH-FR-81: the repository is append-only for this host);
+#   - empty passwords are refused before any change, without echoing them.
+# Run from the playbook directory (needs Docker or Podman; no host, no network):
+#   ansible-playbook -i localhost, tests/guards.d/restic_backup.yml
+# Exit 0 = every case passed. GUARD_IMAGE / GUARD_RUNTIME work as in
+# tests/guards.d/semaphore.yml.
+#
+# Only the two things the role needs a real distro for are stubbed: the
+# community.general.zypper module (an empty stub collection that logs its
+# arguments and reports "no change") and `systemctl`. Nothing else is faked.
+- name: Guard test restic_backup (real role tasks, disposable container, stubbed zypper and systemctl)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    gt_ops_dir: "{{ playbook_dir }}/../.."
+    gt_image: "{{ lookup('ansible.builtin.env', 'GUARD_IMAGE') | default('docker.io/geerlingguy/docker-debian13-ansible:latest', true) }}"
+    gt_runtime_env: "{{ lookup('ansible.builtin.env', 'GUARD_RUNTIME') }}"
+    gt_sentinels:
+      - 'repo-pw-sentinel'
+      - 'rest-pw-sentinel'
+    gt_base_vars:
+      restic_backup_repo_password: repo-pw-sentinel
+      restic_backup_rest_server_password: rest-pw-sentinel
+    # Reading aid: gt_s.rcs[n] exit code of run n (2 = a task failed),
+    # gt_s.logs[n] its output, gt_s.tree {path: {kind, mode, uid, gid}} for the
+    # paths the role creates (absent = missing key), gt_s.env the env file
+    # content or null, gt_s.zypper / gt_s.systemctl the stub logs.
+    gt_cases:
+      - name: defaults plus both passwords -> env file 0600 root, directories 0700, script 0700, second run 0 changed
+        vars: {}
+        runs: 2
+        that:
+          - gt_s.rcs == [0, 0]
+          - "gt_s.tree['/var/lib/restic-backup/restic-backup.env'] == {'kind': 'f', 'mode': '0600', 'uid': 0, 'gid': 0}"
+          - "gt_s.tree['/var/lib/restic-backup'] == {'kind': 'd', 'mode': '0700', 'uid': 0, 'gid': 0}"
+          - "gt_s.tree['/var/lib/restic-backup/staging'] == {'kind': 'd', 'mode': '0700', 'uid': 0, 'gid': 0}"
+          - "gt_s.tree['/usr/local/bin/restic-backup.sh'] == {'kind': 'f', 'mode': '0700', 'uid': 0, 'gid': 0}"
+          - gt_s.env is search('^RESTIC_PASSWORD=repo-pw-sentinel$', multiline=True)
+          - gt_s.env is search('^RESTIC_REPOSITORY=rest:http://ops:rest-pw-sentinel@nas\.de\.int\.wahlberger\.dev:8000/ops/$', multiline=True)
+          - gt_s.logs[1] is search('changed=0\s')
+      - name: restic_backup_forget_enabled true -> refused naming the variable, nothing created, no package installed (SH-FR-81)
+        vars: { restic_backup_forget_enabled: true }
+        that:
+          - gt_s.rcs == [2]
+          - "'restic_backup_forget_enabled is true' in gt_s.logs[0]"
+          - gt_s.tree == {}
+          - gt_s.env == None
+          - gt_s.zypper == []
+          - gt_s.systemctl == []
+      - name: restic_backup_forget_enabled as the string "true" is refused too
+        vars: { restic_backup_forget_enabled: "true" }
+        that:
+          - gt_s.rcs == [2]
+          - "'restic_backup_forget_enabled is true' in gt_s.logs[0]"
+          - gt_s.tree == {}
+          - gt_s.zypper == []
+      - name: restic_backup_forget_enabled false (the default) is accepted
+        vars: { restic_backup_forget_enabled: false }
+        that:
+          - gt_s.rcs == [0]
+          - gt_s.tree['/var/lib/restic-backup/restic-backup.env'].mode == '0600'
+      - name: empty repository password -> refused before any change, nothing echoed
+        vars: { restic_backup_repo_password: "" }
+        that:
+          - gt_s.rcs == [2]
+          - gt_s.tree == {}
+          - gt_s.zypper == []
+          - gt_s.logs[0] is not search('rest-pw-sentinel')
+      - name: empty REST server password -> refused before any change, nothing echoed
+        vars: { restic_backup_rest_server_password: "" }
+        that:
+          - gt_s.rcs == [2]
+          - gt_s.tree == {}
+          - gt_s.zypper == []
+          - gt_s.logs[0] is not search('repo-pw-sentinel')
+  tasks:
+    - name: Run the cases in a disposable container
+      block:
+        - name: Pick a container runtime
+          ansible.builtin.shell:
+            cmd: |
+              set -eu
+              for rt in {{ gt_runtime_env | default('docker podman', true) }}; do
+                if command -v "$rt" >/dev/null 2>&1 && "$rt" info >/dev/null 2>&1; then echo "$rt"; exit 0; fi
+              done
+              exit 1
+            executable: /bin/sh
+          register: gt_rt
+          changed_when: false
+          failed_when: gt_rt.rc != 0
+          check_mode: false
+
+        # A play var would be re-templated (a new random number) on every use.
+        - name: Pick the container name once
+          ansible.builtin.set_fact:
+            gt_cname: "t06b-restic-guard-{{ 99999 | random }}"
+
+        - name: Create a scratch directory
+          ansible.builtin.tempfile:
+            state: directory
+            prefix: restic-guard.
+          register: gt_tmp
+
+        - name: Create the scratch layout
+          ansible.builtin.file:
+            path: "{{ gt_tmp.path }}/{{ item }}"
+            state: directory
+            mode: "0755"
+          loop:
+            - bin
+            - vars
+            - state
+            - collections/ansible_collections/community/general/plugins/modules
+
+        - name: Write the stubs, the nested inventory, config and playbook
+          ansible.builtin.copy:
+            dest: "{{ gt_tmp.path }}/{{ item.name }}"
+            mode: "{{ item.mode | default('0644') }}"
+            content: "{{ item.content }}"
+          loop_control:
+            label: "{{ item.name }}"
+          loop:
+            - name: bin/systemctl
+              mode: "0755"
+              content: |
+                #!/bin/sh
+                echo "$*" >>"$GT_STATE/systemctl.log"
+                case "$*" in
+                *show*)
+                  printf 'Id=restic-backup.timer\nLoadState=loaded\nActiveState=active\n'
+                  printf 'SubState=waiting\nUnitFileState=enabled\n' ;;
+                esac
+                exit 0
+            - name: collections/ansible_collections/community/general/MANIFEST.json
+              content: '{"collection_info": {"namespace": "community", "name": "general", "version": "0.0.0"}, "format": 1}'
+            - name: collections/ansible_collections/community/general/plugins/modules/zypper.py
+              content: |
+                from ansible.module_utils.basic import AnsibleModule
+                import json
+                import os
+
+
+                def main():
+                    module = AnsibleModule(
+                        argument_spec=dict(name=dict(type="list", elements="str"), state=dict()),
+                        supports_check_mode=True,
+                    )
+                    with open(os.environ["GT_STATE"] + "/zypper.log", "a") as log:
+                        log.write(json.dumps(module.params, sort_keys=True) + "\n")
+                    module.exit_json(changed=False)
+
+
+                main()
+            - name: inventory.ini
+              content: |
+                ops.de.wahlberger.dev ansible_connection=local ansible_python_interpreter=/usr/bin/python3
+            - name: ansible.cfg
+              content: |
+                [defaults]
+                roles_path = /ops/roles
+                collections_path = /work/collections
+                retry_files_enabled = false
+                localhost_warning = false
+                host_key_checking = false
+                nocolor = true
+            - name: play.yml
+              content: |
+                ---
+                - name: Nested restic_backup run
+                  hosts: all
+                  gather_facts: false
+                  roles:
+                    - role: restic_backup
+            - name: collect.py
+              content: |
+                {% raw %}
+                import json, os, sys
+
+                state = sys.argv[1]
+                paths = sys.argv[2:]
+
+
+                def read(path, default=""):
+                    try:
+                        with open(path) as f:
+                            return f.read()
+                    except OSError:
+                        return default
+
+
+                out = {"rcs": [], "logs": [], "tree": {}}
+                n = 1
+                while os.path.exists("%s/rc-%d" % (state, n)):
+                    out["rcs"].append(int(read("%s/rc-%d" % (state, n)).strip()))
+                    out["logs"].append(read("%s/run-%d.log" % (state, n)))
+                    n += 1
+                for p in paths:
+                    if os.path.lexists(p):
+                        st = os.lstat(p)
+                        out["tree"][p] = {
+                            "kind": "d" if os.path.isdir(p) else "f",
+                            "mode": "%04o" % (st.st_mode & 0o7777),
+                            "uid": st.st_uid,
+                            "gid": st.st_gid,
+                        }
+                env = "/var/lib/restic-backup/restic-backup.env"
+                out["env"] = read(env) if os.path.exists(env) else None
+                out["zypper"] = read(state + "/zypper.log").splitlines()
+                out["systemctl"] = read(state + "/systemctl.log").splitlines()
+                print(json.dumps(out))
+                {% endraw %}
+
+        - name: Write the case variables
+          ansible.builtin.copy:
+            dest: "{{ gt_tmp.path }}/vars/case-{{ idx }}.json"
+            mode: "0600"
+            content: "{{ (gt_base_vars | combine(item.vars)) | to_nice_json }}"
+          loop: "{{ gt_cases }}"
+          loop_control:
+            index_var: idx
+            label: "{{ item.name }}"
+
+        - name: Write the case runner
+          ansible.builtin.copy:
+            dest: "{{ gt_tmp.path }}/run.sh"
+            mode: "0755"
+            content: |
+              #!/bin/sh
+              set -u
+              export PATH=/work/bin:$PATH
+              export ANSIBLE_CONFIG=/work/ansible.cfg
+              {% for c in gt_cases %}
+              echo "== case {{ loop.index0 }}"
+              st=/work/state/{{ loop.index0 }}
+              rm -rf /var/lib/restic-backup /usr/local/bin/restic-backup.sh /etc/restic-backup \
+                /etc/systemd/system/restic-backup.service /etc/systemd/system/restic-backup.timer "$st"
+              mkdir -p "$st"
+              export GT_STATE="$st"
+              n=1
+              while [ "$n" -le {{ c.runs | default(1) }} ]; do
+                ansible-playbook -i /work/inventory.ini /work/play.yml --diff -v \
+                  -e @/work/vars/case-{{ loop.index0 }}.json >"$st/run-$n.log" 2>&1
+                echo $? >"$st/rc-$n"
+                n=$((n + 1))
+              done
+              python3 /work/collect.py "$st" /var/lib/restic-backup /var/lib/restic-backup/restic-backup.env \
+                /var/lib/restic-backup/staging /usr/local/bin/restic-backup.sh >"$st/state.json"
+              {% endfor %}
+
+        # --network none: the role needs none (zypper is a stub), and the test
+        # must not reach out.
+        - name: Run all cases in one container
+          ansible.builtin.command:
+            argv:
+              - "{{ gt_rt.stdout }}"
+              - run
+              - --rm
+              - --name
+              - "{{ gt_cname }}"
+              - --network
+              - none
+              - -v
+              - "{{ gt_tmp.path }}:/work"
+              - -v
+              - "{{ gt_ops_dir | realpath }}:/ops:ro"
+              - --entrypoint
+              - sh
+              - "{{ gt_image }}"
+              - /work/run.sh
+          register: gt_container
+          changed_when: false
+
+        - name: Read the case states
+          ansible.builtin.slurp:
+            src: "{{ gt_tmp.path }}/state/{{ idx }}/state.json"
+          register: gt_states
+          loop: "{{ gt_cases }}"
+          loop_control:
+            index_var: idx
+            label: "{{ item.name }}"
+
+        # rc 2 = ansible-playbook's exit code for a failed task.
+        - name: Assert every case
+          ansible.builtin.assert:
+            that: "{{ item.that }}"
+            fail_msg: "{{ item.name }}: state={{ gt_s | to_json }}"
+            success_msg: "{{ item.name }}"
+            quiet: true
+          vars:
+            gt_s: "{{ gt_states.results[idx].content | b64decode | from_json }}"
+          loop: "{{ gt_cases }}"
+          loop_control:
+            index_var: idx
+            label: "{{ item.name }}"
+
+        # The nested runs use -v and --diff: a password in any output means a
+        # task is missing no_log / diff: false.
+        - name: Assert no password appears in any nested output
+          ansible.builtin.assert:
+            that:
+              - gt_leaks | length == 0
+            fail_msg: "{{ item.name }}: secret(s) in the output of run(s): {{ gt_leaks }}"
+            quiet: true
+          vars:
+            gt_s: "{{ gt_states.results[idx].content | b64decode | from_json }}"
+            gt_leaks: "{{ gt_sentinels | select('in', gt_s.logs | join('\n')) | list }}"
+          loop: "{{ gt_cases }}"
+          loop_control:
+            index_var: idx
+            label: "{{ item.name }}"
+      always:
+        - name: Remove the container
+          ansible.builtin.command:
+            argv: ["{{ gt_rt.stdout | default('docker') }}", rm, -f, "{{ gt_cname | default('t06b-none') }}"]
+          changed_when: false
+          failed_when: false
+
+        - name: Remove the scratch directory
+          ansible.builtin.shell:
+            cmd: 'rm -rf "{{ gt_tmp.path }}" 2>/dev/null || true'
+          changed_when: false
+          when: gt_tmp is defined and gt_tmp.path is defined

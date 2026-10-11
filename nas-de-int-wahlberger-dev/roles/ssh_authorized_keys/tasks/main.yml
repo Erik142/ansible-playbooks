@@ -8,9 +8,34 @@
       roles/ssh_authorized_keys/README.md.
     quiet: true
 
+# A key (matched on its type+body, ignoring options and comment) must never be
+# authorized and revoked at once. Fail before any change is made.
+- name: Fail when a key is in both ssh_authorized_keys_list and ssh_authorized_keys_revoked
+  ansible.builtin.assert:
+    that:
+      - (item | regex_findall(ssh_authorized_keys_body_regex) | first | default(item))
+        not in (ssh_authorized_keys_list | map('regex_findall', ssh_authorized_keys_body_regex) | map('first') | list)
+    fail_msg: >-
+      The key with comment '{{ item | regex_findall(ssh_authorized_keys_comment_regex) | first | default('unnamed key', true) }}'
+      is in both ssh_authorized_keys_list and ssh_authorized_keys_revoked.
+      Remove it from one of them.
+    quiet: true
+  loop: "{{ ssh_authorized_keys_revoked }}"
+  loop_control:
+    label: "{{ item | regex_findall(ssh_authorized_keys_comment_regex) | first | default('unnamed key', true) }}"
+
 - name: Authorize the configured SSH keys for {{ ssh_authorized_keys_user }}
   ansible.posix.authorized_key:
     user: "{{ ssh_authorized_keys_user }}"
     key: "{{ item }}"
     state: present
   loop: "{{ ssh_authorized_keys_list }}"
+
+- name: Remove the revoked SSH keys from {{ ssh_authorized_keys_user }}
+  ansible.posix.authorized_key:
+    user: "{{ ssh_authorized_keys_user }}"
+    key: "{{ item }}"
+    state: absent
+  loop: "{{ ssh_authorized_keys_revoked }}"
+  loop_control:
+    label: "{{ item | regex_findall(ssh_authorized_keys_comment_regex) | first | default('unnamed key', true) }}"

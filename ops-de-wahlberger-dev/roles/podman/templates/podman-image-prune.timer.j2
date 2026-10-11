@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodic prune of unused Podman images
+
+[Timer]
+OnCalendar={{ podman_image_prune_on_calendar }}
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

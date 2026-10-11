@@ -1,0 +1,901 @@
+---
+# Verifies the `security` role (T-05): public-SSH hardening (SH-FR-15..18,
+# 116..122, 157..159, SH-NFR-14), the sshd -t guard (SH-FR-121, SH-AC-45),
+# fail2ban (SH-FR-17, 123, 124, 211), the login email (SH-FR-125, SH-E-32) and
+# (T-06) the vendor sshd_config seeding, the weekly zypper dup, rebootmgr and snapper.
+#
+# Everything is asserted against the converged container: sshd -T for the
+# effective configuration, real SSH logins for allow/deny behaviour, and
+# fail2ban-client for the live jail. Each play cleans up what it creates.
+
+# --- 1. Effective sshd configuration -------------------------------------------
+- name: Verify the effective sshd configuration
+  hosts: all
+  gather_facts: false
+  vars:
+    verify_sshd_expected:
+      passwordauthentication: "no"
+      kbdinteractiveauthentication: "no"
+      permitrootlogin: "no"
+      authenticationmethods: publickey
+      allowusers: erikwahlberger
+      maxauthtries: "3"
+      logingracetime: "30"
+      allowtcpforwarding: "no"
+      allowagentforwarding: "no"
+      x11forwarding: "no"
+      # Without PAM, OpenSSH refuses public-key logins for locked accounts.
+      usepam: "yes"
+      # T-05 follow-up F-1: /etc/ssh/sshd_config must be seeded from the vendor
+      # /usr/etc/ssh/sshd_config. A bare new file would drop these.
+      subsystem: sftp /usr/libexec/ssh/sftp-server
+      printmotd: "no"
+  tasks:
+    - name: Dump the effective sshd configuration
+      ansible.builtin.command: sshd -T
+      register: verify_sshd_dump
+      changed_when: false
+
+    # sshd -T prints keywords in camel case (PermitRootLogin) on this OpenSSH,
+    # lower case on older ones: compare case-insensitively.
+    - name: Parse it into keyword -> value
+      ansible.builtin.set_fact:
+        verify_sshd_effective: "{{ dict(verify_sshd_dump.stdout_lines | map('lower') | map('split', ' ', 1) | list) }}"
+
+    - name: Assert every required directive has its exact value
+      ansible.builtin.assert:
+        that: verify_sshd_effective[item.key] | default('<unset>') == item.value
+        fail_msg: "sshd {{ item.key }} is {{ verify_sshd_effective[item.key] | default('<unset>') }}, expected {{ item.value }}"
+        quiet: true
+      loop: "{{ verify_sshd_expected | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+# A drop-in must not be able to override the hardening: sshd takes the FIRST
+# value of a keyword, and the vendor file includes the drop-in directory at its
+# top. The role moves that Include below its own directives.
+- name: Verify the vendor sshd_config was kept and drop-ins cannot override the hardening
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Dump the effective sshd configuration
+      ansible.builtin.command: sshd -T
+      register: verify_vendor_dump
+      changed_when: false
+
+    - name: Assert AcceptEnv from the vendor file is still in effect
+      ansible.builtin.assert:
+        that:
+          - verify_vendor_dump.stdout_lines | select('match', '(?i)^acceptenv .*\\bLANG\\b') | list | length == 1
+          - verify_vendor_dump.stdout_lines | select('match', '(?i)^acceptenv .*\\bLC_ALL\\b') | list | length == 1
+        fail_msg: "AcceptEnv from /usr/etc/ssh/sshd_config is missing: the vendor file is shadowed"
+        quiet: true
+
+    - name: Read the installed sshd_config
+      ansible.builtin.stat:
+        path: /etc/ssh/sshd_config
+      register: verify_sshd_file
+
+    - name: Assert it is root-only
+      ansible.builtin.assert:
+        that:
+          - verify_sshd_file.stat.mode == '0600'
+          - verify_sshd_file.stat.pw_name == 'root'
+        quiet: true
+
+    # X11Forwarding and UsePAM are ACTIVE lines in the vendor file, so the role
+    # edits them in place (below the vendor's own position of the Include);
+    # MaxAuthTries is only a comment there and goes to the top of the file.
+    - name: Try to override hardened directives from a drop-in
+      block:
+        - name: Write the drop-in
+          ansible.builtin.copy:
+            dest: /etc/ssh/sshd_config.d/99-t06-override.conf
+            content: "MaxAuthTries 9\nX11Forwarding yes\nUsePAM no\n"
+            owner: root
+            group: root
+            mode: "0644"
+
+        - name: Read the effective configuration again
+          ansible.builtin.command: sshd -T
+          register: verify_dropin_dump
+          changed_when: false
+
+        - name: Assert the drop-in lost against the role's value
+          ansible.builtin.assert:
+            that:
+              - verify_dropin_dump.stdout_lines | select('match', '(?i)^maxauthtries 3$') | list | length == 1
+              - verify_dropin_dump.stdout_lines | select('match', '(?i)^x11forwarding no$') | list | length == 1
+              - verify_dropin_dump.stdout_lines | select('match', '(?i)^usepam yes$') | list | length == 1
+            fail_msg: "a drop-in overrode a hardened directive: the Include sits above the role's directives"
+            quiet: true
+      always:
+        - name: Remove the drop-in
+          ansible.builtin.file:
+            path: /etc/ssh/sshd_config.d/99-t06-override.conf
+            state: absent
+
+# --- 2. SH-AC-45: an invalid sshd configuration is not applied -----------------
+- name: Verify that an invalid sshd configuration is rejected and not applied
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Snapshot sshd_config (checksum)
+      ansible.builtin.stat:
+        path: /etc/ssh/sshd_config
+        checksum_algorithm: sha256
+      register: verify_ac45_file_before
+
+    - name: Snapshot the effective configuration
+      ansible.builtin.command: sshd -T
+      register: verify_ac45_dump_before
+      changed_when: false
+
+    - name: Count the sshd reloads logged so far
+      ansible.builtin.shell: |
+        set -o pipefail
+        journalctl -u sshd.service -o cat --no-pager | grep -c '^Reloaded OpenSSH' || true
+      args:
+        executable: /bin/bash
+      register: verify_ac45_reloads_before
+      changed_when: false
+
+    - name: Run the sshd tasks with a directive sshd rejects
+      block:
+        - name: Apply the role's sshd tasks with an invalid directive
+          ansible.builtin.include_role:
+            name: security
+            tasks_from: sshd.yml
+          vars:
+            security_ssh_extra_directives:
+              - NoSuchDirective yes
+        - name: Remember that the role did NOT fail
+          ansible.builtin.set_fact:
+            verify_ac45_failed: false
+      rescue:
+        - name: Remember the failure
+          ansible.builtin.set_fact:
+            verify_ac45_failed: true
+            verify_ac45_error: "{{ ansible_failed_result | to_json }}"
+
+    - name: Assert the role failed because of the invalid directive
+      ansible.builtin.assert:
+        that:
+          - verify_ac45_failed
+          - verify_ac45_error is search('Bad configuration option')
+          - verify_ac45_error is search('NoSuchDirective')
+        fail_msg: "expected a sshd -t validation failure, got failed={{ verify_ac45_failed }}"
+        quiet: true
+
+    - name: Snapshot sshd_config after the failed run
+      ansible.builtin.stat:
+        path: /etc/ssh/sshd_config
+        checksum_algorithm: sha256
+      register: verify_ac45_file_after
+
+    - name: Read the effective configuration after the failed run
+      ansible.builtin.command: sshd -T
+      register: verify_ac45_dump_after
+      changed_when: false
+
+    - name: Count the sshd reloads after the failed run
+      ansible.builtin.shell: |
+        set -o pipefail
+        journalctl -u sshd.service -o cat --no-pager | grep -c '^Reloaded OpenSSH' || true
+      args:
+        executable: /bin/bash
+      register: verify_ac45_reloads_after
+      changed_when: false
+
+    - name: Assert nothing changed and sshd was not reloaded
+      ansible.builtin.assert:
+        that:
+          - verify_ac45_file_after.stat.checksum == verify_ac45_file_before.stat.checksum
+          - verify_ac45_dump_after.stdout == verify_ac45_dump_before.stdout
+          - verify_ac45_reloads_after.stdout == verify_ac45_reloads_before.stdout
+        fail_msg: "the invalid directive changed the file, the effective configuration or caused a reload"
+        quiet: true
+
+    # Positive control: the reload counter must move when a VALID change is
+    # applied, otherwise the assertion above proves nothing.
+    - name: Apply a valid, harmless directive
+      ansible.builtin.include_role:
+        name: security
+        tasks_from: sshd.yml
+      vars:
+        security_ssh_extra_directives:
+          - LogLevel VERBOSE
+
+    - name: Count the sshd reloads after the valid change
+      ansible.builtin.shell: |
+        set -o pipefail
+        journalctl -u sshd.service -o cat --no-pager | grep -c '^Reloaded OpenSSH' || true
+      args:
+        executable: /bin/bash
+      register: verify_ac45_reloads_valid
+      changed_when: false
+      until: verify_ac45_reloads_valid.stdout | int == verify_ac45_reloads_before.stdout | int + 1
+      retries: 10
+      delay: 1
+
+    - name: Put LogLevel back to its default
+      ansible.builtin.include_role:
+        name: security
+        tasks_from: sshd.yml
+      vars:
+        security_ssh_extra_directives:
+          - LogLevel INFO
+
+# --- 3. Locked passwords and real logins ---------------------------------------
+- name: Verify locked passwords and who can log in
+  hosts: all
+  gather_facts: false
+  vars:
+    verify_login_dir: /tmp/t05-login
+    verify_ssh_opts: >-
+      -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+      -o LogLevel=ERROR -o ConnectTimeout=10
+    # Syntactically valid sha512-crypt field, so the account has a usable password.
+    verify_fake_hash: "$6$t05salt$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  tasks:
+    - name: Test locked passwords and logins
+      block:
+        - name: Create the allowed user with a usable password
+          ansible.builtin.user:
+            name: erikwahlberger
+            password: "{{ verify_fake_hash }}"
+            create_home: true
+
+        - name: Create a user that is not allowed to log in, with an EMPTY password field
+          ansible.builtin.user:
+            name: t05probe
+            create_home: true
+
+        - name: Empty that user's password field
+          ansible.builtin.command: usermod -p "" t05probe
+          changed_when: true
+
+        - name: Create the working directory for the test key
+          ansible.builtin.file:
+            path: "{{ verify_login_dir }}"
+            state: directory
+            mode: "0700"
+
+        - name: Generate a test key
+          ansible.builtin.command:
+            argv: [ssh-keygen, -q, -t, ed25519, -N, "", -C, t05-verify-key, -f, "{{ verify_login_dir }}/key"]
+            creates: "{{ verify_login_dir }}/key"
+
+        - name: Authorize the test key for the allowed user, the probe user and root
+          ansible.builtin.shell: |
+            set -eu
+            for entry in erikwahlberger:/home/erikwahlberger t05probe:/home/t05probe root:/root; do
+              user="${entry%%:*}"; home="${entry#*:}"
+              install -d -m 0700 -o "$user" "$home/.ssh"
+              cat "{{ verify_login_dir }}/key.pub" >> "$home/.ssh/authorized_keys"
+              chown "$user" "$home/.ssh/authorized_keys"
+              chmod 0600 "$home/.ssh/authorized_keys"
+            done
+          changed_when: true
+
+        - name: Read both password fields before the role runs
+          ansible.builtin.shell: |
+            set -o pipefail
+            grep -E '^(erikwahlberger|t05probe):' /etc/shadow | cut -d: -f1,2
+          args:
+            executable: /bin/bash
+          register: verify_shadow_before
+          changed_when: false
+
+        - name: Assert the precondition is real (a usable hash and an empty field exist)
+          ansible.builtin.assert:
+            that:
+              - "'erikwahlberger:$6$t05salt$' in verify_shadow_before.stdout"
+              - "'t05probe:' in verify_shadow_before.stdout_lines"
+            quiet: true
+
+        - name: Apply the role's account tasks
+          ansible.builtin.include_role:
+            name: security
+            tasks_from: accounts.yml
+
+        - name: Read the shadow file
+          ansible.builtin.slurp:
+            src: /etc/shadow
+          register: verify_shadow_all
+
+        - name: Assert no account has a usable password (every field starts with ! or *)
+          ansible.builtin.assert:
+            that: verify_unlocked == []
+            fail_msg: "accounts with a usable password: {{ verify_unlocked }}"
+            quiet: true
+          vars:
+            verify_unlocked: >-
+              {{ (verify_shadow_all.content | b64decode).splitlines() | map('split', ':')
+                 | rejectattr('1', 'match', '^[!*]') | map(attribute=0) | list }}
+
+        - name: Read the allowed user's field after locking
+          ansible.builtin.shell: |
+            set -o pipefail
+            grep '^erikwahlberger:' /etc/shadow | cut -d: -f2
+          args:
+            executable: /bin/bash
+          register: verify_locked_field
+          changed_when: false
+
+        - name: Assert the lock kept the hash (usermod -L prefix), so it is reversible
+          ansible.builtin.assert:
+            that: verify_locked_field.stdout == '!' ~ verify_fake_hash
+            quiet: true
+
+        - name: Apply the account tasks a second time
+          ansible.builtin.include_role:
+            name: security
+            tasks_from: accounts.yml
+
+        - name: Read the shadow file after the second run
+          ansible.builtin.shell: |
+            set -o pipefail
+            grep -E '^(erikwahlberger|t05probe):' /etc/shadow | cut -d: -f1,2
+          args:
+            executable: /bin/bash
+          register: verify_shadow_second
+          changed_when: false
+
+        - name: Read the shadow file once more for comparison
+          ansible.builtin.shell: |
+            set -o pipefail
+            grep -E '^(erikwahlberger|t05probe):' /etc/shadow | cut -d: -f1,2
+          args:
+            executable: /bin/bash
+          register: verify_shadow_third
+          changed_when: false
+
+        - name: Assert the second run left the fields alone (no double lock)
+          ansible.builtin.assert:
+            that:
+              - verify_shadow_second.stdout == verify_shadow_third.stdout
+              - "'erikwahlberger:!$6$' in verify_shadow_second.stdout"
+              - "'erikwahlberger:!!' not in verify_shadow_second.stdout"
+            quiet: true
+
+        # A locked account must still log in with its key: that is the lockout
+        # risk of FR-122 combined with sshd (needs UsePAM yes).
+        - name: Log in as the allowed user (locked password, public key)
+          ansible.builtin.command: >-
+            ssh -i {{ verify_login_dir }}/key {{ verify_ssh_opts }} erikwahlberger@127.0.0.1 id -un
+          register: verify_login_ok
+          changed_when: false
+
+        - name: Assert the key login worked
+          ansible.builtin.assert:
+            that: verify_login_ok.stdout == 'erikwahlberger'
+            quiet: true
+
+        - name: Try users that must be refused, and password / keyboard-interactive
+          ansible.builtin.command: "{{ item.cmd }}"
+          register: verify_login_denied
+          changed_when: false
+          failed_when: false
+          loop:
+            - name: user not in AllowUsers, valid key
+              cmd: ssh -i {{ verify_login_dir }}/key {{ verify_ssh_opts }} t05probe@127.0.0.1 id -un
+            - name: root, valid key
+              cmd: ssh -i {{ verify_login_dir }}/key {{ verify_ssh_opts }} root@127.0.0.1 id -un
+            - name: allowed user, password only
+              cmd: >-
+                ssh -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive
+                {{ verify_ssh_opts }} erikwahlberger@127.0.0.1 id -un
+          loop_control:
+            label: "{{ item.name }}"
+
+        # "(publickey)" is the list of methods the server still offers: only
+        # public-key authentication (SH-NFR-14).
+        - name: Assert each was refused, with publickey as the only method offered
+          ansible.builtin.assert:
+            that:
+              - item.rc != 0
+              - item.stdout == ''
+              - "'Permission denied (publickey).' in item.stderr"
+            fail_msg: "{{ item.item.name }}: rc={{ item.rc }} stdout={{ item.stdout }} stderr={{ item.stderr }}"
+            quiet: true
+          loop: "{{ verify_login_denied.results }}"
+          loop_control:
+            label: "{{ item.item.name }}"
+      always:
+        - name: Remove the test users
+          ansible.builtin.user:
+            name: "{{ item }}"
+            state: absent
+            remove: true
+            force: true
+          loop: [erikwahlberger, t05probe]
+
+        - name: Remove the working directory with the test key
+          ansible.builtin.file:
+            path: "{{ verify_login_dir }}"
+            state: absent
+
+        - name: Remove the test key from root's authorized_keys
+          ansible.builtin.lineinfile:
+            path: /root/.ssh/authorized_keys
+            regexp: ' t05-verify-key$'
+            state: absent
+
+# --- 4. fail2ban -----------------------------------------------------------------
+- name: Verify the fail2ban jail
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Check the configuration parses
+      ansible.builtin.command: fail2ban-client -t
+      changed_when: false
+
+    - name: Read the live jail settings
+      ansible.builtin.command: "fail2ban-client get sshd {{ item }}"
+      register: verify_f2b
+      changed_when: false
+      loop: [maxretry, findtime, bantime, actions, ignoreip]
+
+    - name: Assert the SH-FR-123 thresholds and the ban action
+      ansible.builtin.assert:
+        that:
+          - verify_f2b.results[0].stdout == '5'
+          - verify_f2b.results[1].stdout == '600'
+          - verify_f2b.results[2].stdout == '3600'
+          - verify_f2b.results[3].stdout_lines | last == 'nftables-multiport'
+        quiet: true
+
+    - name: Assert exactly the configured networks are ignored (SH-FR-124)
+      ansible.builtin.assert:
+        that:
+          - >-
+            verify_f2b.results[4].stdout_lines[1:] | map('regex_replace', '^[|` -]+', '') | sort
+            == ['10.10.0.0/16', '10.243.0.0/16', '127.0.0.0/8']
+        fail_msg: "ignoreip is {{ verify_f2b.results[4].stdout_lines }}"
+        quiet: true
+
+    - name: Dump the parsed configuration
+      ansible.builtin.command: fail2ban-client -d
+      register: verify_f2b_dump
+      changed_when: false
+
+    - name: Assert no firewalld action is configured (SH-FR-211)
+      ansible.builtin.assert:
+        that: verify_f2b_dump.stdout is not search('firewallcmd|rich', ignorecase=True)
+        quiet: true
+
+    # The ban must really land in nftables, in its own table.
+    - name: Ban a documentation address
+      ansible.builtin.command: fail2ban-client set sshd banip 192.0.2.99
+      changed_when: true
+
+    - name: Read the nftables ruleset
+      ansible.builtin.command: nft list ruleset
+      register: verify_f2b_nft
+      changed_when: false
+
+    - name: Assert the ban is an nftables set element in fail2ban's table
+      ansible.builtin.assert:
+        that:
+          - verify_f2b_nft.stdout is search('table inet f2b-table')
+          - verify_f2b_nft.stdout is search('elements = \{ 192\.0\.2\.99 \}')
+        quiet: true
+
+    - name: Unban it again
+      ansible.builtin.command: fail2ban-client set sshd unbanip 192.0.2.99
+      changed_when: true
+
+# --- 5. Login email (SH-FR-125, SH-E-32) -----------------------------------------
+- name: Verify the SSH login email
+  hosts: all
+  gather_facts: false
+  vars:
+    verify_mail_dir: /tmp/t05-mail
+    verify_mail_env:
+      RESEND_API_KEY: t05-test-key
+      NOTIFY_FROM: "Homelab Alerts <alerts@example.test>"
+      NOTIFY_TO: owner@example.test
+      SSH_LOGIN_NOTIFY_IGNORE: "127.0.0.0/8,10.10.0.0/16,10.243.0.0/16,198.51.100.0/24,not-a-network"
+      SSH_LOGIN_NOTIFY_URL: http://127.0.0.1:18025/emails
+    # sshd's real log format (checked in this container):
+    verify_log_lines: |
+      Server listening on 0.0.0.0 port 22.
+      Accepted publickey for erikwahlberger from 203.0.113.9 port 51234 ssh2: ED25519 SHA256:abcDEF123+/xyz
+      Accepted publickey for erikwahlberger from 10.243.5.6 port 40000 ssh2: ED25519 SHA256:zerotier
+      Accepted publickey for erikwahlberger from 127.0.0.1 port 40001 ssh2: ED25519 SHA256:loopback
+      Accepted publickey for erikwahlberger from 198.51.100.77 port 40002 ssh2: ED25519 SHA256:custom-ignore
+      Accepted password for erikwahlberger from 203.0.113.50 port 40003 ssh2
+      Failed publickey for invalid user x from 203.0.113.51 port 40004 ssh2: ED25519 SHA256:failed
+      Accepted publickey for erikwahlberger from 2001:db8::7 port 40005 ssh2: ED25519 SHA256:v6public
+      Accepted publickey for erikwahlberger from ::ffff:10.10.1.1 port 40006 ssh2: ED25519 SHA256:mappedprivate
+  tasks:
+    - name: Test the login notification script and service
+      block:
+        - name: Assert the service is enabled and running
+          ansible.builtin.systemd:
+            name: ssh-login-notify.service
+          register: verify_notify_unit
+          failed_when: verify_notify_unit.status.ActiveState != 'active' or verify_notify_unit.status.UnitFileState != 'enabled'
+
+        - name: Create the working directory
+          ansible.builtin.file:
+            path: "{{ verify_mail_dir }}"
+            state: directory
+            mode: "0700"
+
+        - name: Write a fake Resend endpoint that records every request
+          ansible.builtin.copy:
+            dest: "{{ verify_mail_dir }}/fake-resend.py"
+            mode: "0600"
+            content: |
+              import json, http.server
+              class H(http.server.BaseHTTPRequestHandler):
+                  def do_POST(self):
+                      body = self.rfile.read(int(self.headers["Content-Length"]))
+                      rec = {"path": self.path, "auth": self.headers.get("Authorization"),
+                             "ctype": self.headers.get("Content-Type"), "body": json.loads(body)}
+                      with open("{{ verify_mail_dir }}/requests.jsonl", "a") as f:
+                          f.write(json.dumps(rec) + "\n")
+                      self.send_response(200)
+                      self.end_headers()
+                      self.wfile.write(b"{}")
+                  def log_message(self, *a):
+                      pass
+              http.server.HTTPServer(("127.0.0.1", 18025), H).serve_forever()
+
+        - name: Start it in the background
+          ansible.builtin.command: "python3 {{ verify_mail_dir }}/fake-resend.py"
+          async: 120
+          poll: 0
+          changed_when: true
+
+        - name: Wait for it
+          ansible.builtin.wait_for:
+            host: 127.0.0.1
+            port: 18025
+            timeout: 20
+
+        - name: Feed sshd log lines to the script
+          ansible.builtin.command: /usr/local/bin/ssh-login-notify.py --stdin
+          args:
+            stdin: "{{ verify_log_lines }}"
+          environment: "{{ verify_mail_env }}"
+          register: verify_notify_run
+          changed_when: false
+
+        - name: Read what the fake endpoint received
+          ansible.builtin.slurp:
+            src: "{{ verify_mail_dir }}/requests.jsonl"
+          register: verify_mail_requests
+
+        - name: Parse the requests
+          ansible.builtin.set_fact:
+            verify_mails: "{{ verify_mail_requests.content | b64decode | trim | split('\n') | map('from_json') | list }}"
+
+        - name: Assert only the two public logins were mailed, with user, source and fingerprint
+          ansible.builtin.assert:
+            that:
+              - verify_mails | length == 2
+              - verify_mails | map(attribute='path') | unique | list == ['/emails']
+              - verify_mails | map(attribute='auth') | unique | list == ['Bearer t05-test-key']
+              - verify_mails[0].body.from == 'Homelab Alerts <alerts@example.test>'
+              - verify_mails[0].body.to == ['owner@example.test']
+              - "'203.0.113.9' in verify_mails[0].body.subject"
+              - "'erikwahlberger' in verify_mails[0].body.subject"
+              - "'User: erikwahlberger' in verify_mails[0].body.text"
+              - "'Source: 203.0.113.9 (port 51234)' in verify_mails[0].body.text"
+              - "'ED25519 SHA256:abcDEF123+/xyz' in verify_mails[0].body.text"
+              - "'2001:db8::7' in verify_mails[1].body.subject"
+              - "'SHA256:v6public' in verify_mails[1].body.text"
+            fail_msg: "mails: {{ verify_mails | map(attribute='body') | map(attribute='subject') | list }}"
+            quiet: true
+
+        - name: Assert the secret never reaches the log, and the bad ignore entry was reported
+          ansible.builtin.assert:
+            that:
+              - "'t05-test-key' not in verify_notify_run.stderr"
+              - "'invalid ignore-list entry' in verify_notify_run.stderr"
+            quiet: true
+
+        # SH-E-32: no endpoint at all (connection refused). The script must
+        # still exit 0, log each failure, and keep going.
+        - name: Feed two public logins while Resend is unreachable
+          ansible.builtin.command: /usr/local/bin/ssh-login-notify.py --stdin
+          args:
+            stdin: |
+              Accepted publickey for erikwahlberger from 203.0.113.9 port 1 ssh2: ED25519 SHA256:one
+              Accepted publickey for erikwahlberger from 203.0.113.10 port 2 ssh2: ED25519 SHA256:two
+          environment: "{{ verify_mail_env | combine({'SSH_LOGIN_NOTIFY_URL': 'http://127.0.0.1:1/emails'}) }}"
+          register: verify_notify_down
+          changed_when: false
+
+        - name: Assert both failures were logged, nothing leaked, and exit was clean
+          ansible.builtin.assert:
+            that:
+              - verify_notify_down.rc == 0
+              - verify_notify_down.stderr_lines | select('search', 'sending the login mail for erikwahlberger from 203.0.113.9 failed') | list | length == 1
+              - verify_notify_down.stderr_lines | select('search', 'sending the login mail for erikwahlberger from 203.0.113.10 failed') | list | length == 1
+              - "'t05-test-key' not in verify_notify_down.stderr"
+            quiet: true
+
+        - name: Feed a public login with an empty API key
+          ansible.builtin.command: /usr/local/bin/ssh-login-notify.py --stdin
+          args:
+            stdin: "Accepted publickey for erikwahlberger from 203.0.113.9 port 1 ssh2: ED25519 SHA256:one\n"
+          environment: "{{ verify_mail_env | combine({'RESEND_API_KEY': ''}) }}"
+          register: verify_notify_nokey
+          changed_when: false
+
+        - name: Assert an empty key is a logged failure, not a crash
+          ansible.builtin.assert:
+            that:
+              - verify_notify_nokey.rc == 0
+              - "'RESEND_API_KEY is empty' in verify_notify_nokey.stderr"
+            quiet: true
+
+        - name: Reject unknown arguments
+          ansible.builtin.command: /usr/local/bin/ssh-login-notify.py --bogus
+          register: verify_notify_usage
+          changed_when: false
+          failed_when: verify_notify_usage.rc != 2
+      always:
+        - name: Stop the fake endpoint
+          ansible.builtin.command: pkill -f fake-resend.py
+          register: verify_pkill
+          changed_when: verify_pkill.rc == 0
+          failed_when: verify_pkill.rc > 1
+
+        - name: Remove the working directory
+          ansible.builtin.file:
+            path: "{{ verify_mail_dir }}"
+            state: absent
+
+# --- 6. Weekly zypper dup, snapper, rebootmgr (T-06) -----------------------------
+- name: Verify the weekly zypper dup, snapper and rebootmgr
+  hosts: all
+  gather_facts: true
+  vars:
+    verify_up_dir: /tmp/t06-updates
+  tasks:
+    - name: Read the rendered units
+      ansible.builtin.slurp:
+        src: "/etc/systemd/system/{{ item }}"
+      register: verify_up_units
+      loop: [zypper-dup.timer, zypper-dup.service]
+
+    - name: Assert the schedule, the dup command and the failure hook
+      ansible.builtin.assert:
+        that:
+          - verify_timer is search('^OnCalendar=Sun \*-\*-\* 04:00:00 Europe/Berlin$', multiline=True)
+          - verify_timer is search('^Persistent=true$', multiline=True)
+          - verify_service is search('^ExecStart=/usr/bin/zypper --non-interactive dup ', multiline=True)
+          - verify_service is search('^OnFailure=notify-failure-immediate@%n\.service$', multiline=True)
+          - verify_service is not search('zypper (--non-interactive )?patch')
+          - verify_service is not search('systemctl reboot|shutdown')
+        quiet: true
+      vars:
+        verify_timer: "{{ verify_up_units.results[0].content | b64decode }}"
+        verify_service: "{{ verify_up_units.results[1].content | b64decode }}"
+
+    - name: Ask systemd for the next elapse in Berlin time
+      ansible.builtin.command: systemd-analyze calendar "Sun *-*-* 04:00:00 Europe/Berlin"
+      register: verify_up_calendar
+      changed_when: false
+
+    - name: Assert the timer is a valid Sunday 04:00 Berlin expression
+      ansible.builtin.assert:
+        that:
+          - verify_up_calendar.stdout is search('Normalized form. Sun \*-\*-\* 04:00:00 Europe/Berlin')
+        quiet: true
+
+    - name: Read the timer state
+      ansible.builtin.systemd:
+        name: zypper-dup.timer
+      register: verify_up_timer
+      failed_when: verify_up_timer.status.ActiveState != 'active' or verify_up_timer.status.UnitFileState != 'enabled'
+
+    # The previous NAS-derived role (nas-de-int-wahlberger-dev/roles/security)
+    # installed these; the VM must not carry them. Paths are not created by this
+    # role, so this guards against a copy-paste regression of that role.
+    - name: Look for the legacy zypper-autopatch units and script
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: verify_up_old
+      loop:
+        - /etc/systemd/system/zypper-autopatch.service
+        - /etc/systemd/system/zypper-autopatch.timer
+        - /usr/local/bin/request-reboot-if-needed.sh
+        - /etc/rebootmgr.conf
+
+    - name: Assert none of the legacy files exist
+      ansible.builtin.assert:
+        that: verify_up_old.results | selectattr('stat.exists') | list | length == 0
+        fail_msg: "legacy files present: {{ verify_up_old.results | selectattr('stat.exists') | map(attribute='item') | list }}"
+        quiet: true
+
+    # snapper-zypp-plugin is what makes zypper take pre/post pairs on btrfs.
+    # package_facts needs the rpm Python bindings, which the test image lacks.
+    - name: Query the snapper packages
+      ansible.builtin.command: rpm -q snapper snapper-zypp-plugin  # noqa: command-instead-of-module
+      register: verify_up_rpm
+      changed_when: false
+
+    - name: Assert the zypp commit plugin is in place
+      ansible.builtin.stat:
+        path: /usr/lib/zypp/plugins/commit/snapper-zypp-plugin
+      register: verify_up_plugin
+      failed_when: not verify_up_plugin.stat.exists or not verify_up_plugin.stat.executable
+
+    - name: Apply the update tasks with rebootmgr enabled
+      ansible.builtin.include_role:
+        name: security
+        tasks_from: updates.yml
+      vars:
+        security_autoupdate_reboot: true
+
+    - name: Read rebootmgr.conf
+      ansible.builtin.slurp:
+        src: /etc/rebootmgr/rebootmgr.conf
+      register: verify_up_conf
+
+    - name: Assert strategy, window start and duration
+      ansible.builtin.assert:
+        that:
+          - verify_conf is search('^strategy=maint-window$', multiline=True)
+          - verify_conf is search('^window-start=Sun 04:00$', multiline=True)
+          - verify_conf is search('^window-duration=1h$', multiline=True)
+        quiet: true
+      vars:
+        verify_conf: "{{ verify_up_conf.content | b64decode }}"
+
+    - name: Read the service unit with rebootmgr enabled
+      ansible.builtin.slurp:
+        src: /etc/systemd/system/zypper-dup.service
+      register: verify_up_service_reboot
+
+    - name: Assert it requests the reboot only through the script
+      ansible.builtin.assert:
+        that: (verify_up_service_reboot.content | b64decode) is search('^ExecStartPost=/usr/local/bin/zypper-dup-request-reboot\.sh$', multiline=True)
+        quiet: true
+
+    - name: Read the rebootmgr unit state
+      ansible.builtin.systemd:
+        name: rebootmgr
+      register: verify_up_rebootmgr
+
+    - name: Assert rebootmgr is enabled and running
+      ansible.builtin.assert:
+        that:
+          - verify_up_rebootmgr.status.ActiveState == 'active'
+          - verify_up_rebootmgr.status.UnitFileState == 'enabled'
+        quiet: true
+
+    - name: Ask rebootmgr what it is using
+      ansible.builtin.command: "rebootmgrctl {{ item }}"
+      register: verify_up_ctl
+      changed_when: false
+      loop: [get-strategy, get-window]
+
+    - name: Assert the running daemon uses the maintenance window
+      ansible.builtin.assert:
+        that:
+          - verify_up_ctl.results[0].stdout is search('maint-window')
+          - verify_up_ctl.results[1].stdout is search("'Sun \*-\*-\* 04:00:00', lasting 01:00")
+        fail_msg: "rebootmgrctl: {{ verify_up_ctl.results | map(attribute='stdout') | list }}"
+        quiet: true
+
+    # The reboot-request script, run against fake zypper / rebootmgrctl /
+    # reboot-notify that log into one file, in call order.
+    - name: Test the reboot-request script
+      block:
+        - name: Create the fake commands
+          ansible.builtin.file:
+            path: "{{ verify_up_dir }}/bin"
+            state: directory
+            mode: "0755"
+
+        - name: Install the fakes
+          ansible.builtin.copy:
+            dest: "{{ item.dest }}"
+            mode: "0755"
+            content: "{{ item.content }}"
+          loop:
+            - dest: "{{ verify_up_dir }}/bin/zypper"
+              content: |
+                #!/bin/sh
+                [ "$1" = needs-rebooting ] && exit "${FAKE_NEEDS_REBOOTING_RC}"
+                exit 99
+            - dest: "{{ verify_up_dir }}/bin/rebootmgrctl"
+              content: |
+                #!/bin/sh
+                echo "rebootmgrctl $*" >>"${FAKE_LOG}"
+                exit "${FAKE_REBOOTMGRCTL_RC:-0}"
+            - dest: "{{ verify_up_dir }}/bin/systemctl"
+              content: |
+                #!/bin/sh
+                echo "systemctl $*" >>"${FAKE_LOG}"
+            - dest: /usr/local/bin/reboot-notify.sh
+              content: |
+                #!/bin/sh
+                echo "reboot-notify" >>"${FAKE_LOG}"
+                exit "${FAKE_NOTIFY_RC:-0}"
+          loop_control:
+            label: "{{ item.dest }}"
+
+        - name: Run the script for every scenario
+          ansible.builtin.shell: |
+            set -u
+            rm -f "$FAKE_LOG" "$FAKE_LOG.out" /var/run/reboot-notify-sent
+            # One run per word of FAKE_NOTIFY_SEQ (the exit code reboot-notify.sh
+            # has in that run), WITHOUT clearing the once-marker in between.
+            for notify_rc in ${FAKE_NOTIFY_SEQ:-${FAKE_NOTIFY_RC:-0}}; do
+              FAKE_NOTIFY_RC=$notify_rc PATH="{{ verify_up_dir }}/bin:$PATH" sh /usr/local/bin/zypper-dup-request-reboot.sh >>"$FAKE_LOG.out" 2>&1
+              echo "rc=$?"
+            done
+            if [ -f /var/run/reboot-notify-sent ]; then echo "marker=yes"; else echo "marker=no"; fi
+            echo "--log"; cat "$FAKE_LOG" 2>/dev/null || true
+            echo "--out"; cat "$FAKE_LOG.out"
+          register: verify_up_runs
+          changed_when: false
+          environment: "{{ item.env | combine({'FAKE_LOG': verify_up_dir ~ '/calls'}) }}"
+          loop:
+            - name: reboot needed
+              env: {FAKE_NEEDS_REBOOTING_RC: "102"}
+              expect: ["rc=0", "reboot-notify", "rebootmgrctl reboot", "marker=yes"]
+              notify_calls: 1
+              ordered: true
+            - name: no reboot needed
+              env: {FAKE_NEEDS_REBOOTING_RC: "0"}
+              expect: ["rc=0", "marker=no"]
+              absent: [reboot-notify, rebootmgrctl]
+            - name: zypper error
+              env: {FAKE_NEEDS_REBOOTING_RC: "7"}
+              expect: ["rc=0"]
+              absent: [reboot-notify, rebootmgrctl]
+            - name: notify fails, request still made
+              env: {FAKE_NEEDS_REBOOTING_RC: "102", FAKE_NOTIFY_RC: "1"}
+              expect: ["rc=0", "rebootmgrctl reboot", "reboot-notify.sh failed", "marker=no"]
+              notify_calls: 1
+            - name: notify fails, the next run sends the heads-up again (marker only after success)
+              env: {FAKE_NEEDS_REBOOTING_RC: "102", FAKE_NOTIFY_SEQ: "1 0"}
+              expect: ["reboot-notify.sh failed", "marker=yes"]
+              notify_calls: 2
+            - name: notify succeeds, the next run does not email again (once per pending reboot)
+              env: {FAKE_NEEDS_REBOOTING_RC: "102", FAKE_NOTIFY_SEQ: "0 0"}
+              expect: ["marker=yes"]
+              notify_calls: 1
+            - name: request fails, still exit 0
+              env: {FAKE_NEEDS_REBOOTING_RC: "102", FAKE_REBOOTMGRCTL_RC: "1"}
+              expect: ["rc=0", "rebootmgrctl reboot failed"]
+          loop_control:
+            label: "{{ item.name }}"
+
+        - name: Assert each scenario
+          ansible.builtin.assert:
+            that:
+              - item.item.expect | select('in', item.stdout) | list | length == item.item.expect | length
+              - (item.item.absent | default([])) | select('in', item.stdout) | list | length == 0
+              - not (item.item.ordered | default(false)) or item.stdout.index('reboot-notify') < item.stdout.index('rebootmgrctl reboot')
+              - item.item.notify_calls is not defined or (item.stdout_lines | select('equalto', 'reboot-notify') | list | length) == item.item.notify_calls
+              - "'systemctl' not in item.stdout"
+            fail_msg: "{{ item.item.name }}: {{ item.stdout }}"
+            quiet: true
+          loop: "{{ verify_up_runs.results }}"
+          loop_control:
+            label: "{{ item.item.name }}"
+
+        - name: Assert the script never reboots by itself
+          ansible.builtin.command: grep -nE 'systemctl|shutdown|reboot now' /usr/local/bin/zypper-dup-request-reboot.sh
+          register: verify_up_grep
+          changed_when: false
+          failed_when: verify_up_grep.stdout_lines | reject('match', '^[0-9]+:#') | list | length > 0
+      always:
+        - name: Remove the fakes and state files
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - "{{ verify_up_dir }}"
+            - /usr/local/bin/reboot-notify.sh
+            - /var/run/reboot-notify-sent

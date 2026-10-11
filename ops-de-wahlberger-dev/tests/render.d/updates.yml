@@ -1,0 +1,55 @@
+---
+# Registers the update/reboot files of the security role (T-06): the weekly
+# zypper-dup units, the rebootmgr config and the reboot-request script.
+# Rendered with the role defaults plus the production group_vars (which turn
+# security_autoupdate_reboot on).
+render_items:
+  - role: security
+    src: zypper-dup.timer.j2
+    dest: zypper-dup.timer
+    kind: systemd-unit
+    asserts:
+      - '^OnCalendar=Sun \*-\*-\* 04:00:00 Europe/Berlin$'
+      - '^Persistent=true$'
+      - '^WantedBy=timers\.target$'
+  - role: security
+    src: zypper-dup.service.j2
+    dest: zypper-dup.service
+    kind: systemd-unit
+    vars:
+      security_autoupdate_reboot: true
+    asserts:
+      - '^OnFailure=notify-failure-immediate@%n\.service$'
+      - '^ExecStart=/usr/bin/zypper --non-interactive dup --auto-agree-with-licenses$'
+      - '^ExecStartPost=/usr/local/bin/zypper-dup-request-reboot\.sh$'
+      - '^SuccessExitStatus=102$'
+  - role: security
+    src: zypper-dup.service.j2
+    dest: zypper-dup-noreboot.service
+    kind: systemd-unit
+    vars:
+      security_autoupdate_reboot: false
+    asserts:
+      - '^ExecStart=/usr/bin/zypper --non-interactive dup '
+      - '^OnFailure=notify-failure-immediate@%n\.service$'
+  - role: security
+    src: rebootmgr.conf.j2
+    dest: rebootmgr.conf
+    kind: text
+    asserts:
+      - '^strategy=maint-window$'
+      - '^window-start=Sun 04:00$'
+      - '^window-duration=1h$'
+  - role: security
+    src: zypper-dup-request-reboot.sh.j2
+    dest: zypper-dup-request-reboot.sh
+    kind: text
+    asserts:
+      - 'zypper needs-rebooting'
+      - '-eq 102'
+      - '^\s*rebootmgrctl reboot \|\|'
+      - '^\s*if /usr/local/bin/reboot-notify\.sh; then'
+      # No direct reboot: the rendered script may not contain these commands anywhere.
+      - '\A(?![\s\S]*systemctl)(?![\s\S]*shutdown)(?![\s\S]*reboot now)'
+      # The heads-up email comes first, then the request.
+      - '\A[\s\S]*/usr/local/bin/reboot-notify\.sh; then[\s\S]*rebootmgrctl reboot \|\|'

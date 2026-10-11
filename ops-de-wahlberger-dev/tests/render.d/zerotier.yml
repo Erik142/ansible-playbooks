@@ -1,0 +1,11 @@
+---
+# Registers the zerotier Quadlet (T-02 walking skeleton). Role tasks add their
+# own tests/render.d/NN-<name>.yml; see tests/lib/render.yml for the format.
+render_items:
+  - role: zerotier
+    src: zerotier.container.j2
+    dest: zerotier.container
+    kind: quadlet
+    asserts:
+      - '^Network=host$'
+      - '^Exec=8056c2e21cc5c789$'

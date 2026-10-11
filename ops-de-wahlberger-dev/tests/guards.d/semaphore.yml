@@ -1,0 +1,566 @@
+---
+# Guard test for the semaphore role (T-09; SH-FR-52, SH-FR-210, SH-E-01,
+# SH-FR-166 to SH-FR-169, SH-FR-207, SH-FR-215 to SH-FR-219, SH-FR-130,
+# SH-FR-186, SH-FR-204, SH-FR-66 role side, SH-AC-19 offline half, SH-AC-53
+# render half).
+#
+# Run from the playbook directory (needs Docker or Podman; no host, no network):
+#   ansible-playbook -i localhost, tests/guards.d/semaphore.yml
+# (`-i localhost,` keeps the production inventory and its Vault out of it.)
+# Exit 0 = every case passed. tests/guard-tests.sh (T-14) runs this file for
+# `guard-tests.sh semaphore`.
+#
+# How it works: the REAL role is run by a nested ansible-playbook as root in a
+# disposable container (`--network none`, role tree mounted read-only), so
+# owners and modes can really be set and read back. Only the two programs the
+# role calls on a live host are stubbed: `podman` (the admin lookup via
+# `podman exec`) and `systemctl` (the restart handler); both append their
+# arguments to a log. Variables come from the real production vars.yml, so a
+# drift between the role and the production wiring (vm_proxy_design ->
+# semaphore_design, subnet, require_existing_db) is caught too; only the
+# secrets, the UID and the data root are overridden per case.
+#
+# The container image must ship ansible-core (default: the geerlingguy
+# Debian image the Molecule setup also uses; override with GUARD_IMAGE).
+# GUARD_RUNTIME=docker|podman forces the runtime.
+#
+# The state of each case is collected inside the container by one Python
+# script into a JSON document (`gt_s`), and the assertions below read only
+# that document and the nested run's output.
+- name: Guard test semaphore (real role, disposable container, stubbed podman and systemctl)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    gt_ops_dir: "{{ playbook_dir }}/../.."
+    gt_image: "{{ lookup('ansible.builtin.env', 'GUARD_IMAGE') | default('docker.io/geerlingguy/docker-debian13-ansible:latest', true) }}"
+    gt_runtime_env: "{{ lookup('ansible.builtin.env', 'GUARD_RUNTIME') }}"
+    gt_cname: "t09-semaphore-guard-{{ 99999 | random }}"
+    # The role derives semaphore_data_dir from podman_data_dir; every case sets
+    # podman_data_dir to /srv, so the default derivation is exercised throughout.
+    gt_root: /srv/semaphore
+    gt_secret: 'S3cr"et\v'
+    gt_admin_pw: 'Adm"in\pw-sentinel'
+    # Unescaped fragments: an output may show a secret JSON-escaped, so the
+    # quote and backslash of gt_secret / gt_admin_pw are left out of these.
+    gt_sentinels:
+      - 'S3cr'
+      - 'pw-sentinel'
+      - 'cookie-sentinel'
+      - 'accesskey-sentinel'
+      - 'oidc-sentinel'
+    gt_base_vars:
+      podman_data_dir: /srv
+      semaphore_uid: 1001
+      semaphore_admin_password: 'Adm"in\pw-sentinel'
+      semaphore_access_key_encryption: accesskey-sentinel
+      semaphore_cookie_hash: 'S3cr"et\v'
+      semaphore_cookie_encryption: cookie-sentinel
+      semaphore_oidc_client_secret: oidc-sentinel
+    gt_seed_db: >-
+      mkdir -p /srv/semaphore/data && printf x > /srv/semaphore/data/database.sqlite
+      && chmod 0644 /srv/semaphore/data/database.sqlite
+    # Reading aid for the expressions below:
+    #   gt_s.rcs[n]       exit code of run n (2 = a task failed)
+    #   gt_s.logs[n]      full output of run n
+    #   gt_s.tree         {relative path: {kind, mode, uid, gid}} below the data root ({} = root absent)
+    #   gt_s.systemctl    stub log lines ("RUN n" markers separate runs)
+    #   gt_s.podman       stub log lines
+    #   gt_s.quadlets     {file name: content} in /etc/containers/systemd
+    #   gt_s.config / gt_s.oidc  parsed config.json / SEMAPHORE_OIDC_PROVIDERS (or null)
+    gt_cases:
+      # --- Guards: each fails before any change -------------------------------
+      - name: semaphore_uid empty (the production default) -> fails naming it, host untouched (FR-210)
+        vars: { semaphore_uid: "" }
+        setup: "{{ gt_seed_db }}"
+        that:
+          - gt_s.rcs == [2]
+          - "'semaphore_uid is empty' in gt_s.logs[0]"
+          - gt_s.tree.keys() | sort | list == ['.', 'data', 'data/database.sqlite']
+          - gt_s.tree['data/database.sqlite'].mode == '0644'
+          - gt_s.tree['data/database.sqlite'].uid == 0
+          - gt_s.quadlets == {}
+          - gt_s.systemctl | reject('match', 'RUN ') | list == []
+          - gt_s.podman == []
+      - name: semaphore_uid 0 (root) is refused
+        vars: { semaphore_uid: 0 }
+        that:
+          - gt_s.rcs == [2]
+          - "'semaphore_uid is empty or not a positive integer' in gt_s.logs[0]"
+          - gt_s.tree == {}
+          - gt_s.quadlets == {}
+      - name: semaphore_uid non-numeric is refused
+        vars: { semaphore_uid: abc }
+        that:
+          - gt_s.rcs == [2]
+          - "'semaphore_uid is empty or not a positive integer' in gt_s.logs[0]"
+          - gt_s.tree == {}
+          - gt_s.quadlets == {}
+      # `$` in a regex also matches before a trailing newline; the role uses \A..\Z.
+      - name: semaphore_uid with a trailing newline is refused (QA T-08/T-09 minor)
+        vars: { semaphore_uid: "1001\n" }
+        setup: "{{ gt_seed_db }}"
+        that:
+          - gt_s.rcs == [2]
+          - "'semaphore_uid is empty or not a positive integer' in gt_s.logs[0]"
+          - gt_s.tree.keys() | sort | list == ['.', 'data', 'data/database.sqlite']
+          - gt_s.tree['data/database.sqlite'].mode == '0644'
+          - gt_s.quadlets == {}
+      - name: database absent and required -> fails naming the full path before any change (FR-52, E-01, AC-19)
+        vars: {}
+        that:
+          - gt_s.rcs == [2]
+          - "'/srv/semaphore/data/database.sqlite' in gt_s.logs[0]"
+          - "'semaphore_require_existing_db' in gt_s.logs[0]"
+          - gt_s.tree == {}
+          - gt_s.quadlets == {}
+          - gt_s.systemctl | reject('match', 'RUN ') | list == []
+          - gt_s.podman == []
+      - name: primary design with an empty subnet -> fails naming semaphore_network_subnet before any change
+        vars: { semaphore_network_subnet: "" }
+        setup: "{{ gt_seed_db }}"
+        that:
+          - gt_s.rcs == [2]
+          - "'semaphore_network_subnet' in gt_s.logs[0]"
+          - "'config.json' not in gt_s.tree"
+          - gt_s.quadlets == {}
+          - gt_s.systemctl | reject('match', 'RUN ') | list == []
+      - name: unknown design -> fails before any change
+        vars: { vm_proxy_design: bogus }
+        setup: "{{ gt_seed_db }}"
+        that:
+          - gt_s.rcs == [2]
+          - "'semaphore_design' in gt_s.logs[0]"
+          - "'config.json' not in gt_s.tree"
+          - gt_s.quadlets == {}
+      - name: an empty Vault secret -> fails before any change and the message does not leak the others
+        vars: { semaphore_cookie_hash: "" }
+        setup: "{{ gt_seed_db }}"
+        that:
+          - gt_s.rcs == [2]
+          - "'vault_semaphore_cookie_hash' in gt_s.logs[0]"
+          - gt_s.logs[0] is not search('accesskey-sentinel|oidc-sentinel|cookie-sentinel')
+          - "'config.json' not in gt_s.tree"
+      # --- Not required: the role still never creates a database --------------
+      - name: require_existing_db false and no database -> succeeds, database stays absent, data dir 0700 (FR-204)
+        vars: { semaphore_require_existing_db: false }
+        that:
+          - gt_s.rcs == [0]
+          - "'data/database.sqlite' not in gt_s.tree"
+          - "gt_s.tree['data'] == {'kind': 'd', 'mode': '0700', 'uid': 1001, 'gid': 0}"
+      # --- Primary design, migrated database present ---------------------------
+      - name: primary design, admin present -> modes, owners, Quadlets, restart once, second run 0 changed (FR-166..169, FR-207, FR-130)
+        vars: {}
+        setup: "{{ gt_seed_db }}"
+        runs: 2
+        that:
+          - gt_s.rcs == [0, 0]
+          - "'failed=0' in gt_s.logs[0]"
+          - "gt_s.tree['.'] == {'kind': 'd', 'mode': '0755', 'uid': 0, 'gid': 0}"
+          - "gt_s.tree['data'] == {'kind': 'd', 'mode': '0700', 'uid': 1001, 'gid': 0}"
+          - "gt_s.tree['data/database.sqlite'] == {'kind': 'f', 'mode': '0600', 'uid': 1001, 'gid': 0}"
+          - "gt_s.tree['config.json'] == {'kind': 'f', 'mode': '0600', 'uid': 1001, 'gid': 0}"
+          - "gt_s.tree['semaphore.env'] == {'kind': 'f', 'mode': '0600', 'uid': 0, 'gid': 0}"
+          - gt_s.tree.keys() | sort | list == ['.', 'config.json', 'data', 'data/database.sqlite', 'semaphore.env']
+          - gt_s.quadlets.keys() | sort | list == ['semaphore.container', 'semaphore.network']
+          - "'Network=semaphore.network' in gt_s.quadlets['semaphore.container']"
+          - "'PublishPort=127.0.0.1:3000:3000' in gt_s.quadlets['semaphore.container']"
+          - "'Subnet=172.29.30.0/24' in gt_s.quadlets['semaphore.network']"
+          - gt_s.config.cookie_hash == gt_secret
+          - gt_s.config.access_key_encryption == 'accesskey-sentinel'
+          - gt_s.config.sqlite.host == '/var/lib/semaphore/database.sqlite'
+          - gt_s.oidc.pocketid.client_secret == 'oidc-sentinel'
+          - gt_s.systemctl[:gt_s.systemctl.index('RUN 2')] | select('search', 'restart.*semaphore.service') | list | length >= 1
+          - gt_s.systemctl[gt_s.systemctl.index('RUN 2'):] | select('search', 'restart') | list | length == 0
+          - "'changed=0' in gt_s.logs[1]"
+          - "'failed=0' in gt_s.logs[1]"
+          - gt_s.podman | select('search', 'users get') | list | length == 2
+          - gt_s.podman | select('search', 'users add') | list | length == 0
+      - name: primary design, admin missing -> exactly one `users add`, password never in the output
+        vars: {}
+        setup: "{{ gt_seed_db }}"
+        admin: missing
+        that:
+          - gt_s.rcs == [0]
+          - gt_s.podman | select('search', 'users add .*--login erikwahlberger') | list | length == 1
+          - gt_s.podman | select('search', 'users add .*--admin') | list | length == 1
+      # --- Bridge fallback ------------------------------------------------------
+      - name: bridge fallback (via vm_proxy_design) -> caddy.network, nothing published, no semaphore.network (FR-186, AC-61)
+        vars: { vm_proxy_design: bridge_fallback, semaphore_network_subnet: "" }
+        setup: "{{ gt_seed_db }}"
+        that:
+          - gt_s.rcs == [0]
+          - gt_s.quadlets.keys() | list == ['semaphore.container']
+          - "'Network=caddy.network' in gt_s.quadlets['semaphore.container']"
+          - "'PublishPort' not in gt_s.quadlets['semaphore.container']"
+          - "'caddy-network.service' in gt_s.quadlets['semaphore.container']"
+          - gt_s.tree['data/database.sqlite'].mode == '0600'
+      # --- Check mode and self-run ------------------------------------------------
+      # A fresh host: the units do not exist yet (stub: LoadState=not-found), which is
+      # exactly what the first `--check` of OP-02 sees. Handlers still run in check mode.
+      - name: --check on a fresh host -> succeeds and changes nothing (database keeps its mode, no config, no Quadlet, no start/restart/reload)
+        vars: {}
+        setup: "{{ gt_seed_db }}"
+        check: true
+        systemd: notfound
+        that:
+          - gt_s.rcs == [0]
+          - gt_s.tree.keys() | sort | list == ['.', 'data', 'data/database.sqlite']
+          - gt_s.tree['data/database.sqlite'].mode == '0644'
+          - gt_s.tree['data/database.sqlite'].uid == 0
+          - gt_s.quadlets == {}
+          - gt_s.systemctl | select('search', 'restart|start|stop|reload') | list == []
+          - gt_s.podman | select('search', 'users add') | list | length == 0
+      - name: self-run (--skip-tags semaphore, SH-FR-149) -> the role runs no task at all (FR-66)
+        vars: {}
+        setup: "{{ gt_seed_db }}"
+        skip_tags: semaphore
+        that:
+          - gt_s.rcs == [0]
+          - gt_s.tree.keys() | sort | list == ['.', 'data', 'data/database.sqlite']
+          - gt_s.tree['data/database.sqlite'].mode == '0644'
+          - gt_s.quadlets == {}
+          - gt_s.systemctl | reject('match', 'RUN ') | list == []
+          - gt_s.podman == []
+  tasks:
+    - name: Static checks that need no container
+      block:
+        # site.yml must tag the role, or --skip-tags semaphore (FR-149) skips nothing.
+        - name: Read site.yml
+          ansible.builtin.set_fact:
+            gt_site_roles: "{{ (lookup('ansible.builtin.file', gt_ops_dir ~ '/site.yml') | from_yaml)[0].roles }}"
+
+        - name: Assert site.yml tags the semaphore role with its own name
+          ansible.builtin.assert:
+            that:
+              - gt_site_roles | selectattr('role', 'equalto', 'semaphore') | map(attribute='tags') | first == ['semaphore']
+            quiet: true
+
+        # SH-FR-204: no code path names the SQLite companion files. Comments are
+        # excluded; a seeded control file proves the scan can see a match.
+        - name: Create the scan control directory
+          ansible.builtin.tempfile:
+            state: directory
+            prefix: sem-guard-ctl.
+          register: gt_ctl
+
+        - name: Seed a control file that names a -wal file in code
+          ansible.builtin.copy:
+            dest: "{{ gt_ctl.path }}/seeded.yml"
+            mode: "0644"
+            content: |
+              - ansible.builtin.copy:
+                  dest: /x/database.sqlite-wal
+                  src: y
+
+        - name: Scan the role for tasks naming SQLite companion files
+          ansible.builtin.find:
+            paths: "{{ item }}"
+            recurse: true
+            patterns: ["*.yml", "*.j2"]
+            excludes: ["argument_specs.yml"]
+            contains: '^[^#\n]*sqlite-(wal|shm|journal)'
+          register: gt_scan
+          loop:
+            - "{{ gt_ops_dir }}/roles/semaphore/tasks"
+            - "{{ gt_ops_dir }}/roles/semaphore/templates"
+            - "{{ gt_ctl.path }}"
+
+        - name: Assert the role never names them and the scan can see one
+          ansible.builtin.assert:
+            that:
+              - gt_scan.results[0].matched == 0
+              - gt_scan.results[1].matched == 0
+              - gt_scan.results[2].matched == 1
+            quiet: true
+      always:
+        - name: Remove the scan control directory
+          ansible.builtin.file:
+            path: "{{ gt_ctl.path }}"
+            state: absent
+          when: gt_ctl is defined and gt_ctl.path is defined
+
+    - name: Run the cases in a disposable container
+      block:
+        - name: Pick a container runtime
+          ansible.builtin.shell:
+            cmd: |
+              set -eu
+              for rt in {{ gt_runtime_env | default('docker podman', true) }}; do
+                if command -v "$rt" >/dev/null 2>&1 && "$rt" info >/dev/null 2>&1; then echo "$rt"; exit 0; fi
+              done
+              exit 1
+            executable: /bin/sh
+          register: gt_rt
+          changed_when: false
+          failed_when: gt_rt.rc != 0
+          check_mode: false
+
+        - name: Create a scratch directory
+          ansible.builtin.tempfile:
+            state: directory
+            prefix: sem-guard.
+          register: gt_tmp
+
+        - name: Create the scratch layout
+          ansible.builtin.file:
+            path: "{{ gt_tmp.path }}/{{ item }}"
+            state: directory
+            mode: "0755"
+          loop: [bin, vars, state]
+
+        # The two programs the role calls on a live host. Each logs its arguments.
+        - name: Write the podman and systemctl stubs
+          ansible.builtin.copy:
+            dest: "{{ gt_tmp.path }}/bin/{{ item.name }}"
+            mode: "0755"
+            content: "{{ item.content }}"
+          loop_control:
+            label: "{{ item.name }}"
+          loop:
+            - name: podman
+              content: |
+                #!/bin/sh
+                echo "$*" >>"$GT_STATE/podman.log"
+                case "$*" in
+                *"users get"*) [ "${GT_ADMIN:-exists}" = exists ] && exit 0; echo "user not found" >&2; exit 1 ;;
+                *"users add"*) exit 0 ;;
+                esac
+                exit 0
+            - name: systemctl
+              content: |
+                #!/bin/sh
+                echo "$*" >>"$GT_STATE/systemctl.log"
+                case "$*" in
+                *show*)
+                  if [ "${GT_SYSTEMD:-loaded}" = notfound ]; then
+                    printf 'Id=semaphore.service\nLoadState=not-found\nActiveState=inactive\n'
+                    printf 'SubState=dead\nUnitFileState=\n'
+                  else
+                    printf 'Id=semaphore.service\nLoadState=loaded\nActiveState=active\n'
+                    printf 'SubState=running\nUnitFileState=enabled\n'
+                  fi ;;
+                esac
+                exit 0
+
+        - name: Write the nested inventory, config and playbook
+          ansible.builtin.copy:
+            dest: "{{ gt_tmp.path }}/{{ item.name }}"
+            mode: "0644"
+            content: "{{ item.content }}"
+          loop_control:
+            label: "{{ item.name }}"
+          loop:
+            - name: inventory.ini
+              content: |
+                ops.de.wahlberger.dev ansible_connection=local ansible_python_interpreter=/usr/bin/python3
+            - name: ansible.cfg
+              content: |
+                [defaults]
+                roles_path = /ops/roles
+                retry_files_enabled = false
+                localhost_warning = false
+                host_key_checking = false
+                nocolor = true
+            - name: play.yml
+              content: |
+                ---
+                - name: Nested semaphore run
+                  hosts: all
+                  gather_facts: false
+                  vars_files:
+                    - /ops/inventories/production/group_vars/all/vars.yml
+                  roles:
+                    - role: semaphore
+                      tags: [semaphore]
+
+        # Collects everything the assertions need into <state>/state.json.
+        - name: Write the state collector
+          ansible.builtin.copy:
+            dest: "{{ gt_tmp.path }}/collect.py"
+            mode: "0644"
+            content: |
+              {% raw %}
+              import json, os, sys
+
+              state, root, qdir = sys.argv[1:4]
+
+
+              def read(path, default=""):
+                  try:
+                      with open(path) as f:
+                          return f.read()
+                  except OSError:
+                      return default
+
+
+              out = {"rcs": [], "logs": []}
+              n = 1
+              while os.path.exists("%s/rc-%d" % (state, n)):
+                  out["rcs"].append(int(read("%s/rc-%d" % (state, n)).strip()))
+                  out["logs"].append(read("%s/run-%d.log" % (state, n)))
+                  n += 1
+              tree = {}
+              if os.path.isdir(root):
+                  for dirpath, dirs, files in os.walk(root):
+                      for name in dirs + files:
+                          p = os.path.join(dirpath, name)
+                          st = os.lstat(p)
+                          tree[os.path.relpath(p, root)] = {
+                              "kind": "d" if os.path.isdir(p) else "f",
+                              "mode": "%04o" % (st.st_mode & 0o7777),
+                              "uid": st.st_uid,
+                              "gid": st.st_gid,
+                          }
+                  st = os.lstat(root)
+                  tree["."] = {"kind": "d", "mode": "%04o" % (st.st_mode & 0o7777),
+                               "uid": st.st_uid, "gid": st.st_gid}
+              out["tree"] = tree
+              out["systemctl"] = read(state + "/systemctl.log").splitlines()
+              out["podman"] = read(state + "/podman.log").splitlines()
+              out["quadlets"] = {}
+              if os.path.isdir(qdir):
+                  for name in sorted(os.listdir(qdir)):
+                      out["quadlets"][name] = read(os.path.join(qdir, name))
+              try:
+                  out["config"] = json.loads(read(root + "/config.json"))
+              except ValueError:
+                  out["config"] = None
+              out["oidc"] = None
+              for line in read(root + "/semaphore.env").splitlines():
+                  if line.startswith("SEMAPHORE_OIDC_PROVIDERS="):
+                      try:
+                          out["oidc"] = json.loads(line.split("=", 1)[1])
+                      except ValueError:
+                          pass
+              print(json.dumps(out))
+              {% endraw %}
+
+        - name: Write the case variables
+          ansible.builtin.copy:
+            dest: "{{ gt_tmp.path }}/vars/case-{{ idx }}.json"
+            mode: "0600"
+            content: "{{ (gt_base_vars | combine(item.vars)) | to_nice_json }}"
+          loop: "{{ gt_cases }}"
+          loop_control:
+            index_var: idx
+            label: "{{ item.name }}"
+
+        - name: Write the case runner
+          ansible.builtin.copy:
+            dest: "{{ gt_tmp.path }}/run.sh"
+            mode: "0755"
+            content: |
+              #!/bin/sh
+              set -u
+              export PATH=/work/bin:$PATH
+              export ANSIBLE_CONFIG=/work/ansible.cfg
+              {% for c in gt_cases %}
+              echo "== case {{ loop.index0 }}"
+              st=/work/state/{{ loop.index0 }}
+              rm -rf /srv/semaphore /etc/containers/systemd "$st"
+              # The podman role (ordered before this one in site.yml) creates the Quadlet directory.
+              mkdir -p "$st" /etc/containers/systemd
+              export GT_STATE="$st" GT_ADMIN={{ c.admin | default('exists') }} GT_SYSTEMD={{ c.systemd | default('loaded') }}
+              {{ c.setup | default(':') }}
+              n=1
+              while [ "$n" -le {{ c.runs | default(1) }} ]; do
+                echo "RUN $n" >>"$st/systemctl.log"
+                ansible-playbook -i /work/inventory.ini /work/play.yml --diff -v \
+                  -e @/work/vars/case-{{ loop.index0 }}.json \
+                  {{ '--check' if c.check | default(false) else '' }} \
+                  {{ ('--skip-tags ' ~ c.skip_tags) if c.skip_tags is defined else '' }} \
+                  >"$st/run-$n.log" 2>&1
+                echo $? >"$st/rc-$n"
+                n=$((n + 1))
+              done
+              python3 /work/collect.py "$st" /srv/semaphore /etc/containers/systemd >"$st/state.json"
+              {% endfor %}
+
+        # --network none: the role needs none, and the test must not reach out.
+        - name: Run all cases in one container
+          ansible.builtin.command:
+            argv:
+              - "{{ gt_rt.stdout }}"
+              - run
+              - --rm
+              - --name
+              - "{{ gt_cname }}"
+              - --network
+              - none
+              - -v
+              - "{{ gt_tmp.path }}:/work"
+              - -v
+              - "{{ gt_ops_dir | realpath }}:/ops:ro"
+              - --entrypoint
+              - sh
+              - "{{ gt_image }}"
+              - /work/run.sh
+          register: gt_container
+          changed_when: false
+
+        - name: Read the case states
+          ansible.builtin.slurp:
+            src: "{{ gt_tmp.path }}/state/{{ idx }}/state.json"
+          register: gt_states
+          loop: "{{ gt_cases }}"
+          loop_control:
+            index_var: idx
+            label: "{{ item.name }}"
+
+        # rc 2 = ansible-playbook's exit code for a failed task.
+        - name: Assert every case
+          ansible.builtin.assert:
+            that: "{{ item.that }}"
+            fail_msg: "{{ item.name }}: state={{ gt_s | to_json }}"
+            success_msg: "{{ item.name }}"
+            quiet: true
+          vars:
+            gt_s: "{{ gt_states.results[idx].content | b64decode | from_json }}"
+          loop: "{{ gt_cases }}"
+          loop_control:
+            index_var: idx
+            label: "{{ item.name }}"
+
+        # A secret (or the admin password) in any nested output (run with -v, so
+        # task results and the diff are printed) means a task is missing no_log.
+        - name: Assert no secret appears in any nested output
+          ansible.builtin.assert:
+            that:
+              - gt_leaks | length == 0
+            fail_msg: "{{ item.name }}: secret(s) in the output of run(s): {{ gt_leaks }}"
+            quiet: true
+          vars:
+            gt_s: "{{ gt_states.results[idx].content | b64decode | from_json }}"
+            gt_leaks: >-
+              {{ gt_sentinels | select('in', gt_s.logs | join('\n')) | list }}
+          loop: "{{ gt_cases }}"
+          loop_control:
+            index_var: idx
+            label: "{{ item.name }}"
+      always:
+        # Files written by the container are root-owned on a Linux host.
+        - name: Clean the scratch directory as root through the same image
+          ansible.builtin.command:
+            argv:
+              - "{{ gt_rt.stdout }}"
+              - run
+              - --rm
+              - --network
+              - none
+              - -v
+              - "{{ gt_tmp.path }}:/work"
+              - --entrypoint
+              - sh
+              - "{{ gt_image }}"
+              - -c
+              - rm -rf /work/* /work/.[!.]*
+          changed_when: false
+          failed_when: false
+          when: gt_tmp is defined and gt_tmp.path is defined and gt_rt is defined and gt_rt.stdout is defined
+
+        - name: Remove the scratch directory
+          ansible.builtin.file:
+            path: "{{ gt_tmp.path }}"
+            state: absent
+          when: gt_tmp is defined and gt_tmp.path is defined

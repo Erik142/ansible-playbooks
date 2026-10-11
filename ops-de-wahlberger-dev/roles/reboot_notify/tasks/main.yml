@@ -1,0 +1,56 @@
+---
+- name: Create the reboot_notify config directory
+  ansible.builtin.file:
+    path: /etc/reboot-notify
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# A template (not a static copy): bakes in the configured
+# security_autoupdate_reboot_strategy so the email says how the reboot
+# will actually be carried out, not just that one is pending.
+- name: Deploy the reboot notice email template
+  ansible.builtin.template:
+    src: email-template.html.j2
+    dest: /etc/reboot-notify/email-template.html
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy the reboot notice script
+  ansible.builtin.template:
+    src: reboot-notify.sh.j2
+    dest: /usr/local/bin/reboot-notify.sh
+    owner: root
+    group: root
+    mode: "0700"
+
+# Superseded by security's zypper-dup-request-reboot.sh calling this script
+# directly, synchronously, right when it decides to request a reboot — a
+# shutdown-time systemd hook here turned out to be unreliable
+# (Before=shutdown.target is only a soft ordering hint; confirmed it
+# silently never ran under a busy shutdown transaction, 2026-09). Cleans up
+# any previously deployed instance.
+- name: Check whether the old reboot-notify shutdown-hook unit exists
+  ansible.builtin.stat:
+    path: /etc/systemd/system/reboot-notify.service
+  register: reboot_notify_old_unit_file
+
+- name: Stop and disable the old reboot-notify shutdown-hook service
+  ansible.builtin.systemd:
+    name: reboot-notify.service
+    enabled: false
+    state: stopped
+  when: reboot_notify_old_unit_file.stat.exists
+
+- name: Remove the old reboot-notify shutdown-hook unit file
+  ansible.builtin.file:
+    path: /etc/systemd/system/reboot-notify.service
+    state: absent
+  when: reboot_notify_old_unit_file.stat.exists
+
+- name: Reload systemd after removing the old shutdown-hook unit
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: reboot_notify_old_unit_file.stat.exists

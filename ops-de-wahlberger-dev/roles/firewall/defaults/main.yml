@@ -1,0 +1,48 @@
+---
+# Default variables for the `firewall` role (ops VM: public SSH, UI over ZeroTier).
+
+# firewalld zone of the public network interface. openSUSE Tumbleweed defaults
+# to "public".
+firewall_zone: public
+
+# Services the public zone allows inbound: SSH only (SH-FR-06, SH-CC-15). The
+# NAS copy of this role also allowed samba/http/https; the VM must not.
+firewall_allowed_services:
+  - ssh
+
+# Services removed from the public zone if present, so "ssh only" holds on a
+# host whose zone shipped with extras (SH-AC-04 lists the zone's services). The
+# role only enables things elsewhere; this list is the one place it disables.
+firewall_public_removed_services:
+  - dhcpv6-client
+  - mdns
+  - samba
+  - http
+  - https
+  - cockpit
+
+# Ports with no predefined firewalld service. Empty by default; entries are
+# "port/proto" strings and admit every source.
+firewall_allowed_ports: []
+
+# firewalld rich rules (full rule strings) for firewall_zone. Use these for
+# source-restricted access; do NOT put such ports in firewall_allowed_ports.
+firewall_rich_rules: []
+
+# Name of the ZeroTier network interface on the VM (fed by `vm_zt_iface`).
+# Empty (steps 0 to 2): the zone binding and its rules are skipped (SH-FR-194).
+firewall_zerotier_interface: ""
+
+# Zone the ZeroTier interface is bound to, by interface name (SH-FR-185).
+firewall_zerotier_zone: zerotier
+
+# Services the ZeroTier zone allows: SSH for the owner and the Semaphore
+# self-run, HTTPS for the Semaphore UI behind host-networked Caddy.
+firewall_zerotier_services:
+  - ssh
+  - https
+
+# Beszel agent port and the only source allowed to reach it (cloud's ZeroTier
+# member IP, `cloud_zt_ip` in group_vars). Required once the interface is set.
+firewall_zerotier_agent_port: 45876
+firewall_cloud_zt_ip: ""
