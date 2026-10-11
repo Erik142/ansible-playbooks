@@ -429,7 +429,7 @@ from the environment (`SEMAPHORE_USER`, `SEMAPHORE_PASSWORD`).
    ansible-playbook site.yml --tags semaphore -e ansible_host=ops.de.int.wahlberger.dev
    ```
 
-   `restic_backup_sqlite_required: false` in `vars.yml` is a stopgap; the `restic_backup` role is not applied in steps 2 to 4 (they select other tags). Delete that line (the role default `true` applies) in pull request A3, before the step-5 apply. `tests/guards.d/vm_vars.yml` accepts the variable absent or false, so A3 does not need to edit `tests/`. While the line is `false` and the database exists the backup still copies it, but a later disappearance of the database would no longer mail the owner (`roles/restic_backup/README.md`, "Missing database").
+   The stopgap `restic_backup_sqlite_required: false` was deleted from `vars.yml` by pull request A3, so the role default `true` applies: a missing database fails the run and mails the owner (`roles/restic_backup/README.md`, "Missing database"). The `restic_backup` role is not applied before step 5, after the database exists.
 7. Run the tests **in this order** (PA-2): SH-AC-18, then **SH-AC-20 before any task runs on the VM** (`tools/compare-record.py record.json https://semaphore.de.int.wahlberger.dev` against the VM: map `semaphore.de.int.wahlberger.dev` to `<vm-zt-ip>` in the workstation's `/etc/hosts` first, as SH-AC-21 does, and remove the line after step 8; the `--check` tasks of SH-AC-22 create task rows and would break the newest-task-id comparison), then SH-AC-03 (including the `--permanent` public-zone rich-rules clause), SH-AC-07, SH-AC-15, SH-AC-16, SH-AC-21, SH-AC-22, SH-AC-53 (compare the file modes and owners with the table in `roles/semaphore/README.md`, `ls -Z` for `container_file_t`), SH-AC-54, SH-AC-58; SH-AC-34 if a snapshot was taken; **SH-AC-55 last**.
 8. Uptime Kuma (SH-AC-58): the HTTP monitor `https://semaphore.de.int.wahlberger.dev/api/ping` (60 s interval, 3 retries) **checks the Pi until step 8**, because the name resolves to the Pi; "up" proves nothing about the VM (PA-7). From step 4 also add a **TCP monitor** `ops.de.int.wahlberger.dev:443` (cloud's Kuma reaches it via matrix row M-04). Until step 8, test the VM's UI with `curl --resolve semaphore.de.int.wahlberger.dev:443:<vm-zt-ip> https://semaphore.de.int.wahlberger.dev/api/ping`.
 9. Finally delete the workstation copy of the Pi database and its companion files, `record.json` stays only as long as needed (SH-FR-172, SH-AC-55).
@@ -681,27 +681,39 @@ closed), which SH-AC-51 detects.
 
 ## Observations recorded by pull request A3
 
-Filled in during step 3 (SH-FR-221, SH-AC-64). Until then every entry is open.
+Measured on the real VM during steps 1 to 3 (2026-10-11), as required by SH-FR-221
+and SH-AC-64.
 
 | Observation | Result |
 |---|---|
-| SH-AC-05: sshd directives not applied (`sshd -T`) | TODO: fill in during step 2/3 (none known) |
-| SH-AC-08: root filesystem type, snapper pairs present | TODO: fill in during step 3. If not btrfs: the Hetzner snapshot is the update rollback |
-| SH-AC-04: zone test result (primary design) | TODO: fill in during step 3 |
-| SH-AC-61 / SH-R-04: fallback used? result | TODO: fill in during step 3 (empty if the primary design stands) |
-| `semaphore_uid` read on the Pi | TODO: fill in during step 3 |
-| `vm_proxy_design` decision | TODO: `primary` or `bridge_fallback` |
+| SH-AC-05: sshd directives not applied (`sshd -T`) | none: all applied (`LoginGraceTime 30`, `MaxAuthTries 3`, `PermitRootLogin no`, `PasswordAuthentication no`, `KbdInteractiveAuthentication no`, `X11Forwarding no`, `AllowTcpForwarding no`, `AllowAgentForwarding no`, `AllowUsers erikwahlberger`, `AuthenticationMethods publickey`); the probe from the internet offered only `publickey` |
+| SH-AC-08: root filesystem type, snapper pairs | btrfs (the kiwi image, `image/`); `snapper list-configs` shows `root`; every `zypper` transaction produced a `pre`/`post` pair (for example 2/3 to 14/15). Snapper is the update rollback; no Hetzner snapshot is needed for it |
+| SH-AC-04: zone test result (primary design) | removing `https` from the `zerotier` zone (runtime) gave no connection, re-adding it restored the 502; with a temporary Cloud Firewall rule for 45876 from cloud's public IPv4, `nc` from cloud failed (the public zone blocks it); the rule was deleted afterwards and the Cloud Firewall again has exactly one inbound rule |
+| SH-AC-61 / SH-R-04: fallback used? | no, the primary design stands (SH-AC-51 passed: 502 from the home LAN, 403 from the host's public address, real client address `10.243.163.88` in Caddy's log, no listener on 80 or 2019) |
+| `semaphore_uid` read on the Pi | `1001` |
+| `vm_proxy_design` decision | `primary` |
+
+Further observations from steps 1 to 3 that later work may need:
+
+- The home MikroTik masquerades LAN to ZeroTier traffic, so the VM sees home devices as `10.243.163.88`; ZeroTier to LAN traffic is not NATed (the NAS sees the VM as `10.243.25.185`). See `docs/zerotier-flow-rules.md`.
+- `firewalld` ships a `docker` zone (target ACCEPT, interface `docker0`) that is active but harmless: Docker is not installed and no `docker0` interface exists.
+- After a VM reboot, a peer's ARP entry for the VM can sit in `FAILED` for a few minutes ("No route to host" from cloud, the Beszel hub shows the VM down). A `ping` from the peer resolves it at once.
+- The Beszel agent starts before ZeroTier creates its interface after a boot and then does not list it among its network interfaces until it is restarted.
+- A public internet scanner was banned by fail2ban within hours of the VM going online; the ban used nftables and left firewalld's rich rules empty.
+- SELinux is enforcing on the VM. Loading the `tun` module is the host's job (`zerotier_load_tun_module`); the container cannot trigger it.
 
 ## Known unverified (live-only or not yet measured)
 
-Nothing below has been observed on the real VM. The fixture evidence
-(`tests/vm`, T-16) is aarch64 and counts as simulator evidence only (PA-14).
+Measured on the real VM in steps 1 to 3 and recorded above: host networking plus the
+firewalld zone as the gate for 443, Caddy seeing real client addresses, `firewall-cmd
+--reload` after the zone-creating run, the final `public` zone service list, the kiwi
+image's boot, cloud-init (Hetzner datasource), btrfs with snapper pairs, SELinux
+enforcing, fail2ban bans. Still not observed on the real VM:
 
-- Host networking plus the firewalld zone as the effective gate for 443; that Caddy sees real client addresses (SH-AC-51); the bridge-fallback DNAT behaviour. Only a container-level proof of the Caddy options exists (`docs/spikes/A-33-caddy-global-options.md`).
-- `firewall-cmd --reload` after the zone-creating run, and what it does to established sessions.
-- The final `public` zone service list (the role removes a fixed deny-list, including `dhcpv6-client`).
-- rebootmgr window and overrun queueing; real `zypper dup` exit codes 102 and 103 (103 is not in `SuccessExitStatus`); snapper pairs on btrfs; the vendor `sshd_config` layout on the real image; a real reboot-notify email.
-- The exact `hcloud` flags and the Tumbleweed image name in this document; Semaphore's extra-arguments field syntax.
+- rebootmgr window and overrun queueing; real `zypper dup` exit codes 102 and 103 (103 is not in `SuccessExitStatus`); a real reboot-notify email.
+- The bridge-fallback DNAT behaviour (only simulator evidence: `tests/vm/RESULTS.md`; the primary design stands).
+- Semaphore's extra-arguments field syntax, the restic backup to the NAS, the database restore, and everything from step 4 on.
+- The simulator evidence in `tests/vm` is aarch64 and counts as such (PA-14).
 
 ## Tests
 
