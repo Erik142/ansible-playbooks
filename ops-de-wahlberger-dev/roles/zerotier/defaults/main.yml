@@ -1,0 +1,17 @@
+---
+# Default variables for the `zerotier` role.
+
+zerotier_image: docker.io/zerotier/zerotier:1.14.2
+
+# Holds ZeroTier's identity keys — MUST persist across restarts, or every
+# restart generates a brand new identity that needs re-authorizing from
+# scratch in ZeroTier Central (or your router's controller), same as
+# rejoining the network for the first time.
+zerotier_data_dir: /opt/podman/zerotier
+
+# REQUIRED: the 16-character network ID from ZeroTier Central (or your
+# router's controller) — the same network the home LAN and the TrueNAS
+# instance in Sweden are already members of. Not secret (membership still
+# needs separate one-time authorization regardless of who knows the ID), so
+# it lives here in plaintext.
+zerotier_network_id: ""

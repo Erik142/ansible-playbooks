@@ -1,0 +1,52 @@
+---
+# Top-level playbook for the Hetzner VM that runs Semaphore UI. Convention:
+# `site.yml` applies the *entire* configuration to the host. The role list and
+# its order are fixed by SH-FR-13; every entry carries a tag equal to its role
+# name (SH-FR-143), so `--tags <role>` limits a run to one role.
+#
+# Run with:  ansible-playbook site.yml
+# Limit to one role:  ansible-playbook site.yml --tags caddy
+- name: Configure the ops.de.wahlberger.dev host
+  hosts: ops
+  become: true
+  gather_facts: true
+  roles:
+    - role: common
+      tags: [common]
+    # Early: other roles' units hook OnFailure= into the unit this role
+    # deploys.
+    - role: notify_failure
+      tags: [notify_failure]
+    # Periodic disk usage check, emailing via notify_failure.
+    - role: disk_space
+      tags: [disk_space]
+    # Personal + Semaphore automation SSH keys, authorized before hardening.
+    - role: ssh_authorized_keys
+      tags: [ssh_authorized_keys]
+    # Harden the host before anything else listens on the network.
+    - role: security
+      tags: [security]
+    # After notify_failure (reuses its Resend credentials) and security.
+    - role: reboot_notify
+      tags: [reboot_notify]
+    - role: firewall
+      tags: [firewall]
+    - role: podman
+      tags: [podman]
+    # ZeroTier carries the UI and the monitoring traffic; it must be up before
+    # the services that bind to its address.
+    - role: zerotier
+      tags: [zerotier]
+    # After podman: needs its rootful API socket to grant this agent access.
+    - role: beszel_agent
+      tags: [beszel_agent]
+    # DNS records before Caddy needs them for the DNS-01 certificate.
+    - role: cloudflare_dns
+      tags: [cloudflare_dns]
+    - role: caddy
+      tags: [caddy]
+    - role: semaphore
+      tags: [semaphore]
+    # Last: backs up what the roles above wrote under the Podman data dir.
+    - role: restic_backup
+      tags: [restic_backup]

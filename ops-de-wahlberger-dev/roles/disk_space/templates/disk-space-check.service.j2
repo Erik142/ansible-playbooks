@@ -1,0 +1,13 @@
+[Unit]
+Description=Disk space check
+# Emails ewahlberger@gmail.com via Resend on a NEW threshold crossing — the
+# "immediate" notify_failure variant, not the default deduped one. This is a
+# Type=oneshot job with no Restart=, and the script itself is already
+# edge-triggered (see disk-space-check.sh.j2's state tracking), so every
+# failure here is already a distinct, meaningful event, not one repeat of
+# many to be deduplicated — see roles/notify_failure/README.md.
+OnFailure=notify-failure-immediate@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/disk-space-check.sh

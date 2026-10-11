@@ -1,0 +1,29 @@
+[Unit]
+Description=ZeroTier (overlay network to the home LAN)
+After=network-online.target
+Wants=network-online.target
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=zerotier
+Image={{ zerotier_image }}
+# Host networking, not caddy.network — the whole point is giving the HOST
+# (and therefore every other container that NATs through it, like
+# uptime_kuma) a route to the home LAN, not just this one container. A
+# normally-isolated container's own tunnel would be useless to its
+# siblings — see roles/zerotier/README.md.
+Network=host
+AddDevice=/dev/net/tun
+AddCapability=NET_ADMIN
+# Identity keys — see the comment on zerotier_data_dir in defaults/main.yml
+# for why this must be a real, persistent bind mount.
+Volume={{ zerotier_data_dir }}:/var/lib/zerotier-one:Z
+# The entrypoint joins this network ID at startup — idempotent, a no-op if
+# already joined. No separate Ansible "join" task needed.
+Exec={{ zerotier_network_id }}
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

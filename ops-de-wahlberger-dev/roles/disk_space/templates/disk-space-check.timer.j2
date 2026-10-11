@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodic disk space check
+
+[Timer]
+OnBootSec={{ disk_space_check_boot_delay }}
+OnUnitActiveSec={{ disk_space_check_interval }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

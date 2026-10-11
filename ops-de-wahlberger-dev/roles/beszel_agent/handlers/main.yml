@@ -1,0 +1,14 @@
+---
+- name: Restart podman.socket
+  ansible.builtin.systemd:
+    name: podman.socket
+    state: restarted
+    daemon_reload: true
+
+- name: Restart beszel-agent
+  ansible.builtin.systemd:
+    name: beszel-agent.service
+    state: restarted
+    daemon_reload: true
+  # A fresh VM under --check has no unit yet (the template task only simulated).
+  when: not ansible_check_mode

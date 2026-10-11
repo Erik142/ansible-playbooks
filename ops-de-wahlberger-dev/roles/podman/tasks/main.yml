@@ -1,0 +1,111 @@
+---
+- name: Install Podman and Quadlet support
+  community.general.zypper:
+    name: "{{ podman_packages }}"
+    state: present
+
+# The playbook does not mount/format this filesystem — it's expected to
+# already be mounted (see "Data layout" in the top-level README). Failing fast
+# here beats silently writing container data onto the root filesystem.
+- name: Verify the container data directory is on a mounted filesystem
+  ansible.builtin.include_tasks: verify_mount.yml
+
+- name: Create the persistent container data directory
+  ansible.builtin.file:
+    path: "{{ podman_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Ensure the Quadlet unit directory exists
+  ansible.builtin.file:
+    path: "{{ podman_quadlet_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Enable and start the Podman API socket
+  ansible.builtin.systemd:
+    name: podman.socket
+    enabled: true
+    state: started
+  when: podman_enable_socket | bool
+
+# By default Podman copies the HOST's /etc/hosts into every container. On
+# hosts where something rewrites it to `127.0.1.1 <fqdn>` (cloud-init's
+# manage_etc_hosts on the Pi, after a reboot), a container resolving the
+# host's own FQDN then gets its own loopback and can't reach the host
+# (broke Semaphore SSHing to its own host). Use the image's /etc/hosts as the
+# base instead; the FQDN then resolves via DNS. Applies to containers created
+# after this is in place (a Quadlet service restart recreates them).
+- name: Ensure the containers.conf drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/containers/containers.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Stop containers inheriting the host's /etc/hosts
+  ansible.builtin.copy:
+    dest: /etc/containers/containers.conf.d/50-base-hosts-file.conf
+    content: |
+      # Managed by Ansible (podman role).
+      [containers]
+      base_hosts_file = "{{ podman_base_hosts_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+# Rootful Podman published ports (DNAT to the container bridge) need IPv4
+# forwarding. netavark only flips it on at runtime when containers start, so a
+# package upgrade that re-applies sysctl defaults silently turns it off again
+# and every routed connection to a published port hangs. Persist it.
+- name: Persist IPv4 forwarding for published container ports
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    sysctl_file: /etc/sysctl.d/99-podman-ip-forward.conf
+    sysctl_set: true
+    state: present
+    reload: true
+
+- name: Deploy the image-prune systemd units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - podman-image-prune.service
+    - podman-image-prune.timer
+  when: podman_image_prune_enabled | bool
+  notify: Reload systemd
+
+- name: Apply systemd unit changes before enabling the timer
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start the image-prune timer
+  ansible.builtin.systemd:
+    name: podman-image-prune.timer
+    enabled: true
+    state: started
+  when: podman_image_prune_enabled | bool
+  register: podman_prune_timer
+  # --check on a fresh host: the unit file does not exist yet because the
+  # template task above only simulated creating it. Only that exact miss is
+  # tolerated, and only in check mode; a real run still fails.
+  failed_when:
+    - podman_prune_timer is failed
+    - not (ansible_check_mode and (podman_prune_timer.msg | default('')) is search('Could not find the requested service'))
+
+- name: Disable the image-prune timer
+  ansible.builtin.systemd:
+    name: podman-image-prune.timer
+    enabled: false
+    state: stopped
+  failed_when: false
+  when: not (podman_image_prune_enabled | bool)
