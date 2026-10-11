@@ -26,8 +26,10 @@
     # Failure cases: guard text that must appear in the failed assert's own
     # msg (not in the task name, which also contains the variable names).
     cg_fail_cases:
-      - name: production vars as shipped (vm_zt_ip empty, no token) -> AC-62
-        vars: {}
+      # What the production vars were until pull request A2 set vm_zt_ip: the
+      # value is forced here so the case no longer depends on the shipped vars.
+      - name: vm_zt_ip empty, no token (production vars until PR A2) -> AC-62
+        vars: {vm_zt_ip: ""}
         msg: '"msg": "vm_zt_ip is empty or not an IPv4 address'
       - name: vm_zt_ip empty, token present
         vars: {vm_zt_ip: "", cloudflare_dns_api_token: "{{ cg_token }}"}
