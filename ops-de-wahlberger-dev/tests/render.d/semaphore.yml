@@ -32,7 +32,7 @@ render_items:
       - '^OnFailure=notify-failure@%n\.service$'
       - '^Restart=always$'
       - '^ContainerName=semaphore$'
-      - '^Image=docker\.io/semaphoreui/semaphore:v2\.19\.16$'
+      - '^Image=docker\.io/semaphoreui/semaphore:v2\.19\.[0-9]+$'
       - '^Volume=/opt/podman/semaphore/config\.json:/etc/semaphore/config\.json:Z$'
       - '^Volume=/opt/podman/semaphore/data:/var/lib/semaphore:Z$'
       - '^EnvironmentFile=/opt/podman/semaphore/semaphore\.env$'
