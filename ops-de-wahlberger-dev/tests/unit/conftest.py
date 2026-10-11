@@ -121,6 +121,14 @@ def template_repo(tmp_path_factory):
     for d in (N, C):
         for rel in COPY_OTHER:
             _copy(REAL / d, root / d, rel)
+    # The baseline is "stage A": the three ZeroTier values empty, whatever the real
+    # tree ships today (pull request A2 sets them). The tests below edit these lines.
+    ops_vars = root / V / "inventories/production/group_vars/all/vars.yml"
+    text = ops_vars.read_text()
+    for key in ("vm_zt_ip", "vm_zt_iface", "cloud_zt_ip"):
+        text, n = re.subn(rf'^{key}: ".*"$', f'{key}: ""', text, flags=re.M)
+        assert n == 1, f"fixture drift: {key} not found once in the ops vars.yml"
+    ops_vars.write_text(text)
     (root / V / "README.md").write_text(README)
     (root / V / "CLAUDE.md").write_text("# conventions\n")
     (root / V / "docs").mkdir()
