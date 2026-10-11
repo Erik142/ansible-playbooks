@@ -11,4 +11,13 @@ argument_specs:
         type: list
         elements: str
         required: true
-        description: Public key lines (ssh-ed25519/ssh-rsa ... comment) to authorize.
+        description: Public key lines (ssh-ed25519/ssh-rsa ... comment) to authorize. A line may start with authorized_keys options such as from="a,b".
+      ssh_authorized_keys_revoked:
+        type: list
+        elements: str
+        required: false
+        default: []
+        description: >-
+          Public key lines to remove from the account. Matched on key type and
+          body. The role fails before any change if a key is also in
+          ssh_authorized_keys_list.

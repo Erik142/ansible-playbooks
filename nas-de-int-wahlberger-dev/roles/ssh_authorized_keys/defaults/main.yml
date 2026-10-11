@@ -7,5 +7,13 @@ ssh_authorized_keys_user: erikwahlberger
 # REQUIRED: list of public key lines ("ssh-ed25519 AAAA... comment") to
 # authorize for ssh_authorized_keys_user — your personal key(s) for manual
 # access, plus Semaphore UI's dedicated automation key. Not secret (public
-# keys), so this lives in vars.yml, not Vault.
+# keys), so this lives in vars.yml, not Vault. A line may start with
+# authorized_keys options, e.g. 'from="10.0.0.0/24,1.2.3.4" ssh-ed25519 AAAA...'
+# (stored verbatim; changing the options updates the entry in place).
 ssh_authorized_keys_list: []
+
+# Keys to REMOVE from ssh_authorized_keys_user (state: absent), e.g. a retired
+# Semaphore automation key. Matched on key type+body; options/comment are
+# irrelevant. A key present in both this list and ssh_authorized_keys_list
+# makes the role fail before changing anything.
+ssh_authorized_keys_revoked: []
