@@ -98,6 +98,10 @@
     url: "https://github.com/henrygd/beszel/releases/download/v{{ beszel_agent_version }}/beszel_{{ beszel_agent_version }}_checksums.txt"
     return_content: true
   register: beszel_agent_checksums
+  # Read-only GET: it must run under --check, or the checksum fact below has
+  # nothing to parse (ansible-core 2.20 returns no `content` in check mode).
+  check_mode: false
+  changed_when: false
 
 - name: Determine this host's expected checksum
   ansible.builtin.set_fact:
