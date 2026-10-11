@@ -35,3 +35,12 @@ render_items:
   - src: roles/security/files/ssh-login-notify.py
     dest: ssh-login-notify.py
     kind: python-script
+  - role: security
+    src: login-email-template.html.j2
+    dest: login-email-template.html
+    kind: text
+    asserts:
+      - '@@HOST@@'
+      - '@@USER@@'
+      - '@@ADDR@@'
+      - 'SSH LOGIN'

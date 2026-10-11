@@ -1,0 +1,69 @@
+---
+# Guard test (OP-02 first `--check --diff` on a FRESH host): every systemd task
+# in the ops roles that enables or starts/restarts/reloads a named unit must
+# survive the unit not existing yet, because in check mode the package or
+# template that provides it was only simulated ("Could not find the requested
+# service"). A task is compliant if it (a) has a failed_when that tolerates
+# exactly that message in check mode only, (b) is skipped in check mode
+# (`when: not ansible_check_mode`, used by restart handlers), or (c) has
+# `failed_when: false`. Static: reads roles/*/tasks and roles/*/handlers, no host.
+#   ansible-playbook -i localhost, tests/guards.d/systemd_check_mode.yml
+# The tests/vm 'bare' snapshot (make-bare.sh, scenarios/s05-fresh-check.sh)
+# proves the behaviour; this stops a new unguarded task from being added.
+- name: Guard test systemd tasks tolerate a missing unit in check mode
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    # Units that ship with systemd itself and exist on every host.
+    sg_always_present: [systemd-journald, systemd-journald.service]
+    sg_roles: "{{ playbook_dir }}/../../roles"
+    sg_files: >-
+      {{ sg_found.files | map(attribute='path')
+         | select('search', '/(tasks|handlers)/[^/]+[.]yml$') | sort | list }}
+  tasks:
+    - name: Find the role task and handler files
+      ansible.builtin.find:
+        paths: "{{ sg_roles }}"
+        patterns: "*.yml"
+        recurse: true
+      register: sg_found
+
+    - name: The scan found the role files (the guard is not vacuous)
+      ansible.builtin.assert:
+        that: sg_files | length >= 15
+        quiet: true
+
+    - name: Collect the offending tasks
+      ansible.builtin.set_fact:
+        sg_offenders: "{{ sg_offenders | default([]) + [item.0 | basename ~ ': ' ~ (item.1.name | default('?'))] }}"
+      when: >-
+        'ansible.builtin.systemd' in item.1
+        and (item.1['ansible.builtin.systemd'].name | default('')) | length > 0
+        and (item.1['ansible.builtin.systemd'].state | default('') in ['started', 'restarted', 'reloaded']
+             or item.1['ansible.builtin.systemd'].enabled | default(false) | bool)
+        and (item.1['ansible.builtin.systemd'].name | string) not in sg_always_present
+        and not ('ansible_check_mode' in (item.1.when | default('') | string))
+        and not ('Could not find the requested service' in (item.1.failed_when | default('') | string)
+                 and 'ansible_check_mode' in (item.1.failed_when | default('') | string))
+        and (item.1.failed_when | default('') | string | lower) != 'false'
+      loop: "{{ sg_pairs }}"
+      loop_control:
+        label: "{{ item.0 | basename }}: {{ item.1.name | default('?') }}"
+      vars:
+        sg_pairs: >-
+          {%- set r = [] -%}
+          {%- for f in sg_files -%}
+          {%- set doc = lookup('ansible.builtin.file', f) | regex_replace('\{\{', '[[') | regex_replace('\{%', '[%') | from_yaml -%}
+          {%- for t in doc | default([], true) -%}{%- set _ = r.append([f, t]) -%}{%- endfor -%}
+          {%- endfor -%}
+          {{ r }}
+
+    - name: No systemd enable/start task lacks the check-mode tolerance
+      ansible.builtin.assert:
+        that: sg_offenders | default([]) | length == 0
+        fail_msg: >-
+          systemd tasks that fail under --check on a fresh host (add failed_when tolerating
+          'Could not find the requested service' only in check mode, or when: not ansible_check_mode):
+          {{ sg_offenders | default([]) | join(', ') }}
+        quiet: true

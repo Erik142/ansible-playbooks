@@ -15,3 +15,9 @@ zerotier_data_dir: /opt/podman/zerotier
 # needs separate one-time authorization regardless of who knows the ID), so
 # it lives here in plaintext.
 zerotier_network_id: ""
+
+# Load the `tun` kernel module on the host (now and at every boot) before the
+# container starts. Needed under SELinux enforcing, where the container may not
+# trigger the module load itself. Turn off only on a host that builds tun in or
+# loads it by other means.
+zerotier_load_tun_module: true

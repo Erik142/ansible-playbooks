@@ -20,6 +20,27 @@
     - security_ssh_login_notify_enabled | bool
     - not ansible_check_mode
 
+- name: Create the login notification config directory
+  ansible.builtin.file:
+    path: /etc/ssh-login-notify
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: security_ssh_login_notify_enabled | bool
+
+# Same look as the reboot notice (reboot_notify). Deployed before the script and
+# the service, which read it at start; a change restarts the watcher.
+- name: Deploy the login email template
+  ansible.builtin.template:
+    src: login-email-template.html.j2
+    dest: /etc/ssh-login-notify/email-template.html
+    owner: root
+    group: root
+    mode: "0644"
+  when: security_ssh_login_notify_enabled | bool
+  notify: Restart ssh-login-notify
+
 - name: Deploy the login notification script
   ansible.builtin.copy:
     src: ssh-login-notify.py

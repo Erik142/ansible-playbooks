@@ -76,7 +76,14 @@
     path: "{{ caddy_build_dir }}"
     state: build
     force: "{{ caddy_containerfile.changed }}"
+  register: caddy_image_build
   notify: Restart caddy
+  # --check on a fresh host: the Podman install was only simulated, so the
+  # module cannot find the podman binary. Only that exact miss is tolerated,
+  # and only in check mode; a real run still fails.
+  failed_when:
+    - caddy_image_build is failed
+    - not (ansible_check_mode and (caddy_image_build.msg | default('')) is search('Failed to find required executable'))
 
 # Only the bridge fallback uses caddy.network (shared with Semaphore, SH-FR-186);
 # the primary design runs on host networking.
