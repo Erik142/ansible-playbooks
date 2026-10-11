@@ -30,18 +30,18 @@ semaphore_design: "{{ vm_proxy_design }}"
 
 # --- ZeroTier ------------------------------------------------------------------
 zerotier_network_id: "8056c2e21cc5c789"
-# This VM's member IP in Central (10.243.0.0/16). Empty in pull request A; set
-# in pull request A2. Caddy and cloudflare_dns fail while it is empty.
-vm_zt_ip: ""
-# Interface name of the ZeroTier device on the VM, read in step 3 (`ip -br
-# link`) and set in pull request A2. Empty: the firewall skips the zone.
-vm_zt_iface: ""
-# cloud-wahlberger-dev's ZeroTier member IP (Beszel hub source), a required
-# placeholder: the real value comes from ZeroTier Central at OP-02 and is not in
-# any repository file. While vm_zt_iface is empty the firewall role skips the
-# ZeroTier zone and never reads it; once vm_zt_iface is set, an empty value
-# makes the firewall role fail before any change, naming firewall_cloud_zt_ip.
-cloud_zt_ip: ""
+# This VM's member IP in Central (10.243.0.0/16), set in pull request A2 (it was
+# empty in pull request A, when Caddy and cloudflare_dns refused to run).
+vm_zt_ip: "10.243.25.185"
+# Interface name of the ZeroTier device on the VM (`ip -br link`), set in pull
+# request A2. ZeroTier derives the name from the network ID, so it is the same on
+# every host of this network. Empty would make the firewall skip the zone.
+vm_zt_iface: "ztmjfaojmv"
+# cloud-wahlberger-dev's ZeroTier member IP (Beszel hub source), read from
+# ZeroTier Central at OP-02 and set together with vm_zt_iface in pull request A2.
+# Once vm_zt_iface is set, an empty value makes the firewall role fail before any
+# change, naming firewall_cloud_zt_ip.
+cloud_zt_ip: "10.243.203.116"
 # cloud-wahlberger-dev's public IPv4 (A record cloud.wahlberger.dev, a public
 # DNS fact, not a secret). fail2ban never bans it (SH-FR-124).
 cloud_public_ip: "49.13.141.178"
