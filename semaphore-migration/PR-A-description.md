@@ -20,7 +20,7 @@ Contents:
 - Planning documents under `semaphore-migration/`, `architecture/`, `homelab-architecture/`.
 - "Before" flow-rule record in `ops-de-wahlberger-dev/docs/zerotier-flow-rules.md`: see "Open before merge".
 
-## Files by class (`tests/pr-boundaries.sh A`: OK, 247 changed files)
+## Files by class (`tests/pr-boundaries.sh A`: OK, 251 changed files)
 
 Class: new VM directory (`ops-de-wahlberger-dev/*`), all untracked/new:
 roles (`caddy`, `cloudflare_dns`, `common`, `container`, `disk_space`, `firewall`,
@@ -99,7 +99,7 @@ the workstation only; the Pi does not apply it. Rollback: revert PR A.
 
 ## Local verification (2026-10-11)
 
-- `tests/pr-boundaries.sh A`: OK (247 changed files).
+- `tests/pr-boundaries.sh A`: OK (251 changed files).
 - `STATIC_CHECKS_SKIP_UNIT=1 tests/static-checks.sh`: all passed. SKIPPED: SH-AC-17v (no vault password file), SH-AC-43 (applies after PR E), SH-BR-16 (needs `STATIC_CHECKS_PR`), UNIT (skipped on request).
 - `npx --yes --package renovate@latest -- renovate-config-validator renovate.json`: config validated, exit 0 (RE2 unavailable locally, so regex validation may be inaccurate).
 - `git diff master --stat -- pi-de-int-wahlberger-dev`: empty.
