@@ -32,6 +32,13 @@
     enabled: true
     state: started
   when: podman_enable_socket | bool
+  register: podman_socket
+  # --check on a fresh host: the Podman install above was only simulated, so
+  # podman.socket does not exist yet. Only that exact miss is tolerated, and
+  # only in check mode; a real run still fails.
+  failed_when:
+    - podman_socket is failed
+    - not (ansible_check_mode and (podman_socket.msg | default('')) is search('Could not find the requested service'))
 
 # By default Podman copies the HOST's /etc/hosts into every container. On
 # hosts where something rewrites it to `127.0.1.1 <fqdn>` (cloud-init's

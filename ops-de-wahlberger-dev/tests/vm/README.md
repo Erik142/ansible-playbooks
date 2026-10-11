@@ -21,6 +21,8 @@ tests/vm/scenarios/s20-caddy.sh               # listeners, https remove/re-add, 
 tests/vm/scenarios/s40-ssh-fail2ban.sh        # sshd reload, fail2ban ban, rich rules
 tests/vm/scenarios/s50-label-updates.sh       # ls -Z, zypper exit 103, rebootmgr
 tests/vm/scenarios/s30-fallback.sh            # LAST: switches to the bridge fallback (changes the guest)
+tests/vm/make-bare.sh                         # once: 'bare' snapshot = clean minus podman/firewalld/snapper/... (a genuinely fresh host)
+tests/vm/scenarios/s05-fresh-check.sh         # whole role set on 'bare': --check --diff, apply, apply, apply (resets to 'bare')
 tests/vm/down.sh                              # graceful poweroff   (--destroy: delete disk, --purge: also images)
 ```
 
