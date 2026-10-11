@@ -14,10 +14,13 @@ Environment:
   RESEND_API_KEY, NOTIFY_FROM, NOTIFY_TO   from /etc/notify-failure/notify-failure.env
   SSH_LOGIN_NOTIFY_IGNORE   comma separated CIDRs/addresses that never trigger a mail
   SSH_LOGIN_NOTIFY_URL      Resend endpoint (default https://api.resend.com/emails)
+  SSH_LOGIN_NOTIFY_TEMPLATE HTML template (default /etc/ssh-login-notify/email-template.html);
+                            if unreadable the mail goes out as plain text only
 
 Usage: ssh-login-notify.py            follow the journal (the systemd service)
        ssh-login-notify.py --stdin    read journal lines from stdin (tests)
 """
+import html
 import ipaddress
 import json
 import os
@@ -30,6 +33,8 @@ import urllib.error
 import urllib.request
 
 DEFAULT_URL = "https://api.resend.com/emails"
+DEFAULT_TEMPLATE = "/etc/ssh-login-notify/email-template.html"
+MAX_VALUE_LENGTH = 100
 SEND_TIMEOUT_SECONDS = 15
 
 # sshd logs e.g.:
@@ -74,14 +79,59 @@ def is_ignored(addr, networks):
     return any(ip.version == net.version and ip in net for net in networks)
 
 
-def build_payload(login, env, host, now):
-    subject = "[%s] SSH login from %s as %s" % (host, login["addr"], login["user"])
+_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]+")
+_PLACEHOLDER = re.compile(r"@@([A-Z_]+)@@")
+
+
+def clean(value):
+    """Control characters (newlines included) become one space; overlong values are cut.
+
+    Everything that ends up in the subject, the text or the HTML passes through here:
+    the user name and more are chosen by whoever logs in.
+    """
+    value = _CONTROL.sub(" ", str(value)).strip()
+    if len(value) > MAX_VALUE_LENGTH:
+        value = value[: MAX_VALUE_LENGTH - 3] + "..."
+    return value
+
+
+def render_html(template, values):
+    """Fill the @@NAME@@ placeholders of `template` with the HTML-escaped `values`.
+
+    One pass over the template: substituted text is never scanned again, so a value
+    such as '@@HOST@@' stays literal. Unknown placeholders are left as they are.
+    """
+    escaped = {key: html.escape(clean(value), quote=True) for key, value in values.items()}
+    return _PLACEHOLDER.sub(lambda m: escaped.get(m.group(1), m.group(0)), template)
+
+
+def load_template(env):
+    """The HTML template, or None (logged) if it cannot be read: the mail then has no html part."""
+    path = env.get("SSH_LOGIN_NOTIFY_TEMPLATE", DEFAULT_TEMPLATE)
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return handle.read()
+    except OSError as exc:
+        log("cannot read the email template %s, sending plain text only: %s" % (path, exc))
+        return None
+
+
+def build_payload(login, env, host, now, template=None):
+    values = {
+        "HOST": host, "TIME": now, "USER": login["user"], "ADDR": login["addr"],
+        "PORT": login["port"], "ALG": login["alg"], "FINGERPRINT": login["fingerprint"],
+    }
+    c = {key: clean(value) for key, value in values.items()}
+    subject = "[%s] SSH login from %s as %s" % (c["HOST"], c["ADDR"], c["USER"])
     text = (
         "A public-source SSH login succeeded on %s at %s.\n\n"
         "User: %s\nSource: %s (port %s)\nKey: %s %s\n\n"
         "If this was not you, treat the key as stolen: see the README incident note.\n"
-    ) % (host, now, login["user"], login["addr"], login["port"], login["alg"], login["fingerprint"])
-    return {"from": env.get("NOTIFY_FROM", ""), "to": [env.get("NOTIFY_TO", "")], "subject": subject, "text": text}
+    ) % (c["HOST"], c["TIME"], c["USER"], c["ADDR"], c["PORT"], c["ALG"], c["FINGERPRINT"])
+    payload = {"from": env.get("NOTIFY_FROM", ""), "to": [env.get("NOTIFY_TO", "")], "subject": subject, "text": text}
+    if template is not None:
+        payload["html"] = render_html(template, values)
+    return payload
 
 
 def send(payload, env):
@@ -108,11 +158,12 @@ def process(lines, env, networks):
     """Handle journal lines; returns the number of mails sent successfully."""
     sent = 0
     host = socket.getfqdn()
+    template = load_template(env)
     for line in lines:
         login = parse_login(line)
         if login is None or is_ignored(login["addr"], networks):
             continue
-        payload = build_payload(login, env, host, time.strftime("%Y-%m-%d %H:%M:%S %Z"))
+        payload = build_payload(login, env, host, time.strftime("%Y-%m-%d %H:%M:%S %Z"), template)
         try:
             send(payload, env)
             sent += 1

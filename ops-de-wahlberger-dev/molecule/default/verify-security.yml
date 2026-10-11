@@ -586,6 +586,8 @@
               - "'User: erikwahlberger' in verify_mails[0].body.text"
               - "'Source: 203.0.113.9 (port 51234)' in verify_mails[0].body.text"
               - "'ED25519 SHA256:abcDEF123+/xyz' in verify_mails[0].body.text"
+              - "'erikwahlberger' in verify_mails[0].body.html"
+              - "'@@' not in verify_mails[0].body.html"
               - "'2001:db8::7' in verify_mails[1].body.subject"
               - "'SHA256:v6public' in verify_mails[1].body.text"
             fail_msg: "mails: {{ verify_mails | map(attribute='body') | map(attribute='subject') | list }}"

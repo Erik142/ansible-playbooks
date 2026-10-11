@@ -91,6 +91,16 @@ whose source is outside `security_ssh_login_notify_ignore`: user, source
 address, key fingerprint. Chosen over a PAM hook because a broken PAM line can
 lock everybody out, a broken watcher cannot. A failed send is logged to the
 journal and the login is never affected (SH-E-32); there is no retry.
+The mail has a text part and an HTML part. The HTML comes from
+`templates/login-email-template.html.j2` (deployed to
+`/etc/ssh-login-notify/email-template.html`, same look as the `reboot_notify`
+mail) with `@@HOST@@`, `@@TIME@@`, `@@USER@@`, `@@ADDR@@`, `@@PORT@@`,
+`@@ALG@@`, `@@FINGERPRINT@@` placeholders. The user name and address come from
+the login, so every value is control-character-stripped, length-capped and
+`html.escape`d, and substituted in a single pass (a user called `@@HOST@@`
+stays literal); the subject is stripped of control characters. If the template
+is unreadable the mail goes out as text only. Unit tests:
+`tests/unit/test_ssh_login_notify.py`.
 Limitation (SH-R-01): an attacker with root can stop the service, and
 a pre-authentication exploit logs no login at all. The service is a Python 3
 script (`files/ssh-login-notify.py`), so `shellcheck` does not apply to it; the
