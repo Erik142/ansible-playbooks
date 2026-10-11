@@ -31,9 +31,56 @@ Saved in step 0 (SH-FR-33), before the flow rules are changed. Filled in by the
 pull-request-A packaging task (T-19) from the text you save in step 0; used to
 restore the network in the step-3 rollback.
 
-- Date: TODO: fill in (date of the step-0 reading)
+- Date: 2026-10-11
 - Source: ZeroTier Central, Flow Rules editor, network `8056c2e21cc5c789`
-- Rule set (paste verbatim): TODO: fill in from the step-0 input. Per the spec, no flow rules existed on 2026-10-10 (Central default rule set).
+- Rule set (paste verbatim): Per the spec, no flow rules existed on 2026-10-10 (Central default rule set).
+  ```
+  #
+  # This is a default rule set that allows IPv4 and IPv6 traffic but otherwise
+  # behaves like a standard Ethernet switch.
+  #
+  # Please keep in mind that ZeroTier versions prior to 1.2.0 do NOT support advanced
+  # network rules.
+  #
+  # Since both senders and receivers enforce rules, you will get the following
+  # behavior in a network with both old and new versions:
+  #
+  # (old: 1.1.14 and older, new: 1.2.0 and newer)
+  #
+  # old <--> old: No rules are honored.
+  # old <--> new: Rules work but are only enforced by new side. Tags will NOT work, and
+  #               capabilities will only work if assigned to the new side.
+  # new <--> new: Full rules engine support including tags and capabilities.
+  #
+  # We recommend upgrading all your devices to 1.2.0 as soon as convenient. Version
+  # 1.2.0 also includes a significantly improved software update mechanism that is
+  # turned on by default on Mac and Windows. (Linux and mobile are typically kept up
+  # to date using package/app management.)
+  #
+
+  #
+  # Allow only IPv4, IPv4 ARP, and IPv6 Ethernet frames.
+  #
+  drop
+      not ethertype ipv4
+      and not ethertype arp
+      and not ethertype ipv6
+  ;
+
+  #
+  # Uncomment to drop non-ZeroTier issued and managed IP addresses.
+  #
+  # This prevents IP spoofing but also blocks manual IP management at the OS level and
+  # bridging unless special rules to exempt certain hosts or traffic are added before
+  # this rule.
+  #
+  #drop
+  #	not chr ipauth
+  #;
+
+  # Accept anything else. This is required since default is 'drop'.
+  accept;
+  ```
 
 ## In force (rule set after the change)
 

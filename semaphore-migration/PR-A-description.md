@@ -20,7 +20,7 @@ Contents:
 - Planning documents under `semaphore-migration/`, `architecture/`, `homelab-architecture/`.
 - "Before" flow-rule record in `ops-de-wahlberger-dev/docs/zerotier-flow-rules.md`: see "Open before merge".
 
-## Files by class (`tests/pr-boundaries.sh A`: OK, 245 changed files)
+## Files by class (`tests/pr-boundaries.sh A`: OK, 247 changed files)
 
 Class: new VM directory (`ops-de-wahlberger-dev/*`), all untracked/new:
 roles (`caddy`, `cloudflare_dns`, `common`, `container`, `disk_space`, `firewall`,
@@ -88,7 +88,7 @@ the workstation only; the Pi does not apply it. Rollback: revert PR A.
 
 ## Open before merge (added by Erik)
 
-- "Before" rule set: the text of Central's current rule set (OP-00b, SH-FR-33) was not available to T-19. `ops-de-wahlberger-dev/docs/zerotier-flow-rules.md`, section "Before", still holds the TODO placeholders for date and rule set. Erik adds the date and verbatim text in a follow-up commit on this branch before merge (acceptance alternative of T-19). The spec says no flow rules existed on 2026-10-10 (Central default rule set); confirm this when filling in. SH-AC-63 and SH-AC-27 pass today with the placeholders.
+- "Before" rule set: the text of Central's current rule set (OP-00b, SH-FR-33) was added by Erik on 2026-10-11 to `ops-de-wahlberger-dev/docs/zerotier-flow-rules.md`, section "Before": the verbatim Central default rule set (no custom rules).
 - Step-0 baseline (SH-FR-213), date and time: every Beszel system and every Uptime Kuma monitor that is up. TODO.
 
 ## CI caveats
@@ -99,7 +99,7 @@ the workstation only; the Pi does not apply it. Rollback: revert PR A.
 
 ## Local verification (2026-10-11)
 
-- `tests/pr-boundaries.sh A`: OK (245 changed files).
+- `tests/pr-boundaries.sh A`: OK (247 changed files).
 - `STATIC_CHECKS_SKIP_UNIT=1 tests/static-checks.sh`: all passed. SKIPPED: SH-AC-17v (no vault password file), SH-AC-43 (applies after PR E), SH-BR-16 (needs `STATIC_CHECKS_PR`), UNIT (skipped on request).
 - `npx --yes --package renovate@latest -- renovate-config-validator renovate.json`: config validated, exit 0 (RE2 unavailable locally, so regex validation may be inaccurate).
 - `git diff master --stat -- pi-de-int-wahlberger-dev`: empty.

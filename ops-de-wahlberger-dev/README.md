@@ -338,6 +338,8 @@ Then:
 
 **Rollback:** delete the server and repeat step 1. The same applies if SH-AC-05 has not passed 60 min after creation (SH-E-46): no hardening is attempted on a server that exceeded the bound.
 
+**Expected, not a fault:** the first full apply is followed by a second run that reports `changed=1` (`zerotier : Create the ZeroTier data directory`): the ZeroTier container re-modes `/opt/podman/zerotier` on its first start. The third run reports `changed=0`. Seen in the simulator (`tests/vm/RESULTS.md`); expect it on the real VM and do not chase it.
+
 ### Step 3 - ZeroTier, DNS and Caddy (OP-03)
 
 1. In Central: authorize the member, fix `<vm-zt-ip>`, write the flow rules (SH-FR-132). On the VM read the interface name: `ip -br link` (`<zt-iface>`). Also read `<cloud-zt-ip>` in Central.
@@ -691,15 +693,13 @@ Filled in during step 3 (SH-FR-221, SH-AC-64). Until then every entry is open.
 
 ## Known unverified (live-only or not yet measured)
 
-Nothing below has been observed on the real VM. The fixture evidence (when
-`tests/vm` exists, T-16) is aarch64 and counts as simulator evidence only (PA-14).
+Nothing below has been observed on the real VM. The fixture evidence
+(`tests/vm`, T-16) is aarch64 and counts as simulator evidence only (PA-14).
 
 - Host networking plus the firewalld zone as the effective gate for 443; that Caddy sees real client addresses (SH-AC-51); the bridge-fallback DNAT behaviour. Only a container-level proof of the Caddy options exists (`docs/spikes/A-33-caddy-global-options.md`).
 - `firewall-cmd --reload` after the zone-creating run, and what it does to established sessions.
 - The final `public` zone service list (the role removes a fixed deny-list, including `dhcpv6-client`).
 - rebootmgr window and overrun queueing; real `zypper dup` exit codes 102 and 103 (103 is not in `SuccessExitStatus`); snapper pairs on btrfs; the vendor `sshd_config` layout on the real image; a real reboot-notify email.
-- That the Pi's Vault holds the seven key names `tools/populate-vault.sh` copies (the tool refuses on a missing key).
-- `cloud_public_ip: 49.13.141.178` in `vars.yml` was taken from public DNS; confirm it.
 - The exact `hcloud` flags and the Tumbleweed image name in this document; Semaphore's extra-arguments field syntax.
 
 ## Tests
