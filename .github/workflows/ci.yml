@@ -38,7 +38,7 @@ jobs:
 
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.14"
+          python-version: "3.15"
 
       # Pinned to 2.20.8 — Semaphore's own actual bundled Ansible version
       # (confirmed via `podman exec semaphore ansible --version` on
@@ -111,7 +111,7 @@ jobs:
       - uses: actions/setup-python@v7
         if: steps.has_molecule.outputs.present == 'true'
         with:
-          python-version: "3.14"
+          python-version: "3.15"
 
       # Pinned to 2.20.8 — Semaphore's own actual bundled Ansible version
       # (confirmed via `podman exec semaphore ansible --version` on
@@ -184,7 +184,7 @@ jobs:
 
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.14"
+          python-version: "3.15"
 
       - name: Install Ansible tooling
         run: pip install "ansible-core==2.20.8" ansible-lint yamllint -r nas-de-int-wahlberger-dev/tests/unit/requirements.txt
