@@ -247,6 +247,13 @@ jobs:
         working-directory: ops-de-wahlberger-dev
         run: ansible-galaxy collection install -r requirements.yml
 
+      # Test-only: the container guards (SH-GUARDS-C, e.g. security_check_mode)
+      # talk to their throwaway container via the community.docker.docker
+      # connection plugin. Not in requirements.yml: the playbook itself never
+      # uses it, so the production collection set stays unchanged.
+      - name: Install collections used only by the container guards
+        run: ansible-galaxy collection install "community.docker:>=5.4.0"
+
       - name: Render check
         working-directory: ops-de-wahlberger-dev
         env:

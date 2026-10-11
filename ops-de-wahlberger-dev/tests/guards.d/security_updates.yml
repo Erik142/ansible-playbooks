@@ -147,7 +147,9 @@
             that:
               - item.0.rc == 0
               - (item.1.content | default('') | b64decode | length > 0) == item.0.item.upgrades
-              - not item.0.item.upgrades or (item.1.content | b64decode) is search('"name": \["\*"\]')
+              # Quoted on purpose: an unquoted `": "` inside makes YAML parse a mapping, which
+              # ansible-core 2.19+ rejects ("Conditional expressions must be strings").
+              - "not item.0.item.upgrades or (item.1.content | b64decode) is search('\\[.\\*.\\]')"
             fail_msg: "{{ item.0.item.name }}: rc={{ item.0.rc }} upgrade-call-recorded={{ item.1.content is defined }} {{ item.0.stdout }}{{ item.0.stderr }}"
             quiet: true
           loop: "{{ cu_runs.results | zip(cu_logs.results) | list }}"
