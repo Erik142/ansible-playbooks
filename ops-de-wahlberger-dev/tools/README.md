@@ -12,6 +12,7 @@ names, or `match`/`MISMATCH`.
 | `db-prepare.sh <copy>` | On the workstation copy of `database.sqlite` (copy `-wal` along, FR-176): checkpoint, `integrity_check` = ok, all schedules inactive, no `-wal/-shm/-journal` left (it leaves WAL mode to guarantee this), then lists access keys, API tokens, integrations and `pi.de.int.wahlberger.dev`, `pi-de-int-wahlberger-dev`, `/mnt/data` matches by name. Run it before placing the DB on the VM; keep the printed lists for the migration notes (AC-54). | 0 ok, 1 unusable copy, 2 usage |
 | `compare-record.py <record.json> <vm-url>` | On the VM BEFORE any task runs (PA-2): every count and the newest task id must equal the record, and every VM schedule must be inactive. Same env credentials. | 0 equal, 1 differs (each difference printed), 2 error |
 | `vault-hash-compare.sh <key>...` | AC-17: prints `<key>: match` or `<key>: MISMATCH` comparing the Pi and VM vaults. Env: `VAULT_PI`, `VAULT_VM`, `VAULT_PI_PASS_FILE`, `VAULT_VM_PASS_FILE` (defaults: both repo vaults, passwords from each playbook's `ansible.cfg`, i.e. unlock 1Password first). | 0 all match, 1 any MISMATCH, 2 error |
+| `vault-pair-compare.sh <vault.yml>:<key> <vault.yml>:<key> [label]` or `--cloud-nas` | Two DIFFERENTLY-named keys in two vaults: prints `<label>: match` or `<label>: MISMATCH` (a missing key is a MISMATCH, stderr names the side). Each side splits on its last colon. See "Comparing differently-named keys". | 0 match, 1 MISMATCH, 2 error |
 | `check-from-list.sh <repo> --vm-public-ip <ip> [--vm-zt-ip <ip>] [--sem-subnet <cidr>] [--extra <addr>]...` | AC-23: the `semaphore-automation@ops.de.wahlberger.dev` line is the same string in nas, cloud and `ops-de-wahlberger-dev`, and `from=` lists exactly the public IP, ZT IP, subnet plus extras (FR-191). ZT IP and subnet default to the VM `vars.yml`. | 0 ok, 1 failed, 2 input error |
 | `populate-vault.sh [--replace-placeholder] [--force] [--regenerate-secrets] [--show-hash]` | T-12, ONCE, before PR A: builds the VM's real `group_vars/all/vault.yml` from `vault-manifest.yml`. See "Populating the VM Vault" below. | 0 all verified, 1 MISMATCH / bad format, 2 error, 3 refused to overwrite |
 
@@ -19,6 +20,25 @@ Tests: `cd ops-de-wahlberger-dev && pytest tests/tools -q` (needs `pytest`; the 
 tests start a throwaway `semaphoreui/semaphore:v2.19.16` container named `t13-sem-*` and
 are skipped with a stated reason when Docker, the image, or `ansible-vault` is missing).
 Lint: `ruff check --config tools/ruff.toml tools tests/tools && shellcheck tools/*.sh`.
+
+## Comparing differently-named keys (`vault-pair-compare.sh`)
+
+Use it when the same secret lives under two names, e.g. the restic REST password:
+`vault_restic_backup_rest_server_password` (cloud, client) must equal
+`vault_restic_server_cloud_htpasswd_password` (NAS, server). Nothing but the verdict is printed.
+
+```sh
+# Convenience: both playbooks' default vault.yml (override: VAULT_CLOUD, VAULT_NAS)
+ops-de-wahlberger-dev/tools/vault-pair-compare.sh --cloud-nas      # restic_rest_password: match
+# Any pair; optional label, else "<keyA> vs <keyB>"
+ops-de-wahlberger-dev/tools/vault-pair-compare.sh \
+  cloud-wahlberger-dev/inventories/production/group_vars/all/vault.yml:vault_a \
+  nas-de-int-wahlberger-dev/inventories/production/group_vars/all/vault.yml:vault_b my-label
+```
+
+Passwords: `VAULT_CLOUD_PASS_FILE` / `VAULT_NAS_PASS_FILE` (pair mode: `VAULT_LEFT_PASS_FILE` /
+`VAULT_RIGHT_PASS_FILE`), else each playbook's `ansible.cfg` (`.vault_pass.sh`: unlock 1Password
+first). Tests: `pytest tests/tools/test_vault_pair.py -q`.
 
 ## Populating the VM Vault (`populate-vault.sh`, T-12)
 

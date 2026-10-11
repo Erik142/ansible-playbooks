@@ -441,6 +441,7 @@ from the environment (`SEMAPHORE_USER`, `SEMAPHORE_PASSWORD`).
 ### Step 5 - Backups (OP-05)
 
 1. Merge **pull request B** (NAS client `ops`, Vault keys; written by T-20). Apply the NAS from `nas-de-int-wahlberger-dev/`: first `ansible-playbook site.yml --check --diff --tags restic_server`, read it, then `ansible-playbook site.yml --tags restic_server`.
+   Before the first backup, check the cloud client and NAS server passwords agree (values never printed; needs 1Password unlocked): `tools/vault-pair-compare.sh --cloud-nas` must print `restic_rest_password: match` (see [`tools/README.md`](tools/README.md)).
 2. Apply the VM with `--tags restic_backup` (check first), then start one backup, which creates the repository:
 
    ```sh
