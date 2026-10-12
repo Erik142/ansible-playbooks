@@ -91,6 +91,15 @@ vault_restic_server_cloud_htpasswd_password: "REPLACE-with-the-cloud-rest-server
 # vault_restic_backup_repo_password.
 vault_restic_server_cloud_repo_password: "REPLACE-with-cloud-restic-repo-password"
 
+# restic REST server, client `ops` (ops-de-wahlberger-dev). SHARED SECRET: must
+# be the exact same value as ops' vault_restic_backup_rest_server_password.
+# Copy it with ops-de-wahlberger-dev/tools/vault-copy-keys.sh --ops-to-nas.
+vault_restic_server_ops_htpasswd_password: "REPLACE-with-the-ops-rest-server-password"
+
+# Repository password of ops' restic repository, used by the maintenance run.
+# Must be the exact same value as ops' vault_restic_backup_repo_password.
+vault_restic_server_ops_repo_password: "REPLACE-with-ops-restic-repo-password"
+
 # Resend API key for failure notification emails. Same key as
 # cloud-wahlberger-dev and pi-de-int-wahlberger-dev — one Resend account.
 vault_notify_failure_resend_api_key: "REPLACE-with-a-resend-api-key"
