@@ -312,8 +312,12 @@ if v.get("disk_space_paths") != ["/", "/mnt/data", "/mnt/containers", "/mnt/back
 if v.get("restic_server_clients") != [{"username": "cloud",
         "password": "{{ vault_restic_server_cloud_htpasswd_password | default('') }}"}]:
     errors.append("restic_server_clients differs from BD-FR-138")
-if v.get("restic_server_maintenance_repo_password") != "{{ vault_restic_server_cloud_repo_password | default('') }}":
-    errors.append("restic_server_maintenance_repo_password differs from BD-FR-139")
+if v.get("restic_server_maintenance_repos") != [
+        {"repo": "cloud", "password": "{{ vault_restic_server_cloud_repo_password | default('') }}"},
+        {"repo": "ops", "password": "{{ vault_restic_server_ops_repo_password | default('') }}"}]:
+    errors.append("restic_server_maintenance_repos differs from SH-CC-01 (cloud, ops)")
+if {"path": "/mnt/data/restic-repos/ops/snapshots", "max_age_hours": 26} not in (v.get("backup_disk_freshness_checks") or []):
+    errors.append("backup_disk_freshness_checks lacks the ops path (SH-FR-87)")
 if v.get("restic_server_allowed_sources") != ["10.10.0.0/16", "10.243.0.0/16"]:
     errors.append("restic_server_allowed_sources must be [10.10.0.0/16, 10.243.0.0/16]")
 if not comment_above(lines, r"firewall_rich_rules:"):

@@ -60,15 +60,25 @@ argument_specs:
         type: int
         required: false
         description: rest-server --max-size, in bytes.
-      restic_server_maintenance_repo:
-        type: str
-        required: false
-        description: Repository (subdirectory of restic_server_data_dir) the maintenance run prunes.
-      restic_server_maintenance_repo_password:
-        type: str
+      restic_server_maintenance_repos:
+        type: list
+        elements: dict
         required: true
-        no_log: true
-        description: Encryption password of that repository; must be non-empty.
+        description: >-
+          One {repo, password} entry per repository the maintenance run
+          maintains (prune guard, forget, prune, check), in this order.
+          Replaces the single restic_server_maintenance_repo and
+          restic_server_maintenance_repo_password, which fail the role if set.
+        options:
+          repo:
+            type: str
+            required: true
+            description: Repository name, a subdirectory of restic_server_data_dir ([A-Za-z0-9][A-Za-z0-9._-]*); unique.
+          password:
+            type: str
+            required: true
+            no_log: true
+            description: Encryption password of that repository; must be non-empty.
       restic_server_maintenance_keep_daily:
         type: int
         required: false
@@ -108,4 +118,4 @@ argument_specs:
       restic_server_maintenance_env_file:
         type: path
         required: false
-        description: Root-only (0600) file with RESTIC_PASSWORD, read by systemd through EnvironmentFile=.
+        description: Root-only (0600) file with one RESTIC_PASSWORD_<REPO> line per maintained repository, read by systemd through EnvironmentFile=.

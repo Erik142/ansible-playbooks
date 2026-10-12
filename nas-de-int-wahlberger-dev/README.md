@@ -165,8 +165,11 @@ Three layers, all local to this host plus one remote client:
   reachable only from `10.10.0.0/16` (home LAN) and `10.243.0.0/16`
   (ZeroTier) through firewalld rich rules built from
   `restic_server_allowed_sources`. A daily
-  `restic-server-maintenance.timer` (06:00) runs forget/prune/check; the client
-  never prunes.
+  `restic-server-maintenance.timer` (06:00) runs the prune guard, forget
+  (7 daily, 4 weekly, 6 monthly), prune and check for each repository in
+  `restic_server_maintenance_repos` (`cloud` and `ops`); the clients never prune.
+  `/mnt/data/restic-repos/ops/snapshots` has a 26 h freshness check like `cloud`
+  (skipped as absent until the first `ops` backup).
 - The old NAS-to-Pi restic job is removed by `restic_backup_decommission`.
   The Pi is **not changed**: its `nas` and `cloud` repositories stay as frozen
   fallbacks.
@@ -299,7 +302,7 @@ ssh nas 'sudo chown -R restic-server:restic-server /mnt/data/restic-repos/cloud;
 # verify as the service account; the password comes from the root-only env file
 # and is never typed or printed
 ssh nas 'sudo ls /mnt/data/restic-repos/cloud/snapshots | wc -l; sudo du -sb /mnt/data/restic-repos/cloud'   # equal to the Pi
-ssh nas 'sudo sh -c "set -a; . /etc/restic-server-maintenance.env; set +a; exec runuser -u restic-server --preserve-environment -- restic --no-cache -r /mnt/data/restic-repos/cloud check --read-data"'
+ssh nas 'sudo sh -c ". /etc/restic-server-maintenance.env; export RESTIC_PASSWORD=\"\$RESTIC_PASSWORD_CLOUD\"; exec runuser -u restic-server --preserve-environment -- restic --no-cache -r /mnt/data/restic-repos/cloud check --read-data"'
 ```
 
 The number of files in `snapshots/` is the snapshot count. This is the path that
@@ -434,10 +437,12 @@ restic restore latest --target /tmp/restore
 
 Read the values with `ansible-vault view inventories/production/group_vars/all/vault.yml`.
 
-**Stale lock (DOC-O6).** As the service account, so no root-owned files appear:
+**Stale lock (DOC-O6).** As the service account, so no root-owned files appear.
+Every DOC-O6/O7/O8/O10 command below takes the repository name as `<repo>`
+(`cloud` or `ops`; examples show `cloud`):
 
 ```sh
-sudo -u restic-server env RESTIC_REPOSITORY=/mnt/data/restic-repos/cloud RESTIC_PASSWORD=... restic --no-cache unlock
+sudo -u restic-server env RESTIC_REPOSITORY=/mnt/data/restic-repos/<repo> RESTIC_PASSWORD=... restic --no-cache unlock
 ```
 
 **Restore the cloud repository from a snapshot (DOC-O7).** Stop the server and

@@ -90,7 +90,7 @@ def env(tmp_path: Path) -> Env:
     log = tmp_path / "calls.jsonl"
     environ = {
         "PATH": os.environ.get("PATH", ""),
-        "RESTIC_PASSWORD": "s3cret-pw-for-tests",
+        "RESTIC_PASSWORD_CLOUD": "s3cret-pw-for-tests",
         "FAKE_RESTIC_LOG": str(log),
         "FAKE_RESTIC_SNAPSHOTS": "[]",
         "FAKE_RESTIC_DRYRUN": "[]",

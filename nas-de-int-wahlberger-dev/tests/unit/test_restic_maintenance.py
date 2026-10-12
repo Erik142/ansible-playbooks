@@ -352,14 +352,43 @@ def test_traversal_name_resolving_to_a_valid_repository_is_still_rejected(script
 @pytest.mark.parametrize("password", [None, ""])
 def test_missing_or_empty_password_fails_before_any_restic_call(script_module, env, password):
     if password is None:
-        del env.environ["RESTIC_PASSWORD"]
+        del env.environ["RESTIC_PASSWORD_CLOUD"]
     else:
-        env.environ["RESTIC_PASSWORD"] = password
+        env.environ["RESTIC_PASSWORD_CLOUD"] = password
 
     code, _, err = run(script_module, env)
 
-    assert code == 2 and "RESTIC_PASSWORD" in err
+    assert code == 2 and "RESTIC_PASSWORD_CLOUD" in err
     assert env.argvs() == []
+
+
+def test_plain_restic_password_is_not_accepted_any_more(script_module, env):
+    env.environ["RESTIC_PASSWORD"] = env.environ.pop("RESTIC_PASSWORD_CLOUD")
+
+    code, _, err = run(script_module, env)
+
+    assert code == 2 and "RESTIC_PASSWORD_CLOUD" in err
+    assert env.argvs() == []
+
+
+def test_only_the_selected_repositorys_password_reaches_restic(script_module, env):
+    env.set_snapshots([env.add_snapshot(GOOD_A, 0)])
+    env.environ["RESTIC_PASSWORD_OPS"] = "ops-pw-for-tests"
+
+    code, _, _ = run(script_module, env)
+
+    assert code == 0
+    for call in env.calls():
+        assert call["env"]["RESTIC_PASSWORD"] == "s3cret-pw-for-tests"
+        assert not any(k.startswith("RESTIC_PASSWORD_") for k in call["env"])
+
+
+@pytest.mark.parametrize(
+    ("repo", "variable"),
+    [("cloud", "RESTIC_PASSWORD_CLOUD"), ("ops", "RESTIC_PASSWORD_OPS"), ("my-repo.v2", "RESTIC_PASSWORD_MY_REPO_V2")],
+)
+def test_password_variable_is_derived_from_the_repository_name(script_module, repo, variable):
+    assert script_module.password_variable(repo) == variable
 
 
 @pytest.mark.parametrize(
@@ -423,8 +452,9 @@ def test_password_never_appears_in_argv(script_module, env):
 
     run(script_module, env)
 
-    assert all(env.environ["RESTIC_PASSWORD"] not in " ".join(a) for a in sub_argvs(env))
-    assert {c["env"]["RESTIC_PASSWORD"] for c in env.calls()} == {env.environ["RESTIC_PASSWORD"]}
+    secret = env.environ["RESTIC_PASSWORD_CLOUD"]
+    assert all(secret not in " ".join(a) for a in sub_argvs(env))
+    assert {c["env"]["RESTIC_PASSWORD"] for c in env.calls()} == {secret}
 
 
 def test_nanosecond_and_offset_times_parse_to_the_same_instant(script_module):

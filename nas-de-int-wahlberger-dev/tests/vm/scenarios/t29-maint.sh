@@ -37,7 +37,7 @@ pw=$(gs "systemctl cat $M | grep -cF fixture-restic-repo-not-a-secret"); em=$(gs
 if [[ $pw == 0 && $em == "600 root:root" ]]; then record "BD-AC-52" PASS "0 matches of the repo password in systemctl cat; env file $em"; else record "BD-AC-52" FAIL "$pw $em"; fi
 
 # --- BD-AC-50
-gs 'cp -a /etc/restic-server-maintenance.env /root/maint.env.orig; sed -i "s/^RESTIC_PASSWORD=.*/RESTIC_PASSWORD=wrong-by-hand/" /etc/restic-server-maintenance.env'
+gs 'cp -a /etc/restic-server-maintenance.env /root/maint.env.orig; sed -i "s/^RESTIC_PASSWORD_CLOUD=.*/RESTIC_PASSWORD_CLOUD=wrong-by-hand/" /etc/restic-server-maintenance.env'
 T=$(now); gs "systemctl start $M"; r=$(res $M); sleep 5; al=$(alert_since $M "$T")
 role_only restic_server >"$OUT/ac50.log" 2>&1
 chg=$(awk '/^TASK \[/{t=$0} /^changed:/{print t}' "$OUT/ac50.log" | grep -ci 'maintenance\|env'); same=$(gs 'cmp /etc/restic-server-maintenance.env /root/maint.env.orig && echo same')

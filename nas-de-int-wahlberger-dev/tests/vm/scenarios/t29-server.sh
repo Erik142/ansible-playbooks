@@ -22,7 +22,7 @@ else record "BD-AC-40" FAIL "$m|$t|$h|$pl|leak=$leak"; fi
 record "BD-AC-40 (SELinux labels, BD-FR-160/BD-A-11)" SKIPPED "VM guest has no SELinux (tree built by zypper --root, selinux=0); verify on the NAS"
 
 # --- BD-AC-41
-for spec in 'clients|{"restic_server_clients":[]}|restic_server_clients' 'emptypw|{"restic_server_clients":[{"username":"cloud","password":""}]}|cloud' 'repopw|{"restic_server_maintenance_repo_password":""}|restic_server_maintenance_repo_password'; do
+for spec in 'clients|{"restic_server_clients":[]}|restic_server_clients' 'emptypw|{"restic_server_clients":[{"username":"cloud","password":""}]}|cloud' 'repopw|{"restic_server_maintenance_repos":[{"repo":"cloud","password":""}]}|restic_server_maintenance_repos'; do
   IFS='|' read -r n ov need <<<"$spec"
   role_only restic_server -e "$ov" >"$OUT/ac41-$n.log" 2>&1; rc=$?
   chg=$(awk '/^TASK \[/{t=$0} /^changed:/{print t}' "$OUT/ac41-$n.log" | grep -c restic_server)

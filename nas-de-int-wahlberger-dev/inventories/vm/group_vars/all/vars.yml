@@ -49,11 +49,13 @@ firewall_rich_rules: >-
   | list }}
 # Username `cloud` like production: with --private-repos it names the repository
 # directory (restic-repos/cloud), which the freshness check, the maintenance run
-# (restic_server_maintenance_repo) and BD-AC-30/42 all address.
+# (restic_server_maintenance_repos) and BD-AC-30/42 all address.
 restic_server_clients:
   - username: cloud
     password: fixture-restic-htpasswd-not-a-secret
-restic_server_maintenance_repo_password: fixture-restic-repo-not-a-secret
+restic_server_maintenance_repos:
+  - repo: cloud
+    password: fixture-restic-repo-not-a-secret
 
 # --- Failure notifications (fake key: no mail leaves the VM) ------------------
 notify_failure_resend_api_key: re_fixture_not_a_real_key
