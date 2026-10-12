@@ -44,7 +44,7 @@ A2 | A3)
 B)
     allowed="$N/inventories/production/group_vars/all/* $docs_any" ;;
 B2)
-    allowed="$N/inventories/production/group_vars/all/* $N/roles/restic_server/* $docs_any" ;;
+    allowed="$N/inventories/production/group_vars/all/* $N/inventories/vm/* $N/roles/restic_server/* $N/tests/* $docs_any" ;;
 C | C2 | C-R)
     allowed="$keys_vars" ;;
 D)
