@@ -109,6 +109,13 @@ def test_b_rejects_restic_server_role_which_is_b2(repo):
     assert pr(repo, "B2")[0] == 0
 
 
+def test_b2_allows_nas_tests_and_vm_inventory_but_b_does_not(repo):
+    branch(repo, {N + "/roles/restic_server/tasks/main.yml": "x", N + "/tests/unit/test_x.py": "x",
+                  N + "/inventories/vm/group_vars/all/vars.yml": "x"})
+    assert pr(repo, "B2")[0] == 0
+    assert pr(repo, "B")[0] == 1
+
+
 @pytest.mark.parametrize("name", ["C", "C2", "C-R"])
 def test_c_variants_only_key_lists(repo, name):
     keys = [N + "/" + VARS, C + "/" + VARS, OPS_VARS]
