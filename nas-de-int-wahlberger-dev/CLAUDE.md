@@ -81,7 +81,7 @@ contrast (Debian, `apt`, `ufw`, `geerlingguy.security`, hyphenated role names).
 | `backup_disk` | Local 6 TB backup disk (btrfs, subvolume `@btrbk` mounted at `/mnt/backup/btrbk`): mount, scrub, smartd + hook, daily health check. **Never formats**; only `backup_disk_init.yml` does. Gated by `backup_disk_enabled` |
 | `btrbk` | Daily btrbk snapshots of `/mnt/data` (incl. the restic repos) and `/mnt/containers`, replicated to the backup disk; pinned, fingerprint-checked OBS repo; a weekly `btrbk-key-refresh.timer` renews the repo signing key and emails when it nears expiry or the fingerprint changes. Gated by `backup_disk_enabled` |
 | `db_dump` | Pre-btrbk consistent dumps (`pg_dump` per Postgres container, `sqlite3 .backup` for Forgejo) into `/mnt/containers/db-dumps/`. Gated by `backup_disk_enabled` |
-| `restic_server` | restic `rest-server` Quadlet at `/mnt/data/restic-repos`, append-only, quota, firewalld-restricted to `restic_server_allowed_sources`; daily maintenance run at 06:00, RandomizedDelaySec=5min (forget/prune/check, prune guard). The cloud host backs up to it. Gated by `backup_disk_enabled` |
+| `restic_server` | restic `rest-server` Quadlet at `/mnt/data/restic-repos`, append-only, quota, firewalld-restricted to `restic_server_allowed_sources`; daily maintenance run at 06:00, RandomizedDelaySec=5min (forget/prune/check, prune guard). The cloud and ops hosts back up to it. Gated by `backup_disk_enabled` |
 | `restic_backup_decommission` | Idempotently removes the old NAS-to-Pi restic job (replaces the former `restic_backup` role). Gated by `restic_backup_decommission_enabled` |
 | `container` | Generic helper: renders one `.container` Quadlet template and restarts on change. Included by service roles, not listed in `site.yml`. |
 
@@ -125,6 +125,8 @@ migrating Paperless-ngx:
   password, `vault_restic_server_cloud_htpasswd_password` and
   `vault_restic_server_cloud_repo_password` (must equal cloud's
   `vault_restic_backup_rest_server_password` / `vault_restic_backup_repo_password`),
+  `vault_restic_server_ops_htpasswd_password` and `vault_restic_server_ops_repo_password`
+  (same pairing with the ops host's two vault keys),
   and the Cloudflare DNS API token — Samba itself needs none, being guest-only.
   `vault_restic_backup_repo_password` and `vault_restic_backup_rest_server_password`
   are **restore-only**, kept to read the Pi's frozen `nas` restic repository; no

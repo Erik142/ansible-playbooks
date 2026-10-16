@@ -42,7 +42,7 @@ A)
 A2 | A3)
     allowed="$V/*" ;;
 B)
-    allowed="$N/inventories/production/group_vars/all/* $docs_any" ;;
+    allowed="$N/inventories/production/group_vars/all/* $N/tests/static-checks.sh $docs_any" ;;
 B2)
     allowed="$N/inventories/production/group_vars/all/* $N/inventories/vm/* $N/roles/restic_server/* $N/tests/* $docs_any" ;;
 C | C2 | C-R)

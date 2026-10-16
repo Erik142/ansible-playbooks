@@ -234,13 +234,16 @@ forgejo_oidc_client_secret: "{{ vault_forgejo_oidc_client_secret | default('') }
 # same zone — reused rather than minted fresh.
 cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token | default('') }}"
 
-# restic REST server: the single client is cloud-wahlberger-dev. The htpasswd
-# password is the shared secret the Pi's server used (BD-BR-09); the repository
-# password is cloud's vault_restic_backup_repo_password, used by the daily
-# maintenance run to forget/prune the append-only repository.
+# restic REST server clients: cloud-wahlberger-dev and ops-de-wahlberger-dev.
+# Each htpasswd password is the shared secret of that client's
+# vault_restic_backup_rest_server_password (cloud's is the one the Pi's server
+# used, BD-BR-09). The repository passwords are used by the daily maintenance
+# run to forget/prune the append-only repositories.
 restic_server_clients:
   - username: cloud
     password: "{{ vault_restic_server_cloud_htpasswd_password | default('') }}"
+  - username: ops
+    password: "{{ vault_restic_server_ops_htpasswd_password | default('') }}"
 restic_server_maintenance_repo_password: "{{ vault_restic_server_cloud_repo_password | default('') }}"
 
 # Resend API key for failure notification emails (notify_failure role). Same
