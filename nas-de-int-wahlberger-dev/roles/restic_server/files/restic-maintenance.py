@@ -312,6 +312,7 @@ def main(
     out = out if out is not None else sys.stdout
     err = err if err is not None else sys.stderr
     args = build_parser().parse_args(argv)
+    print(f"restic-maintenance: repository {args.repo}", file=out, flush=True)
     try:
         run_maintenance(args, os.environ if env is None else env, out)
     except MaintenanceError as exc:
