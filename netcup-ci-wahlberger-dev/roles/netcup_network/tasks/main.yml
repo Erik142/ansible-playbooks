@@ -1,0 +1,25 @@
+---
+- name: Validate netcup_network inputs
+  ansible.builtin.assert:
+    that:
+      - netcup_network_interface | length > 0
+      - netcup_network_connection_name | length > 0
+      - netcup_network_ipv4_address is match('^[0-9.]+/[0-9]{1,2}$')
+      - netcup_network_gateway4 is match('^[0-9.]+$')
+      - netcup_network_dns | length > 0
+    fail_msg: >-
+      netcup_network: set netcup_network_interface, _connection_name,
+      _ipv4_address (CIDR), _gateway4 and _dns in group_vars
+      from the live NetworkManager profile and the netcup panel.
+    quiet: true
+
+# Writes the profile file only. Nothing is brought up or down here: the live
+# connection keeps running with its current addresses.
+- name: Render the static NetworkManager profile
+  ansible.builtin.template:
+    src: static.nmconnection.j2
+    dest: "/etc/NetworkManager/system-connections/{{ netcup_network_connection_name }}.nmconnection"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Reload NetworkManager connections

@@ -1,0 +1,97 @@
+---
+# Variables applied to every host in the production inventory. Non-secret.
+# Secrets live in the encrypted sibling vault.yml (see vault.yml.example) and
+# are reached through the `vault_*` indirection below.
+#
+# Empty values on purpose: they come from the live host or from ZeroTier Central.
+# The roles that need them fail with a message naming the variable.
+#   netcup_network_*   from the live NetworkManager profile and the netcup panel
+#   vm_zt_ip           this host's ZeroTier member IP (after Central authorization)
+#   vm_zt_iface        ZeroTier interface name (`ip -br link` after the join)
+
+# --- Connection -----------------------------------------------------------------
+ansible_user: erikwahlberger
+
+# --- Static network (netcup_network role) -----------------------------------------
+netcup_network_interface: "ens3"
+netcup_network_connection_name: "wan"
+netcup_network_ipv4_address: "152.53.18.9/22"
+netcup_network_gateway4: "152.53.16.1"
+netcup_network_dns:
+  - 1.1.1.1
+
+# --- ZeroTier -------------------------------------------------------------------
+zerotier_network_id: "8056c2e21cc5c789"
+vm_zt_ip: "10.243.73.1"
+vm_zt_iface: "ztmjfaojmv"
+# cloud-wahlberger-dev's ZeroTier member IP and public IPv4, same values as the
+# ops playbook (Beszel hub source; fail2ban ignore list).
+cloud_zt_ip: "10.243.203.116"
+cloud_public_ip: "49.13.141.178"
+
+# --- Hardening (security role) ----------------------------------------------------
+security_ssh_permit_root_login: "no"
+security_ssh_password_authentication: "no"
+security_ssh_allow_users:
+  - erikwahlberger
+security_fail2ban_enabled: true
+security_fail2ban_findtime: 600
+# Never banned. 127.0.0.0/8 is always added by the role.
+security_fail2ban_ignoreip:
+  - 10.10.0.0/16
+  - 10.243.0.0/16
+  - "{{ cloud_public_ip }}"
+security_ssh_login_notify_enabled: true
+security_snapper_enabled: true
+security_autoupdate_enabled: true
+security_autoupdate_reboot: true
+# No passwordless sudo list: the image already grants erikwahlberger NOPASSWD.
+security_sudoers_passwordless: []
+
+# --- SSH access (ssh_authorized_keys role) ------------------------------------------
+# Personal key only. The ops playbook's automation key does not apply here.
+ssh_authorized_keys_list:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJSKdeHoK+WkyBI69OSZqn0sVqZPPDRs082S/IVoOeSu erikwahlberger@personal"
+ssh_authorized_keys_revoked: []
+
+# --- Containers / disk -------------------------------------------------------------
+podman_data_dir: /opt/podman
+podman_require_mountpoint: false
+podman_image_prune_enabled: true
+disk_space_paths:
+  - /
+disk_space_threshold_percent: 85
+
+# --- Failure notifications ------------------------------------------------------------
+notify_failure_resend_api_key: "{{ vault_notify_failure_resend_api_key | default('') }}"
+notify_failure_crash_threshold: 5
+
+# --- Firewall ---------------------------------------------------------------------
+# Public zone: ssh only. ZeroTier zone: ssh for the owner, and the Beszel agent
+# port from the cloud hub only. No https: this host serves no UI.
+firewall_allowed_services: []
+
+# Public SSH closed (cut-over, 2026-10-17). Access is ZeroTier only. Rollback:
+# restore "- ssh" in firewall_allowed_services and run --tags firewall.
+firewall_public_removed_services:
+  - ssh
+  - dhcpv6-client
+  - mdns
+  - samba
+  - http
+  - https
+  - cockpit
+firewall_zerotier_interface: "{{ vm_zt_iface }}"
+firewall_zerotier_services:
+  - ssh
+firewall_cloud_zt_ip: "{{ cloud_zt_ip }}"
+
+# --- Monitoring -------------------------------------------------------------------
+beszel_agent_port: 45876
+# Beszel hub public key (not secret): same hub as the ops host.
+beszel_agent_hub_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKz/U0NWhnhm19QvVrNu6sVuXiEPVdoPCrGMC8MzTNdH"
+
+# --- Forgejo runner ----------------------------------------------------------------
+forgejo_runner_registration_token: "{{ vault_forgejo_runner_registration_token | default('') }}"
+# Empty: system trust store. Set to the NAS CA bundle path if the chain is private.
+forgejo_runner_ca_file: ""

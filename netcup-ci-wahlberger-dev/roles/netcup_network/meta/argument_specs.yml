@@ -1,0 +1,26 @@
+---
+argument_specs:
+  main:
+    short_description: Static IPv4 NetworkManager profile for the netcup VPS.
+    options:
+      netcup_network_interface:
+        type: str
+        required: true
+        description: Interface name from `ip -br link`.
+      netcup_network_connection_name:
+        type: str
+        required: true
+        description: NetworkManager connection id of the live profile.
+      netcup_network_ipv4_address:
+        type: str
+        required: true
+        description: IPv4 address in CIDR form.
+      netcup_network_gateway4:
+        type: str
+        required: true
+        description: IPv4 gateway.
+      netcup_network_dns:
+        type: list
+        elements: str
+        required: true
+        description: Resolver addresses.

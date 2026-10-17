@@ -1,0 +1,8 @@
+---
+# Verifier entry point. Each imported file belongs to one role; the owning
+# task (T-04 for ssh keys, T-05 for security) fills in its assertions.
+- name: Verify ssh_authorized_keys
+  ansible.builtin.import_playbook: verify-ssh-keys.yml
+
+- name: Verify security
+  ansible.builtin.import_playbook: verify-security.yml

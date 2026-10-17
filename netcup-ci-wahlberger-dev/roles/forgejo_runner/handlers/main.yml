@@ -1,0 +1,16 @@
+---
+# Config changes restart the runner. The container role's own restart handler
+# covers Quadlet changes; this one covers config.yaml only.
+- name: Restart forgejo-runner
+  ansible.builtin.systemd:
+    name: forgejo-runner.service
+    scope: user
+    state: restarted
+    daemon_reload: true
+  become: true
+  become_user: "{{ forgejo_runner_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ forgejo_runner_uid }}"
+  when:
+    - not ansible_check_mode
+    - not (forgejo_runner_skip_runtime | default(false) | bool)

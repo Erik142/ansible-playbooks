@@ -1,0 +1,147 @@
+---
+# Public-SSH hardening (SH-FR-15..17, 116..121, 157..159, 188; SH-NFR-14).
+#
+# Every directive is written with `validate: sshd -t -f %s`, so a candidate
+# file that sshd rejects is never installed: the task fails, the handler is not
+# notified and sshd keeps its running configuration (SH-FR-121, SH-AC-45).
+- name: Refuse an empty or malformed AllowUsers list
+  ansible.builtin.assert:
+    that:
+      - security_ssh_allow_users | length > 0
+      - security_ssh_allow_users | select('match', '^[A-Za-z0-9_][A-Za-z0-9_.-]*$') | list | length == security_ssh_allow_users | length
+    fail_msg: >-
+      security_ssh_allow_users must be a non-empty list of plain user names
+      (an empty list would lock everybody out of the host).
+    quiet: true
+
+- name: Build the list of sshd directives
+  ansible.builtin.set_fact:
+    # "Keyword value" strings. Extra directives first, so the fixed ones below
+    # win when both name the same keyword. A directive sshd rejects fails its
+    # loop item (the loop still visits the rest, each validated on its own) and
+    # so the task, which keeps the Reload sshd handler from running.
+    security_sshd_directives: >-
+      {{
+        security_ssh_extra_directives
+        + [
+          'PermitRootLogin ' ~ security_ssh_permit_root_login,
+          'PasswordAuthentication ' ~ security_ssh_password_authentication,
+          'KbdInteractiveAuthentication no',
+          'AuthenticationMethods publickey',
+          'AllowUsers ' ~ (security_ssh_allow_users | join(' ')),
+          'MaxAuthTries ' ~ security_ssh_max_auth_tries,
+          'LoginGraceTime ' ~ security_ssh_login_grace_time,
+          'AllowTcpForwarding no',
+          'AllowAgentForwarding no',
+          'X11Forwarding no',
+          'UsePAM yes',
+        ]
+      }}
+
+# openSUSE Tumbleweed ships the stock sshd_config as /usr/etc/ssh/sshd_config
+# (usr-merge) and has no /etc/ssh/sshd_config until an admin creates one: sshd
+# reads /etc/ssh/sshd_config first and falls back to the /usr/etc copy only when
+# the former is absent. Creating a new, near-empty /etc file would therefore
+# shadow the vendor file and silently drop `Subsystem sftp`, `AcceptEnv` and
+# `PrintMotd no` (T-05 follow-up F-1). So when the /etc file is missing it is
+# seeded from the vendor file first; an existing file is never touched here.
+- name: Look for the vendor sshd_config
+  ansible.builtin.stat:
+    path: /usr/etc/ssh/sshd_config
+  register: security_sshd_vendor_config
+
+- name: Look for the local sshd_config
+  ansible.builtin.stat:
+    path: /etc/ssh/sshd_config
+  register: security_sshd_local_config
+
+- name: Refuse to continue without any sshd_config to build on
+  ansible.builtin.assert:
+    that: security_sshd_vendor_config.stat.exists or security_sshd_local_config.stat.exists
+    fail_msg: >-
+      Neither /etc/ssh/sshd_config nor the vendor /usr/etc/ssh/sshd_config exists.
+      Creating a bare file would drop Subsystem sftp, so the role stops here.
+    quiet: true
+
+- name: Seed /etc/ssh/sshd_config from the vendor file
+  ansible.builtin.copy:
+    src: /usr/etc/ssh/sshd_config
+    remote_src: true
+    dest: /etc/ssh/sshd_config
+    owner: root
+    group: root
+    mode: "0600"
+    force: false
+    validate: "/usr/sbin/sshd -t -f %s"
+  register: security_sshd_seeded
+  when:
+    - not security_sshd_local_config.stat.exists
+    - security_sshd_vendor_config.stat.exists
+
+# The vendor file includes the drop-in directory near its top. sshd takes the
+# FIRST value of a keyword, so that position would let a drop-in override the
+# hardening below. Only on the run that seeded the file: the Include is put back
+# at the end by the task after the directives.
+- name: Remove the vendor file's early drop-in Include from the seeded copy
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^Include /etc/ssh/sshd_config\\.d/\\*\\.conf$"
+    state: absent
+  when: security_sshd_seeded is changed  # noqa: no-handler
+
+# The regexp matches ACTIVE lines only. With a `#?` it would match the last
+# commented example in the stock file (a `#   X11Forwarding no` in the Match
+# example) and edit that instead of the real `X11Forwarding yes` above it,
+# and sshd takes the first value (found by the Molecule verify).
+# insertbefore BOF: a directive that is not present yet goes to the top of the
+# file, so it can never end up inside a trailing `Match` block, and (first
+# value wins in sshd) can never be overridden by anything below it.
+- name: Set the sshd directives
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "(?i)^\\s*{{ item.split()[0] }}\\s"
+    line: "{{ item }}"
+    insertbefore: BOF
+    create: true
+    owner: root
+    group: root
+    mode: "0600"
+    validate: "/usr/sbin/sshd -t -f %s"
+  loop: "{{ security_sshd_directives }}"
+  loop_control:
+    label: "{{ item.split()[0] }}"
+  notify: Reload sshd
+
+# Appended AFTER the hardening lines above (first value wins), so a drop-in in
+# sshd_config.d/ can never override what is set above. `create: true` here too:
+# in --check mode the task above only simulates creating the file.
+- name: Ensure sshd_config includes the drop-in directory
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^Include /etc/ssh/sshd_config\\.d/\\*\\.conf$"
+    line: "Include /etc/ssh/sshd_config.d/*.conf"
+    create: true
+    owner: root
+    group: root
+    mode: "0600"
+    validate: "/usr/sbin/sshd -t -f %s"
+  notify: Reload sshd
+
+- name: Enable and start sshd
+  ansible.builtin.systemd:
+    name: sshd
+    enabled: true
+    state: started
+  register: security_sshd_service
+  # --check on a fresh host: the unit does not exist yet because the
+  # tasks above only simulated creating it. Only that exact miss is tolerated,
+  # and only in check mode; a real run still fails.
+  failed_when:
+    - security_sshd_service is failed
+    - not (ansible_check_mode and (security_sshd_service.msg | default('')) is search('Could not find the requested service'))
+
+# Apply now rather than at the end of the play: the password locks that follow
+# need UsePAM yes to be active, and a later failing role must not leave a
+# validated-but-unapplied configuration behind.
+- name: Apply the sshd configuration
+  ansible.builtin.meta: flush_handlers

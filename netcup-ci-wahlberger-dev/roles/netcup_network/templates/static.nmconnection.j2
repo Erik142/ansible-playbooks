@@ -1,0 +1,13 @@
+[connection]
+id={{ netcup_network_connection_name }}
+type=ethernet
+interface-name={{ netcup_network_interface }}
+autoconnect=true
+
+[ipv4]
+method=manual
+address1={{ netcup_network_ipv4_address }},{{ netcup_network_gateway4 }}
+dns={{ netcup_network_dns | join(';') }};
+
+[ipv6]
+method=disabled

@@ -1,0 +1,143 @@
+---
+# Weekly `zypper dup` (Tumbleweed is a rolling release), btrfs snapshot pairs
+# around it, and reboots confined to a rebootmgr maintenance window
+# (SH-FR-71..76, SH-FR-195, SH-FR-25, SH-NFR-13, PA-8).
+#
+# Reboots are never issued here: the update script only calls `rebootmgrctl
+# reboot`, a request that rebootmgrd carries out inside the window.
+
+# --- snapper: pre/post snapshot pair around every zypper transaction ----------
+# snapper-zypp-plugin hooks into libzypp and takes the pair via the `root`
+# snapper config. The VM's root is btrfs (SH-FR-25); on any other filesystem the
+# plugin does nothing, see README for the Hetzner-snapshot fallback.
+- name: Install snapper and its zypper plugin
+  community.general.zypper:
+    name:
+      - snapper
+      - snapper-zypp-plugin
+    state: present
+    # snapper needs the real `diffutils`, which conflicts with the busybox-diffutils
+    # of the minimal openSUSE container image (Molecule). Resolving that conflict
+    # automatically could remove arbitrary packages on a real host, so it is only
+    # allowed inside a container (see defaults).
+    force_resolution: "{{ security_snapper_force_resolution | bool }}"
+  when: security_snapper_enabled | bool
+
+- name: Find the filesystem type of /
+  ansible.builtin.set_fact:
+    security_root_fstype: >-
+      {{ ansible_facts.mounts | default([]) | selectattr('mount', 'equalto', '/')
+         | map(attribute='fstype') | list | first | default('unknown') }}
+  when: security_snapper_enabled | bool
+
+# A btrfs root installed by the openSUSE installer already has this config; a
+# Hetzner image or a hand-made install may not. `creates` keeps it idempotent.
+- name: Create the snapper config for / on a btrfs root
+  ansible.builtin.command:
+    cmd: snapper -c root create-config /
+    creates: /etc/snapper/configs/root
+  when:
+    - security_snapper_enabled | bool
+    - security_root_fstype == 'btrfs'
+
+- name: Warn that no snapshot pairs are taken on a non-btrfs root
+  ansible.builtin.debug:
+    msg: >-
+      / is {{ security_root_fstype }}, not btrfs: snapper-zypp-plugin takes no pre/post
+      snapshots here. Take a Hetzner snapshot before the weekly zypper dup if you need a rollback point.
+  when:
+    - security_snapper_enabled | bool
+    - security_root_fstype != 'btrfs'
+
+# --- rebootmgr: reboots only inside the maintenance window ---------------------
+- name: Install rebootmgr
+  community.general.zypper:
+    name: rebootmgr
+    state: present
+  when: (security_autoupdate_enabled | bool) and (security_autoupdate_reboot | bool)
+
+# rebootmgr 4.x (libeconf) reads /etc/rebootmgr/rebootmgr.conf and its .conf.d
+# drop-ins. It ignores the old /etc/rebootmgr.conf, so a file there would be
+# silently inert (found with `rebootmgrctl get-strategy` in the Molecule verify).
+- name: Create the rebootmgr configuration directory
+  ansible.builtin.file:
+    path: /etc/rebootmgr
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: (security_autoupdate_enabled | bool) and (security_autoupdate_reboot | bool)
+
+- name: Remove the legacy rebootmgr config path that rebootmgr 4 ignores
+  ansible.builtin.file:
+    path: /etc/rebootmgr.conf
+    state: absent
+  when: (security_autoupdate_enabled | bool) and (security_autoupdate_reboot | bool)
+  notify: Restart rebootmgr
+
+- name: Deploy the rebootmgr configuration
+  ansible.builtin.template:
+    src: rebootmgr.conf.j2
+    dest: /etc/rebootmgr/rebootmgr.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: (security_autoupdate_enabled | bool) and (security_autoupdate_reboot | bool)
+  notify: Restart rebootmgr
+
+- name: Enable and start rebootmgr
+  ansible.builtin.systemd:
+    name: rebootmgr
+    enabled: true
+    state: started
+  when: (security_autoupdate_enabled | bool) and (security_autoupdate_reboot | bool)
+  register: security_rebootmgr_service
+  # --check on a fresh host: the package install above was only simulated.
+  failed_when:
+    - security_rebootmgr_service is failed
+    - not (ansible_check_mode and (security_rebootmgr_service.msg | default('')) is search('Could not find the requested service'))
+
+# --- the weekly update -----------------------------------------------------------
+- name: Deploy the reboot-request script
+  ansible.builtin.template:
+    src: zypper-dup-request-reboot.sh.j2
+    dest: /usr/local/bin/zypper-dup-request-reboot.sh
+    owner: root
+    group: root
+    mode: "0700"
+  when: (security_autoupdate_enabled | bool) and (security_autoupdate_reboot | bool)
+
+- name: Deploy the zypper-dup service
+  ansible.builtin.template:
+    src: zypper-dup.service.j2
+    dest: /etc/systemd/system/zypper-dup.service
+    owner: root
+    group: root
+    mode: "0644"
+  when: security_autoupdate_enabled | bool
+  notify: Reload systemd
+
+- name: Deploy the zypper-dup timer
+  ansible.builtin.template:
+    src: zypper-dup.timer.j2
+    dest: /etc/systemd/system/zypper-dup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  when: security_autoupdate_enabled | bool
+  notify: Reload systemd
+
+- name: Apply pending handlers before enabling the timer
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start the zypper-dup timer
+  ansible.builtin.systemd:
+    name: zypper-dup.timer
+    enabled: true
+    state: started
+  when: security_autoupdate_enabled | bool
+  register: security_dup_timer
+  # --check on a fresh host: the unit file above was only simulated.
+  failed_when:
+    - security_dup_timer is failed
+    - not (ansible_check_mode and (security_dup_timer.msg | default('')) is search('Could not find the requested service'))

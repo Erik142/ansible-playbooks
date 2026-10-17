@@ -1,0 +1,51 @@
+---
+- name: Verify forgejo_runner Quadlet, config and account
+  hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    forgejo_runner_verify_quadlet: /var/lib/forgejo-runner/.config/containers/systemd/forgejo-runner.container
+    forgejo_runner_verify_config: /var/lib/forgejo-runner/config/config.yaml
+  tasks:
+    - name: Read the Quadlet
+      ansible.builtin.slurp:
+        src: "{{ forgejo_runner_verify_quadlet }}"
+      register: forgejo_runner_quadlet_raw
+
+    - name: Read the runner config
+      ansible.builtin.slurp:
+        src: "{{ forgejo_runner_verify_config }}"
+      register: forgejo_runner_config_raw
+
+    - name: Assert the Quadlet is rootless, socket-only and resource-limited at the unit
+      ansible.builtin.assert:
+        that:
+          - "'Volume=%t/podman/podman.sock:/run/podman/podman.sock' in (forgejo_runner_quadlet_raw.content | b64decode)"
+          - "'docker.sock' not in (forgejo_runner_quadlet_raw.content | b64decode)"
+          - "'Exec=/bin/forgejo-runner daemon' in (forgejo_runner_quadlet_raw.content | b64decode)"
+          - "'User=0:0' in (forgejo_runner_quadlet_raw.content | b64decode)"
+          - "'SecurityLabelDisable=true' in (forgejo_runner_quadlet_raw.content | b64decode)"
+          - "'MemoryMax=' in (forgejo_runner_quadlet_raw.content | b64decode)"
+          - "'CPUQuota=' in (forgejo_runner_quadlet_raw.content | b64decode)"
+          - "'Requires=podman.socket' in (forgejo_runner_quadlet_raw.content | b64decode)"
+        quiet: true
+
+    - name: Assert the runner config caps concurrency and declares the labels
+      ansible.builtin.assert:
+        that:
+          - "'capacity: 1' in (forgejo_runner_config_raw.content | b64decode)"
+          - "'docker_host: unix:///run/podman/podman.sock' in (forgejo_runner_config_raw.content | b64decode)"
+          - "'labels:' in (forgejo_runner_config_raw.content | b64decode)"
+          - "'- \"podman:docker://localhost/ci-podman-node:1\"' in (forgejo_runner_config_raw.content | b64decode)"
+        quiet: true
+
+    - name: Read the subordinate ID ranges
+      ansible.builtin.slurp:
+        src: /etc/subuid
+      register: forgejo_runner_subuid_raw
+
+    - name: Assert the forgejo-runner account has its subordinate UID range
+      ansible.builtin.assert:
+        that:
+          - "'forgejo-runner:100000:65536' in (forgejo_runner_subuid_raw.content | b64decode)"
+        quiet: true

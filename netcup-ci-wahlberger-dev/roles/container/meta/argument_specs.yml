@@ -1,0 +1,23 @@
+---
+argument_specs:
+  main:
+    short_description: Render a Podman Quadlet (.container) unit and restart it on change.
+    description:
+      - Renders a `.container` Quadlet template to the target, reloads systemd,
+        and restarts the generated service only when the unit file changed.
+      - Include it from a service role with ansible.builtin.include_role.
+    options:
+      container_name:
+        type: str
+        required: true
+        description: Service/unit base name; deployed as <name>.container.
+      container_quadlet_src:
+        type: str
+        required: true
+        description: >-
+          Filename of the .container Quadlet template, looked up in the calling
+          role's templates/ dir and rendered with that role's vars.
+      container_quadlet_dir:
+        type: path
+        required: false
+        description: Target directory systemd reads Quadlet unit files from.

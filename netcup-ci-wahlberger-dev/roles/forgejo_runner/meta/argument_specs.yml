@@ -1,0 +1,26 @@
+---
+argument_specs:
+  main:
+    short_description: Forgejo Actions runner, rootless, outbound-only.
+    options:
+      forgejo_runner_image:
+        type: str
+        required: true
+        description: Runner image, pinned to a tag.
+      forgejo_runner_instance_url:
+        type: str
+        required: true
+        description: https URL of the NAS Forgejo instance (reached over ZeroTier).
+      forgejo_runner_registration_token:
+        type: str
+        required: false
+        no_log: true
+        description: Registration token. Empty skips registration (Quadlet still deploys).
+      forgejo_runner_capacity:
+        type: int
+        required: false
+        description: Concurrent jobs, 1 to 3.
+      forgejo_runner_cache_dir:
+        type: path
+        required: false
+        description: Persistent build cache, outside the job workspace.

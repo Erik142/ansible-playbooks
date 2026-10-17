@@ -1,0 +1,37 @@
+---
+# Top-level playbook for the netcup VPS that runs the Forgejo Actions runner.
+# Run with:  ansible-playbook site.yml --check --diff   (always first)
+# Limit:     ansible-playbook site.yml --tags forgejo_runner
+- name: Configure the netcup CI host
+  hosts: ci
+  become: true
+  gather_facts: true
+  roles:
+    - role: common
+      tags: [common]
+    # Static IPv4 from the NetworkManager profile. Writes the file only;
+    # never brings the connection down. Run --check --diff against the live
+    # profile first.
+    - role: netcup_network
+      tags: [netcup_network]
+    - role: notify_failure
+      tags: [notify_failure]
+    - role: disk_space
+      tags: [disk_space]
+    - role: ssh_authorized_keys
+      tags: [ssh_authorized_keys]
+    - role: security
+      tags: [security]
+    - role: reboot_notify
+      tags: [reboot_notify]
+    - role: firewall
+      tags: [firewall]
+    - role: podman
+      tags: [podman]
+    - role: zerotier
+      tags: [zerotier]
+    - role: beszel_agent
+      tags: [beszel_agent]
+    # Last: needs ZeroTier up (route to the NAS Forgejo) and rootless Podman.
+    - role: forgejo_runner
+      tags: [forgejo_runner]

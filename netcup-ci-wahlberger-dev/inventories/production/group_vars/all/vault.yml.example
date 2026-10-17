@@ -1,0 +1,15 @@
+# EXAMPLE Vault contents: structure only, every value empty on purpose.
+# The real file is the encrypted sibling vault.yml. Build it with the
+# populate tool once the 1Password item exists (see README, "Secrets").
+# Every key here is referenced from vars.yml by a non-vault_ name.
+
+# Resend API key for notify_failure (same sender as the other hosts).
+vault_notify_failure_resend_api_key: ""
+
+# Forgejo runner registration token, issued by the NAS Forgejo instance
+# (Site Administration > Actions > Runners). Single use per registration.
+vault_forgejo_runner_registration_token: ""
+
+# Beszel hub public key. Not secret; kept in Vault for the same key list as the
+# spec. vars.yml currently holds the same value in plaintext.
+vault_beszel_agent_hub_key: ""

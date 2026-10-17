@@ -1,0 +1,13 @@
+---
+# Default variables for the `netcup_network` role.
+
+# Interface name (`ip -br link`). REQUIRED.
+netcup_network_interface: ""
+# NetworkManager connection id of the live profile. REQUIRED. No uuid: NM
+# generates one on load, so the role stays portable across netcup hosts.
+netcup_network_connection_name: ""
+# Static IPv4 address in CIDR form and the gateway. REQUIRED.
+netcup_network_ipv4_address: ""
+netcup_network_gateway4: ""
+# Resolvers. REQUIRED, non-empty.
+netcup_network_dns: []

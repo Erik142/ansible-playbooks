@@ -1,0 +1,219 @@
+---
+# T-04: ssh_authorized_keys assertions. Everything runs against a throwaway
+# account (t04verify) so the converged root account stays untouched.
+- name: Verify ssh_authorized_keys
+  hosts: all
+  gather_facts: false
+  vars:
+    verify_user: t04verify
+    verify_file: /home/t04verify/.ssh/authorized_keys
+    verify_key_a_body: AAAAC3NzaC1lZDI1NTE5AAAAIFakeKeyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+    verify_key_b_body: AAAAC3NzaC1lZDI1NTE5AAAAIFakeKeyBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+    verify_key_a: "ssh-ed25519 {{ verify_key_a_body }} verify-key-a"
+    verify_key_a_from: 'from="10.0.0.1,172.20.0.0/24" ssh-ed25519 {{ verify_key_a_body }} verify-key-a'
+    verify_key_a_from2: 'from="10.0.0.1,10.243.0.5" ssh-ed25519 {{ verify_key_a_body }} verify-key-a'
+    verify_key_c_body: AAAAC3NzaC1lZDI1NTE5AAAAIFakeKeyCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+    verify_key_b: "ssh-ed25519 {{ verify_key_b_body }} verify-key-b"
+    verify_key_c: "ssh-ed25519 {{ verify_key_c_body }} verify-key-c"
+    verify_key_b_other_comment: 'from="1.2.3.4" ssh-ed25519 {{ verify_key_b_body }} some-other-comment'
+  tasks:
+    - name: Verify block
+      block:
+        - name: The converged root account still has the molecule test key
+          ansible.builtin.command: grep -c 'molecule-test' /root/.ssh/authorized_keys
+          register: verify_root
+          changed_when: false
+
+        - name: Assert the root test key is present
+          ansible.builtin.assert:
+            that: verify_root.stdout | int == 1
+            quiet: true
+
+        - name: Create the throwaway account
+          ansible.builtin.user:
+            name: "{{ verify_user }}"
+            create_home: true
+
+        # Scenario 1: from= option line is stored verbatim, idempotent,
+        # option changes update in place, and an empty revoked list changes nothing.
+        - name: Apply a key with a from= option (first run)
+          ansible.builtin.include_role:
+            name: ssh_authorized_keys
+          vars:
+            ssh_authorized_keys_user: "{{ verify_user }}"
+            ssh_authorized_keys_list: ["{{ verify_key_a_from }}"]
+            ssh_authorized_keys_revoked: []
+
+        - name: Read authorized_keys
+          ansible.builtin.slurp:
+            src: "{{ verify_file }}"
+          register: verify_s1
+
+        - name: Assert the from= line is stored verbatim, exactly once
+          ansible.builtin.assert:
+            that:
+              - (verify_s1.content | b64decode).splitlines() == [verify_key_a_from]
+            quiet: true
+
+        - name: Record the file state before a repeat run
+          ansible.builtin.stat:
+            path: "{{ verify_file }}"
+            checksum_algorithm: sha256
+          register: verify_before1
+
+        - name: Repeat the same list with an empty revoked list
+          ansible.builtin.include_role:
+            name: ssh_authorized_keys
+          vars:
+            ssh_authorized_keys_user: "{{ verify_user }}"
+            ssh_authorized_keys_list: ["{{ verify_key_a_from }}"]
+            ssh_authorized_keys_revoked: []
+
+        - name: Record the file state after the repeat run
+          ansible.builtin.stat:
+            path: "{{ verify_file }}"
+            checksum_algorithm: sha256
+          register: verify_after1
+
+        # The module rewrites the file only on a change, so an unchanged
+        # mtime + checksum means 0 changed (include_role itself never
+        # reports the changed state of the tasks inside it).
+        - name: Assert the repeat run did not touch the file
+          ansible.builtin.assert:
+            that:
+              - verify_after1.stat.mtime == verify_before1.stat.mtime
+              - verify_after1.stat.checksum == verify_before1.stat.checksum
+            quiet: true
+
+        - name: Change the from= options
+          ansible.builtin.include_role:
+            name: ssh_authorized_keys
+          vars:
+            ssh_authorized_keys_user: "{{ verify_user }}"
+            ssh_authorized_keys_list: ["{{ verify_key_a_from2 }}"]
+            ssh_authorized_keys_revoked: []
+
+        - name: Read authorized_keys after the option change
+          ansible.builtin.slurp:
+            src: "{{ verify_file }}"
+          register: verify_s1b
+
+        - name: Assert the options were updated in place
+          ansible.builtin.assert:
+            that:
+              - (verify_s1b.content | b64decode).splitlines() == [verify_key_a_from2]
+            quiet: true
+
+        # Scenario 2: key only in revoked is removed, repeat reports 0 changed.
+        - name: Seed key B (to be revoked)
+          ansible.builtin.include_role:
+            name: ssh_authorized_keys
+          vars:
+            ssh_authorized_keys_user: "{{ verify_user }}"
+            ssh_authorized_keys_list: ["{{ verify_key_a_from2 }}", "{{ verify_key_b }}"]
+            ssh_authorized_keys_revoked: []
+
+        - name: Revoke key B (listed with other options/comment than seeded)
+          ansible.builtin.include_role:
+            name: ssh_authorized_keys
+          vars:
+            ssh_authorized_keys_user: "{{ verify_user }}"
+            ssh_authorized_keys_list: ["{{ verify_key_a_from2 }}"]
+            ssh_authorized_keys_revoked: ["{{ verify_key_b_other_comment }}"]
+
+        - name: Read authorized_keys after revocation
+          ansible.builtin.slurp:
+            src: "{{ verify_file }}"
+          register: verify_s2
+
+        - name: Assert key B is gone and key A is kept
+          ansible.builtin.assert:
+            that:
+              - verify_key_b_body not in (verify_s2.content | b64decode)
+              - (verify_s2.content | b64decode).splitlines() == [verify_key_a_from2]
+            quiet: true
+
+        - name: Record the file state before the repeat revocation
+          ansible.builtin.stat:
+            path: "{{ verify_file }}"
+            checksum_algorithm: sha256
+          register: verify_before2
+
+        - name: Revoke key B again
+          ansible.builtin.include_role:
+            name: ssh_authorized_keys
+          vars:
+            ssh_authorized_keys_user: "{{ verify_user }}"
+            ssh_authorized_keys_list: ["{{ verify_key_a_from2 }}"]
+            ssh_authorized_keys_revoked: ["{{ verify_key_b_other_comment }}"]
+
+        - name: Record the file state after the repeat revocation
+          ansible.builtin.stat:
+            path: "{{ verify_file }}"
+            checksum_algorithm: sha256
+          register: verify_after2
+
+        - name: Assert the repeat revocation changed nothing
+          ansible.builtin.assert:
+            that:
+              - verify_after2.stat.mtime == verify_before2.stat.mtime
+              - verify_after2.stat.checksum == verify_before2.stat.checksum
+            quiet: true
+
+        # Scenario 3: key in both lists (different options/comment) fails
+        # naming the comment, and changes nothing (SH-FR-190: fails BEFORE any
+        # change). Key C is listed, unrelated to the conflict and absent from
+        # the file: if the role authorized the list before the both-lists
+        # check, C (and B) would appear.
+        - name: Record the file state before the both-lists run
+          ansible.builtin.stat:
+            path: "{{ verify_file }}"
+            checksum_algorithm: sha256
+          register: verify_before3
+
+        - name: Apply with key B in both lists (and an unrelated listed key C)
+          block:
+            - name: Run the role (must fail)
+              ansible.builtin.include_role:
+                name: ssh_authorized_keys
+              vars:
+                ssh_authorized_keys_user: "{{ verify_user }}"
+                ssh_authorized_keys_list: ["{{ verify_key_a_from2 }}", "{{ verify_key_b }}", "{{ verify_key_c }}"]
+                ssh_authorized_keys_revoked: ["{{ verify_key_b_other_comment }}"]
+
+            - name: Record that the role did not fail
+              ansible.builtin.set_fact:
+                verify_both_msg: ROLE-DID-NOT-FAIL
+          rescue:
+            - name: Record the failure result (a loop failure keeps the message per item)
+              ansible.builtin.set_fact:
+                verify_both_msg: "{{ ansible_failed_result | to_json }}"
+
+        - name: Read authorized_keys after the failed run
+          ansible.builtin.slurp:
+            src: "{{ verify_file }}"
+          register: verify_s3
+
+        - name: Record the file state after the failed run
+          ansible.builtin.stat:
+            path: "{{ verify_file }}"
+            checksum_algorithm: sha256
+          register: verify_after3
+
+        - name: Assert the run failed naming the comment and changed nothing
+          ansible.builtin.assert:
+            that:
+              - verify_both_msg != 'ROLE-DID-NOT-FAIL'
+              - "'some-other-comment' in verify_both_msg"
+              - verify_key_b_body not in (verify_s3.content | b64decode)
+              - verify_key_c_body not in (verify_s3.content | b64decode)
+              - verify_after3.stat.checksum == verify_before3.stat.checksum
+              - verify_after3.stat.mtime == verify_before3.stat.mtime
+              - (verify_s3.content | b64decode).splitlines() == [verify_key_a_from2]
+            quiet: true
+      always:
+        - name: Remove the throwaway account
+          ansible.builtin.user:
+            name: "{{ verify_user }}"
+            state: absent
+            remove: true

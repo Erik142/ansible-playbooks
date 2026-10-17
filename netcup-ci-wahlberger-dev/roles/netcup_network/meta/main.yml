@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  role_name: netcup_network
+  author: Erik Wahlberger
+  description: Codifies the static IPv4 NetworkManager profile of the netcup VPS (written by hand from the rescue system).
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: GenericLinux
+      versions: [all]

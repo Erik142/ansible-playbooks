@@ -1,0 +1,25 @@
+---
+# Default variables for the `notify_failure` role.
+
+# REQUIRED: set vault_notify_failure_resend_api_key in Ansible Vault.
+notify_failure_resend_api_key: ""
+
+# Display name + address: the address must be on a domain verified in
+# Resend, or sending fails. Kept consistent with Uptime Kuma's own SMTP
+# notification sender name (configured manually in its UI) so alerts from
+# any source in the homelab look like they come from the same place.
+notify_failure_from_address: "Homelab Alerts <alerts@no-reply.wahlberger.dev>"
+
+notify_failure_to_address: "ewahlberger@gmail.com"
+
+# Tail length of the journalctl excerpt embedded in the email, scoped to
+# just the failed unit's own invocation (see notify-failure.sh.j2).
+notify_failure_log_lines: 50
+
+# Crash-loop dedup: a self-healing blip (OnFailure= fires on every restart,
+# not just a final give-up) should never reach an inbox. Only sends once a
+# unit has failed this many times within this many seconds — a single
+# alert, not one per restart, and nothing at all for a unit that recovers
+# before reaching the threshold. See notify-failure.sh.j2.
+notify_failure_crash_threshold: 5
+notify_failure_crash_window_seconds: 600

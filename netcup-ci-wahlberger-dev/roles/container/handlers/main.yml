@@ -1,0 +1,20 @@
+---
+- name: Restart the container service
+  ansible.builtin.systemd:
+    name: "{{ container_name }}.service"
+    # Rootless: the unit belongs to container_user's systemd --user instance.
+    scope: "{{ 'user' if (container_user | default('')) | length > 0 else 'system' }}"
+    state: restarted
+    daemon_reload: true
+  # Always escalate: system units need root, and rootless units switch to
+  # container_user via become_user below.
+  become: true
+  become_user: "{{ container_user | default(omit) }}"
+  environment: >-
+    {{ {'XDG_RUNTIME_DIR': '/run/user/' ~ container_user_uid}
+       if (container_user | default('')) | length > 0 else {} }}
+  # A fresh VM under --check has no unit yet (the Quadlet task only simulated).
+  # container_skip_restart: render-only runs (molecule) have no service manager.
+  when:
+    - not ansible_check_mode
+    - not (container_skip_restart | default(false) | bool)

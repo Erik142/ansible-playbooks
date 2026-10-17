@@ -1,0 +1,39 @@
+---
+# `container_quadlet_src` is just the template's filename. We resolve it against
+# the *calling* role's templates/ dir via ansible_parent_role_paths[0] (the role
+# that included us, e.g. `tandoor`). We can't let the service role pass a
+# `{{ role_path }}`-based path: include_role vars are templated lazily, at the
+# moment this task reads them, so `role_path` would resolve to *this* role
+# (`container`) and look for the template under roles/container/templates/.
+- name: Deploy the Quadlet unit for {{ container_name }}
+  ansible.builtin.template:
+    src: "{{ ansible_parent_role_paths[0] }}/templates/{{ container_quadlet_src }}"
+    dest: "{{ container_quadlet_dir }}/{{ container_name }}.container"
+    owner: "{{ container_user | default('root') }}"
+    group: "{{ container_user | default('root') }}"
+    mode: "0644"
+  notify: Restart the container service
+
+# Run the restart now (inside this include) instead of at the end of the play,
+# so the handler sees the correct container_name and services come up in the
+# order they are included.
+- name: Apply pending container restarts
+  ansible.builtin.meta: flush_handlers
+
+# A Quadlet is a generated unit: it has no [Install] enablement to pull in, so
+# it is started here and only restarted by the handler on later changes. Runs
+# on every apply, so a unit that is deployed but not running gets started.
+- name: Ensure the container service is running
+  ansible.builtin.systemd:
+    name: "{{ container_name }}.service"
+    scope: "{{ 'user' if (container_user | default('')) | length > 0 else 'system' }}"
+    state: started
+    daemon_reload: true
+  become: true
+  become_user: "{{ container_user | default(omit) }}"
+  environment: >-
+    {{ {'XDG_RUNTIME_DIR': '/run/user/' ~ container_user_uid}
+       if (container_user | default('')) | length > 0 else {} }}
+  when:
+    - not ansible_check_mode
+    - not (container_skip_restart | default(false) | bool)

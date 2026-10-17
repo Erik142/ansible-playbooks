@@ -36,8 +36,9 @@ forgejo_ssh_port: 2222
 
 forgejo_app_name: "Forgejo"
 forgejo_default_branch: main
-# CI is not used here; no runner exists. Flip to true if one is added later.
-forgejo_actions_enabled: false
+# Forgejo Actions: enabled for the netcup CI runner (netcup-ci-wahlberger-dev).
+# The runner connects outbound to this instance; no inbound port is opened.
+forgejo_actions_enabled: true
 
 # --- Package / container registry -------------------------------------------
 # Built-in registry ([packages] ENABLED=true), served from the same vhost.

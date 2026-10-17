@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  role_name: common
+  author: Erik Wahlberger
+  description: Baseline OS setup (zypper updates, common packages, timezone) for openSUSE Tumbleweed hosts.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - base
+    - opensuse
+
+# Production-profile rule `meta-no-dependencies`: do not chain roles here.
+# Order them explicitly in the playbook (site.yml) instead.
+dependencies: []
