@@ -1,7 +1,8 @@
 ---
 # Default variables for the `paperless_ngx` role.
 
-paperless_ngx_image: ghcr.io/paperless-ngx/paperless-ngx:2.20.15
+# v3.x: upgraded from 2.20.15 (required first step). See the v3 migration guide.
+paperless_ngx_image: ghcr.io/paperless-ngx/paperless-ngx:3.3.2
 paperless_ngx_redis_image: docker.io/library/redis:8
 paperless_ngx_db_image: docker.io/library/postgres:18
 
@@ -45,3 +46,7 @@ paperless_ngx_oidc_allow_signups: true
 paperless_ngx_disable_local_login: true
 # Login page redirects straight to Pocket ID instead of showing the local form.
 paperless_ngx_oidc_redirect_login: true
+
+# v3 requires an explicit Django secret key (signing of sessions and tokens).
+# Vault secret; a fresh random value logs everyone out once (Pocket ID login again).
+paperless_ngx_secret_key: ""

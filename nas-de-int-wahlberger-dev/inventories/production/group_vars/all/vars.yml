@@ -213,6 +213,7 @@ paperless_ngx_db_password: "{{ vault_paperless_ngx_db_password | default('') }}"
 # OIDC client secrets from Pocket ID. Migrating from rpi-karlsruhe? Reuse the
 # EXISTING values — they belong to the client_ids above, not to this host.
 paperless_ngx_oidc_client_secret: "{{ vault_paperless_ngx_oidc_client_secret | default('') }}"
+paperless_ngx_secret_key: "{{ vault_paperless_ngx_secret_key | default('') }}"
 
 # Tandoor's Postgres password and Django SECRET_KEY (48 hex chars each,
 # generated fresh — no migration/reuse concern). Its OIDC client secret is

@@ -18,6 +18,8 @@ vault_paperless_ngx_db_password: "REPLACE-with-a-generated-password"
 # app (the client_id lives in vars.yml). Migrating? Reuse the EXISTING secret —
 # it belongs to the Pocket ID client registration, not to this host.
 vault_paperless_ngx_oidc_client_secret: "REPLACE-with-pocket-id-client-secret"
+# Django secret key for Paperless v3 (50+ random characters).
+vault_paperless_ngx_secret_key: "REPLACE-with-random-50-plus-characters"
 
 # Tandoor's PostgreSQL role password (tandoor + tandoor-db) and Django
 # SECRET_KEY. Freshly generated — no migration/reuse concern.
