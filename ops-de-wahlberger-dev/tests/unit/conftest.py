@@ -226,7 +226,10 @@ class Repo:
 @pytest.fixture
 def repo(template_repo, tmp_path):
     root = tmp_path / "repo"
-    shutil.copytree(template_repo, root, symlinks=True)
+    # git may write lock files (maintenance.lock, gc.pid) into the template while
+    # this copy runs; a vanished lock makes copytree fail. Copy without them.
+    shutil.copytree(template_repo, root, symlinks=True,
+                    ignore=shutil.ignore_patterns("*.lock", "gc.pid", "gc.log"))
     canary = tmp_path / "canary-bin"
     canary.mkdir()
     op = canary / "op"
