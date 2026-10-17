@@ -1,0 +1,6 @@
+# Rendered by Ansible (roles/forgejo_runner). Job image for the `podman` label:
+# Podman for builds, node for JavaScript actions such as actions/checkout.
+FROM {{ forgejo_runner_podman_base_image }}
+RUN dnf install -y nodejs git && dnf clean all
+# fuse-overlayfs needs /dev/fuse, which job containers do not get. vfs needs neither.
+RUN printf '[storage]\ndriver = "vfs"\n' > /etc/containers/storage.conf

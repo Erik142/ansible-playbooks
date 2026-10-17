@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  role_name: zerotier
+  author: Erik Wahlberger
+  description: Joins this host to the home ZeroTier overlay network, running as a Podman Quadlet with host networking.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+  galaxy_tags:
+    - networking
+    - zerotier
+    - podman
+
+dependencies: []

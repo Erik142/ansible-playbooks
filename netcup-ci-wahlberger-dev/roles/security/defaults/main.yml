@@ -1,0 +1,69 @@
+---
+# Default variables for the `security` role.
+
+# SSH hardening (SH-FR-15..17, 116..121, 157..159). Port stays 22: key-only
+# auth plus fail2ban is the real control. PasswordAuthentication,
+# KbdInteractiveAuthentication, AuthenticationMethods, forwarding and X11 are
+# fixed by the spec and have no variable.
+security_ssh_permit_root_login: "no"
+security_ssh_password_authentication: "no"
+# Only these users may log in (AllowUsers). Must not be empty: the role fails
+# before any change if it is. The default is the owner account (SH-FR-118).
+security_ssh_allow_users:
+  - erikwahlberger
+security_ssh_max_auth_tries: 3
+security_ssh_login_grace_time: 30
+# Escape hatch and test seam: extra "Keyword value" sshd directives, applied
+# before the fixed ones and validated with `sshd -t` like them.
+security_ssh_extra_directives: []
+
+# Email when someone logs in over SSH from outside the ignore list below
+# (SH-FR-125). Uses the Resend credentials of the notify_failure role.
+security_ssh_login_notify_enabled: true
+# Sources that never trigger the login email: loopback plus the fail2ban
+# ignore list (the same private networks and the cloud host).
+security_ssh_login_notify_ignore: "{{ ['127.0.0.0/8'] + security_fail2ban_ignoreip }}"
+
+# fail2ban bans IPs after repeated failed SSH logins (SH-FR-123: 5 failures
+# within 600 s ban for 3600 s).
+security_fail2ban_enabled: true
+security_fail2ban_bantime: 3600
+security_fail2ban_findtime: 600
+security_fail2ban_maxretry: 5
+# Never banned (SH-FR-124), besides 127.0.0.0/8 which is always added. Hosts
+# set the full list in group_vars: the Semaphore container subnet, 10.10.0.0/16,
+# 10.243.0.0/16 and cloud-wahlberger-dev's public IPv4.
+security_fail2ban_ignoreip:
+  - 10.10.0.0/16
+  - 10.243.0.0/16
+# Ban action. nftables-based on purpose: the firewalld rich-rule actions would
+# put a rich rule into the public zone (SH-FR-211, SH-AC-03).
+security_fail2ban_banaction: nftables-multiport
+
+# Weekly `zypper dup` via zypper-dup.timer (SH-FR-71): Sunday 04:00 Berlin time.
+# The explicit zone makes the schedule independent of the host timezone.
+security_autoupdate_enabled: true
+security_autoupdate_on_calendar: "Sun *-*-* 04:00:00 Europe/Berlin"
+
+# After the dup, ask rebootmgr for a reboot when `zypper needs-rebooting` says
+# one is needed (kernel, glibc, ...). rebootmgr performs it only inside the
+# maintenance window below (strategy maint-window), so a dup that overruns the
+# window leaves the request queued until next Sunday (PA-8). Off by default
+# because rebootmgr needs a real init; hosts opt in in group_vars.
+security_autoupdate_reboot: false
+# window-start is a systemd calendar expression, in the host timezone.
+security_autoupdate_reboot_window_start: "Sun 04:00"
+security_autoupdate_reboot_window_duration: "1h"
+security_autoupdate_reboot_strategy: "maint-window"
+
+# Install snapper-zypp-plugin so every zypper transaction gets a btrfs pre/post
+# snapshot pair (SH-FR-25). On a non-btrfs root nothing is snapshotted (README).
+security_snapper_enabled: true
+# Let zypper resolve package conflicts on its own while installing snapper. Only
+# on for containers (the minimal image ships busybox-diffutils, which conflicts
+# with snapper's diffutils dependency); never on a real host.
+security_snapper_force_resolution: "{{ (ansible_facts.virtualization_type | default('')) in ['docker', 'podman', 'container', 'lxc'] }}"
+
+# Usernames granted passwordless sudo (each gets its own /etc/sudoers.d/
+# drop-in). Empty by default — opt in per host in group_vars.
+security_sudoers_passwordless: []

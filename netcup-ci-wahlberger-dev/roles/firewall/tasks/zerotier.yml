@@ -1,0 +1,83 @@
+---
+# A zone that does not exist yet cannot take runtime changes: firewalld only
+# learns new zones when it re-reads its permanent configuration, and this role
+# never triggers that (SH-FR-189, SH-AC-56). So: runtime ("immediate") changes
+# are made only when the zone is already known to the running firewalld; the
+# permanent configuration is always complete. See README, "First run".
+- name: Ask the running firewalld which zones it knows
+  ansible.builtin.command: firewall-cmd --get-zones
+  register: firewall_known_zones
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Remember whether the ZeroTier zone is already active at runtime
+  ansible.builtin.set_fact:
+    firewall_zerotier_runtime: >-
+      {{ firewall_known_zones.rc | default(1) == 0
+         and firewall_zerotier_zone in (firewall_known_zones.stdout | default('')).split() }}
+
+- name: Ask firewalld which zones its permanent configuration holds
+  ansible.builtin.command: firewall-cmd --permanent --get-zones
+  register: firewall_known_permanent_zones
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+# Check mode only simulates the zone creation below, so on a fresh host the
+# zone-dependent tasks would fail with INVALID_ZONE (T-16 defect, R6). Skip them
+# there; the real run creates the zone first.
+- name: Remember whether the ZeroTier zone can take permanent changes now
+  ansible.builtin.set_fact:
+    firewall_zerotier_zone_ready: >-
+      {{ not ansible_check_mode
+         or (firewall_known_permanent_zones.rc | default(1) == 0
+             and firewall_zerotier_zone in (firewall_known_permanent_zones.stdout | default('')).split()) }}
+
+- name: Create the ZeroTier zone in the permanent configuration
+  ansible.posix.firewalld:
+    zone: "{{ firewall_zerotier_zone }}"
+    permanent: true
+    state: present
+  when: firewall_firewalld_usable | bool
+
+# Services before the interface binding: the moment ZeroTier traffic changes
+# zone, SSH (the Semaphore self-run) must already be allowed in the new zone.
+- name: Allow services in the ZeroTier zone
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    zone: "{{ firewall_zerotier_zone }}"
+    permanent: true
+    immediate: "{{ firewall_zerotier_runtime }}"
+    state: enabled
+  when: firewall_zerotier_zone_ready | bool
+  loop: "{{ firewall_zerotier_services }}"
+
+- name: Allow the Beszel agent port from the cloud ZeroTier address only
+  ansible.posix.firewalld:
+    rich_rule: >-
+      rule family="ipv4" source address="{{ firewall_cloud_zt_ip }}"
+      port port="{{ firewall_zerotier_agent_port }}" protocol="tcp" accept
+    zone: "{{ firewall_zerotier_zone }}"
+    permanent: true
+    immediate: "{{ firewall_zerotier_runtime }}"
+    state: enabled
+  when: firewall_zerotier_zone_ready | bool
+
+- name: Bind the ZeroTier interface to the ZeroTier zone by name
+  ansible.posix.firewalld:
+    interface: "{{ firewall_zerotier_interface }}"
+    zone: "{{ firewall_zerotier_zone }}"
+    permanent: true
+    immediate: "{{ firewall_zerotier_runtime }}"
+    state: enabled
+  when: firewall_zerotier_zone_ready | bool
+
+- name: Report a ZeroTier zone that is permanent-only
+  ansible.builtin.debug:
+    msg: >-
+      Zone {{ firewall_zerotier_zone }} is configured permanently but is not
+      known to the running firewalld yet, so its rules are not active until
+      firewalld re-reads its permanent configuration (operator step, see the
+      runbook). This role does not do that itself (SH-FR-189).
+  when: not firewall_zerotier_runtime

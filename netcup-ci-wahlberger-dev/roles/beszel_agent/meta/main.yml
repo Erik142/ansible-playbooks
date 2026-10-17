@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: beszel_agent
+  author: Erik Wahlberger
+  description: Beszel monitoring agent, installed natively (not containerized) as a hardened systemd service, reporting to the beszel_hub.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - beszel
+    - monitoring
+
+dependencies: []

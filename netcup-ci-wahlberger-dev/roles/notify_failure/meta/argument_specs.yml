@@ -1,0 +1,29 @@
+---
+argument_specs:
+  main:
+    short_description: Sends an email via Resend when a systemd unit's OnFailure= hook fires.
+    options:
+      notify_failure_resend_api_key:
+        type: str
+        required: true
+        description: Resend API key used to send failure notification emails.
+      notify_failure_from_address:
+        type: str
+        required: false
+        description: From address; must be on a domain verified in Resend.
+      notify_failure_to_address:
+        type: str
+        required: false
+        description: Destination address for failure notification emails.
+      notify_failure_log_lines:
+        type: int
+        required: false
+        description: Tail length of the journalctl excerpt embedded in the email.
+      notify_failure_crash_threshold:
+        type: int
+        required: false
+        description: Consecutive failures within the window required before an email is sent.
+      notify_failure_crash_window_seconds:
+        type: int
+        required: false
+        description: Time window (seconds) a run of consecutive failures must stay within to count as one streak.

@@ -1,0 +1,49 @@
+---
+# Reload, not restart: a restart drops the connection a self-run (Semaphore on
+# this very host) is using (SH-FR-188, SH-AC-56).
+#
+# Handlers also run under --check (when notified by a task that would change).
+# On a fresh host the unit does not exist yet because the install was only
+# simulated; that one miss is tolerated in check mode, never in a real run.
+- name: Reload sshd
+  ansible.builtin.systemd:
+    name: sshd
+    state: reloaded
+  register: security_handler_sshd
+  failed_when:
+    - security_handler_sshd is failed
+    - not (ansible_check_mode and (security_handler_sshd.msg | default('')) is search('Could not find the requested service'))
+
+- name: Reload fail2ban
+  ansible.builtin.systemd:
+    name: fail2ban
+    state: reloaded
+  register: security_handler_fail2ban
+  failed_when:
+    - security_handler_fail2ban is failed
+    - not (ansible_check_mode and (security_handler_fail2ban.msg | default('')) is search('Could not find the requested service'))
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart ssh-login-notify
+  ansible.builtin.systemd:
+    name: ssh-login-notify.service
+    state: restarted
+  register: security_handler_login_notify
+  failed_when:
+    - security_handler_login_notify is failed
+    - not (ansible_check_mode and (security_handler_login_notify.msg | default('')) is search('Could not find the requested service'))
+
+# A changed /etc/rebootmgr/rebootmgr.conf (rebootmgr 4 does not read the old
+# /etc/rebootmgr.conf) is only read at start. restart is fine here:
+# it does not touch a reboot that is already queued in rebootmgrd's state file.
+- name: Restart rebootmgr
+  ansible.builtin.systemd:
+    name: rebootmgr
+    state: restarted
+  register: security_handler_rebootmgr
+  failed_when:
+    - security_handler_rebootmgr is failed
+    - not (ansible_check_mode and (security_handler_rebootmgr.msg | default('')) is search('Could not find the requested service'))

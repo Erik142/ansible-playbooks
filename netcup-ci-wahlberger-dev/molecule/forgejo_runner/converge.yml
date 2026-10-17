@@ -1,0 +1,9 @@
+---
+- name: Converge forgejo_runner (rendering only)
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    forgejo_runner_skip_runtime: true
+  roles:
+    - role: forgejo_runner

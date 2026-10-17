@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  role_name: forgejo_runner
+  author: Erik Wahlberger
+  description: Rootless Podman Forgejo Actions runner for the netcup CI host, as a Quadlet under a dedicated unprivileged account.
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: GenericLinux
+      versions: [all]

@@ -1,0 +1,26 @@
+# Rendered by Ansible (roles/forgejo_runner). Do not edit on the host.
+log:
+  level: info
+
+runner:
+  file: {{ forgejo_runner_state_dir }}/.runner
+  capacity: {{ forgejo_runner_capacity }}
+  timeout: 3h
+  # Labels are read here at daemon start, so changes apply without re-registering.
+  labels:
+{% for label in forgejo_runner_labels %}
+    - "{{ label }}"
+{% endfor %}
+
+host:
+  workdir_parent: {{ forgejo_runner_state_dir }}/work
+
+container:
+  # Rootless Podman API socket of the forgejo-runner user, mounted into the
+  # runner container. Not the root socket.
+  docker_host: unix:///run/podman/podman.sock
+  # Only the build cache may be bind-mounted into jobs, nothing else from the host.
+  valid_volumes:
+    - "{{ forgejo_runner_cache_dir }}"
+    - "{{ forgejo_runner_cache_dir }}/**"
+  force_pull: false

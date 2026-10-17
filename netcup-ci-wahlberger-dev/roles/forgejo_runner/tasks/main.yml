@@ -1,0 +1,229 @@
+---
+- name: Validate forgejo_runner inputs
+  ansible.builtin.assert:
+    that:
+      - forgejo_runner_instance_url is match('^https://')
+      - forgejo_runner_capacity | int in [1, 2, 3]
+      - forgejo_runner_cache_dir is match('^/')
+      - not (forgejo_runner_cache_dir is match(forgejo_runner_home ~ '(/|$)'))
+    fail_msg: >-
+      forgejo_runner: the instance URL must be https, capacity must be 1-3, and
+      the cache directory must be absolute and outside {{ forgejo_runner_home }}.
+    quiet: true
+
+- name: Create the forgejo-runner system account (rootless Podman, no login shell)
+  ansible.builtin.user:
+    name: "{{ forgejo_runner_user }}"
+    system: true
+    create_home: true
+    home: "{{ forgejo_runner_home }}"
+    shell: /usr/sbin/nologin
+
+- name: Read the forgejo-runner UID
+  # fail_key false: a check-mode run has not created the account yet.
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ forgejo_runner_user }}"
+    fail_key: false
+
+- name: Set the forgejo-runner UID fact
+  ansible.builtin.set_fact:
+    forgejo_runner_uid: "{{ ((ansible_facts.getent_passwd or {}).get(forgejo_runner_user) or ['', '0'])[1] }}"
+
+# Rootless Podman needs subordinate UID/GID ranges. System accounts get none by
+# default on openSUSE.
+- name: Grant forgejo-runner subordinate UID and GID ranges
+  ansible.builtin.lineinfile:
+    path: "{{ item }}"
+    regexp: "^{{ forgejo_runner_user }}:"
+    line: "{{ forgejo_runner_user }}:100000:65536"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - /etc/subuid
+    - /etc/subgid
+
+# Lingering keeps the user manager, and therefore the runner, running without a
+# login session, and starts it at boot.
+- name: Enable lingering for forgejo-runner
+  ansible.builtin.command:
+    argv: ["loginctl", "enable-linger", "{{ forgejo_runner_user }}"]
+    creates: "/var/lib/systemd/linger/{{ forgejo_runner_user }}"
+  when: not forgejo_runner_skip_runtime | bool
+
+- name: Start the forgejo-runner user manager
+  ansible.builtin.systemd:
+    name: "user@{{ forgejo_runner_uid }}.service"
+    state: started
+  when:
+    - not ansible_check_mode
+    - not forgejo_runner_skip_runtime | bool
+
+- name: Create the runner directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ forgejo_runner_user }}"
+    group: "{{ forgejo_runner_user }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ forgejo_runner_config_dir }}", mode: "0750" }
+    - { path: "{{ forgejo_runner_state_dir }}", mode: "0700" }
+    - { path: "{{ forgejo_runner_state_dir }}/work", mode: "0700" }
+    - { path: "{{ forgejo_runner_quadlet_dir }}", mode: "0755" }
+    - { path: "{{ forgejo_runner_images_dir }}", mode: "0755" }
+
+# The cache is a nested btrfs subvolume: snapper skips nested subvolumes and
+# restic only sees what it is pointed at. Created before the directory task so
+# the subvolume is not shadowed by a plain directory.
+- name: Stat the build cache path
+  ansible.builtin.stat:
+    path: "{{ forgejo_runner_cache_dir }}"
+  register: forgejo_runner_cache_stat
+
+- name: Create the build cache as a btrfs subvolume (fresh host only)
+  ansible.builtin.command:
+    argv: ["btrfs", "subvolume", "create", "{{ forgejo_runner_cache_dir }}"]
+  when:
+    - forgejo_runner_cache_subvolume | bool
+    - not forgejo_runner_cache_stat.stat.exists
+    - not forgejo_runner_skip_runtime | bool
+  changed_when: true
+
+- name: Set ownership of the build cache
+  ansible.builtin.file:
+    path: "{{ forgejo_runner_cache_dir }}"
+    state: directory
+    owner: "{{ forgejo_runner_user }}"
+    group: "{{ forgejo_runner_user }}"
+    mode: "0750"
+
+- name: Render the runner configuration
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ forgejo_runner_config_dir }}/config.yaml"
+    owner: "{{ forgejo_runner_user }}"
+    group: "{{ forgejo_runner_user }}"
+    mode: "0640"
+  notify: Restart forgejo-runner
+
+- name: Enable the rootless Podman API socket for forgejo-runner
+  ansible.builtin.systemd:
+    name: podman.socket
+    scope: user
+    enabled: true
+    state: started
+  become: true
+  become_user: "{{ forgejo_runner_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ forgejo_runner_uid }}"
+  when:
+    - not ansible_check_mode
+    - not forgejo_runner_skip_runtime | bool
+
+# Registration runs the runner image once, as the runner user, and writes .runner
+# into the state dir. The token is passed as an argument: it is visible in the
+# process list for the length of the command, on a single-user host. no_log keeps
+# it out of Ansible's output.
+- name: Register the runner with Forgejo (once)
+  ansible.builtin.command:
+    argv:
+      - podman
+      - run
+      - --rm
+      - --name=forgejo-runner-register
+      # The image runs as 1000, which rootless Podman maps to a sub-UID with no
+      # write access to the state dir. 0 inside the namespace is forgejo-runner.
+      - --user=0:0
+      - "--volume={{ forgejo_runner_state_dir }}:{{ forgejo_runner_state_dir }}:Z"
+      - "--workdir={{ forgejo_runner_state_dir }}"
+      - "{{ forgejo_runner_image }}"
+      - /bin/forgejo-runner
+      - register
+      - --no-interactive
+      - "--instance={{ forgejo_runner_instance_url }}"
+      - "--token={{ forgejo_runner_registration_token }}"
+      - "--name={{ forgejo_runner_name }}"
+      - "--labels={{ forgejo_runner_labels | join(',') }}"
+    creates: "{{ forgejo_runner_state_dir }}/.runner"
+  become: true
+  become_user: "{{ forgejo_runner_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ forgejo_runner_uid }}"
+  no_log: true
+  when:
+    - forgejo_runner_registration_token | length > 0
+    - not ansible_check_mode
+    - not forgejo_runner_skip_runtime | bool
+
+- name: Render the podman job image Containerfile
+  ansible.builtin.template:
+    src: Containerfile.podman-node.j2
+    dest: "{{ forgejo_runner_images_dir }}/Containerfile.podman-node"
+    owner: "{{ forgejo_runner_user }}"
+    group: "{{ forgejo_runner_user }}"
+    mode: "0644"
+  register: forgejo_runner_containerfile
+
+# Rebuilt only when the Containerfile changes. Runs as the runner user, in its
+# own rootless storage, the same store the runner uses for job images.
+- name: Build the podman job image as forgejo-runner
+  ansible.builtin.command:
+    argv: ["podman", "build", "--quiet", "--tag={{ forgejo_runner_podman_image }}", "--file=Containerfile.podman-node", "."]
+    chdir: "{{ forgejo_runner_images_dir }}"
+  become: true
+  become_user: "{{ forgejo_runner_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ forgejo_runner_uid }}"
+  when:
+    - forgejo_runner_containerfile is changed
+    - not ansible_check_mode
+    - not forgejo_runner_skip_runtime | bool
+  changed_when: true
+
+- name: Create the systemd user directory for forgejo-runner
+  ansible.builtin.file:
+    path: "{{ forgejo_runner_home }}/.config/systemd/user"
+    state: directory
+    owner: "{{ forgejo_runner_user }}"
+    group: "{{ forgejo_runner_user }}"
+    mode: "0755"
+
+- name: Deploy the image prune units (user scope)
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ forgejo_runner_home }}/.config/systemd/user/{{ item.dest }}"
+    owner: "{{ forgejo_runner_user }}"
+    group: "{{ forgejo_runner_user }}"
+    mode: "0644"
+  loop:
+    - { src: forgejo-runner-image-prune.service.j2, dest: forgejo-runner-image-prune.service }
+    - { src: forgejo-runner-image-prune.timer.j2, dest: forgejo-runner-image-prune.timer }
+  register: forgejo_runner_prune_units
+
+- name: Enable the image prune timer for forgejo-runner
+  ansible.builtin.systemd:
+    name: forgejo-runner-image-prune.timer
+    scope: user
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+  become_user: "{{ forgejo_runner_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ forgejo_runner_uid }}"
+  when:
+    - not ansible_check_mode
+    - not forgejo_runner_skip_runtime | bool
+
+- name: Deploy the runner Quadlet (rootless, forgejo-runner user)
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: forgejo-runner
+    container_quadlet_src: forgejo-runner.container.j2
+    container_quadlet_dir: "{{ forgejo_runner_quadlet_dir }}"
+    container_user: "{{ forgejo_runner_user }}"
+    container_user_uid: "{{ forgejo_runner_uid | default('') }}"
+    container_skip_restart: "{{ forgejo_runner_skip_runtime }}"

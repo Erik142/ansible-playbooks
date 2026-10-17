@@ -1,0 +1,39 @@
+---
+# Renders the runner's account files, config and Quadlet into a container and
+# checks them. Systemd user instances, lingering, the rootless socket and the
+# image build do not run in a container, so those tasks are skipped here via
+# forgejo_runner_skip_runtime. The first real start is a workstation run.
+driver:
+  name: docker
+platforms:
+  - name: ci-instance
+    image: opensuse/tumbleweed:latest
+    dockerfile: Dockerfile.j2
+    privileged: true
+    cgroupns_mode: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /run
+      - /run/lock
+    command: /usr/lib/systemd/systemd
+provisioner:
+  name: ansible
+  env:
+    # Playbook roles: this scenario also needs the `container` helper.
+    ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/roles
+  inventory:
+    host_vars:
+      ci-instance:
+        ansible_python_interpreter: /usr/bin/python3
+        forgejo_runner_registration_token: "molecule-fake-token-never-used"
+verifier:
+  name: ansible
+scenario:
+  test_sequence:
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - destroy

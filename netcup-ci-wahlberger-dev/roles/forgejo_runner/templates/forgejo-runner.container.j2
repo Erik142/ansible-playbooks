@@ -1,0 +1,36 @@
+[Unit]
+Description=Forgejo Actions runner ({{ forgejo_runner_name }})
+After=podman.socket network-online.target
+Wants=network-online.target
+Requires=podman.socket
+
+[Container]
+ContainerName=forgejo-runner
+# Root inside the rootless namespace is the forgejo-runner host user. The image
+# default (1000) maps to a sub-UID that cannot write the state directory.
+User=0:0
+# SELinux: a confined container may not connect to the user's Podman API service
+# (AVC connectto), and relabeling the socket does not fix that. The runner needs
+# that API by design, so the runner container runs unconfined. Job containers the
+# runner creates through the API still get the default confined label.
+SecurityLabelDisable=true
+Image={{ forgejo_runner_image }}
+# Rootless: runs as the forgejo-runner user's systemd --user instance. No root
+# socket is mounted. %t is that instance's XDG_RUNTIME_DIR.
+Exec=/bin/forgejo-runner daemon --config {{ forgejo_runner_config_dir }}/config.yaml
+WorkingDir={{ forgejo_runner_state_dir }}
+Volume={{ forgejo_runner_state_dir }}:{{ forgejo_runner_state_dir }}:Z
+Volume={{ forgejo_runner_config_dir }}/config.yaml:{{ forgejo_runner_config_dir }}/config.yaml:ro,Z
+Volume=%t/podman/podman.sock:/run/podman/podman.sock
+Volume={{ forgejo_runner_cache_dir }}:{{ forgejo_runner_cache_dir }}
+{% if forgejo_runner_ca_file | length > 0 %}
+Volume={{ forgejo_runner_ca_file }}:/etc/ssl/certs/forgejo-instance-ca.pem:ro,Z
+{% endif %}
+
+[Service]
+Restart=always
+MemoryMax={{ forgejo_runner_memory_max }}
+CPUQuota={{ forgejo_runner_cpu_quota }}
+
+[Install]
+WantedBy=default.target

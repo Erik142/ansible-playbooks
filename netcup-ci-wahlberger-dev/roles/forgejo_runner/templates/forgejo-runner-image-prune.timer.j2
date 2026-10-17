@@ -1,0 +1,11 @@
+# Rendered by Ansible (roles/forgejo_runner).
+[Unit]
+Description=Weekly prune of dangling images in the forgejo-runner Podman store
+
+[Timer]
+OnCalendar=weekly
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

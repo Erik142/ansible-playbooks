@@ -1,0 +1,20 @@
+# Ansible runtime artifacts
+*.retry
+.ansible_cache/
+.ansible/
+
+# Vault password files — never commit these
+.vault_pass
+.vault_password
+vault_pass.txt
+
+# Python artifacts
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Test and build artifacts
+record.json
+results/
+*.fixture

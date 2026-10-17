@@ -1,0 +1,131 @@
+---
+# Input guards first: nothing below changes anything if these fail.
+# "Empty" means unset, null or "": all take the skip path (`default('', true)`
+# also maps null, which a bare `| length` would turn into a NoneType error).
+# `\A..\Z` anchors: a plain `$` would also accept a trailing newline.
+- name: Require a valid interface name and cloud ZeroTier IP before binding the ZeroTier zone
+  ansible.builtin.assert:
+    that:
+      - firewall_zerotier_interface | string is match('\A[A-Za-z0-9_.-]{1,15}\Z')
+      - >-
+        firewall_cloud_zt_ip | default('', true) | string is match(
+        '\A((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}'
+        ~ '(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\Z')
+    fail_msg: >-
+      firewall_zerotier_interface (from vm_zt_iface) must be a Linux interface
+      name (1-15 characters of A-Z a-z 0-9 _ . -) and firewall_cloud_zt_ip
+      (from cloud_zt_ip) must be an IPv4 address, because the 45876/tcp rule is
+      restricted to that source (SH-FR-09).
+    quiet: true
+  when: (firewall_zerotier_interface | default('', true) | string | length) > 0
+  tags: [firewall, firewall_guard]
+
+- name: Install firewalld
+  community.general.zypper:
+    name: firewalld
+    state: present
+  tags: [firewall, firewall_service]
+
+- name: Enable and start firewalld
+  ansible.builtin.systemd:
+    name: firewalld
+    enabled: true
+    state: started
+  register: firewall_service
+  # --check on a fresh host: the package install above was only simulated, so
+  # the unit does not exist yet. Only that exact miss is tolerated, and only in
+  # check mode; a real run still fails.
+  failed_when:
+    - firewall_service is failed
+    - not (ansible_check_mode and (firewall_service.msg | default('')) is search('Could not find the requested service'))
+  tags: [firewall, firewall_service]
+
+# ansible.posix.firewalld cannot even import its client library while firewalld
+# is not installed, which in --check on a fresh host is the normal state (the
+# install above only simulated). A real run is always "usable": the install and
+# start tasks have either worked or failed the play by now.
+- name: Check whether the firewalld unit file is installed
+  ansible.builtin.stat:
+    path: /usr/lib/systemd/system/firewalld.service
+  register: firewall_unit_file
+  when: ansible_check_mode
+  tags: [firewall, firewall_service]
+
+- name: Remember whether the firewalld modules can run
+  ansible.builtin.set_fact:
+    firewall_firewalld_usable: "{{ not ansible_check_mode or (firewall_unit_file.stat.exists | default(false)) }}"
+  tags: [firewall, firewall_service]
+
+# Allow the service ports BEFORE anything else, so this can never lock out SSH.
+- name: Allow inbound services in the public zone
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    zone: "{{ firewall_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ firewall_allowed_services }}"
+  when: firewall_firewalld_usable | bool
+  tags: [firewall]
+
+- name: Allow inbound ports without a predefined firewalld service
+  ansible.posix.firewalld:
+    port: "{{ item }}"
+    zone: "{{ firewall_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ firewall_allowed_ports }}"
+  when: firewall_firewalld_usable | bool
+  tags: [firewall]
+
+# Source-restricted rules. Placed after the services/ports above so a malformed
+# rule can never be the reason SSH is not yet allowed.
+- name: Apply firewalld rich rules in the public zone
+  ansible.posix.firewalld:
+    rich_rule: "{{ item }}"
+    zone: "{{ firewall_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ firewall_rich_rules }}"
+  when: firewall_firewalld_usable | bool
+  tags: [firewall]
+
+# Only after SSH is allowed: take everything else off the public zone.
+- name: Remove services the public zone must not offer
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    zone: "{{ firewall_zone }}"
+    permanent: true
+    immediate: true
+    state: disabled
+  loop: "{{ firewall_public_removed_services | reject('in', firewall_allowed_services) | list }}"
+  when: firewall_firewalld_usable | bool
+  tags: [firewall]
+
+# Rootful Podman publishes container ports via DNAT; masquerading on the public
+# zone keeps that forwarded traffic routed (see README, Podman caveat).
+- name: Enable masquerading so Podman published ports keep working
+  ansible.posix.firewalld:
+    masquerade: true
+    zone: "{{ firewall_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  when: firewall_firewalld_usable | bool
+  tags: [firewall]
+
+- name: Configure the ZeroTier zone
+  ansible.builtin.include_tasks: zerotier.yml
+  when: (firewall_zerotier_interface | default('', true) | string | length) > 0
+  tags: [firewall]
+
+- name: Skip the ZeroTier zone while vm_zt_iface is empty
+  ansible.builtin.debug:
+    msg: >-
+      Skipping the ZeroTier zone binding and its rules because vm_zt_iface
+      (firewall_zerotier_interface) is empty. Only the public zone was
+      configured (SH-FR-194).
+  when: (firewall_zerotier_interface | default('', true) | string | length) == 0
+  tags: [firewall]

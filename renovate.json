@@ -26,6 +26,13 @@
       "matchStrings": ["(?:^|\\n)immich_version:\\s*\"?(?<currentValue>v[\\w.-]+)\"?[ \\t]*"],
       "depNameTemplate": "ghcr.io/immich-app/immich-server",
       "datasourceTemplate": "docker"
+    },
+    {
+      "description": "netcup forgejo_runner job images pinned by digest (tag@sha256)",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)netcup-ci-wahlberger-dev/roles/forgejo_runner/defaults/main\\.ya?ml$/"],
+      "matchStrings": ["(?:^|\\n)\\w+_image:\\s*\"?(?<depName>[a-z0-9./_-]+):(?<currentValue>[\\w.-]+)@(?<currentDigest>sha256:[a-f0-9]+)\"?[ \\t]*"],
+      "datasourceTemplate": "docker"
     }
   ],
   "hostRules": [
