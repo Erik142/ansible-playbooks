@@ -129,6 +129,12 @@ def template_repo(tmp_path_factory):
         text, n = re.subn(rf'^{key}: ".*"$', f'{key}: ""', text, flags=re.M)
         assert n == 1, f"fixture drift: {key} not found once in the ops vars.yml"
     ops_vars.write_text(text)
+    # Stage A also has no new automation key yet (pull request C adds it); the
+    # tests below add it themselves.
+    for d in (N, C, V):
+        p = root / d / "inventories/production/group_vars/all/vars.yml"
+        kept = [ln for ln in p.read_text().splitlines(keepends=True) if "semaphore-automation@ops.de.wahlberger.dev" not in ln]
+        p.write_text("".join(kept))
     (root / V / "README.md").write_text(README)
     (root / V / "CLAUDE.md").write_text("# conventions\n")
     (root / V / "docs").mkdir()

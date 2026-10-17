@@ -30,14 +30,17 @@ security_sudoers_passwordless:
   - erikwahlberger
 
 # --- SSH access (ssh_authorized_keys role) ----------------------------------
-# Your personal key (manual access) plus Semaphore UI's dedicated automation
-# key (pi-de-int-wahlberger-dev), kept separate on purpose — see
-# roles/ssh_authorized_keys/README.md. Neither is secret (public keys), so
-# both live here in plaintext, not Vault. The SAME two keys are authorized on
-# cloud-wahlberger-dev, the NAS, and the Pi.
+# Your personal key (manual access), the Pi's old Semaphore automation key
+# (revoked in the Pi retirement, pull request E) and the new Semaphore
+# automation key (ops-de-wahlberger-dev), which only works from the VM's
+# addresses (from=). See roles/ssh_authorized_keys/README.md. None is secret
+# (public keys), so all live here in plaintext, not Vault. The same keys are
+# authorized on cloud-wahlberger-dev, the NAS and the VM (the VM: personal and
+# new only).
 ssh_authorized_keys_list:
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJSKdeHoK+WkyBI69OSZqn0sVqZPPDRs082S/IVoOeSu erikwahlberger@personal"
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMixf1vPbDUankXYuMO0bJFXjQ+Cmh3QsrwC6TzGPkda semaphore-automation@pi.de.int.wahlberger.dev"
+  - 'from="62.238.112.178,10.243.25.185,172.29.30.0/24" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFWZ1IpLXNuFDDynKMtnh6q62R8cu+ojBoB2h0/QMPlr semaphore-automation@ops.de.wahlberger.dev'
 
 # --- ZeroTier (zerotier role) ------------------------------------------------
 # The same network the home LAN and the TrueNAS instance in Sweden are
