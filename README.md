@@ -13,7 +13,8 @@ secrets. No shared/external roles repo on purpose — see
 |----------|------|---------------|
 | [`cloud-wahlberger-dev`](cloud-wahlberger-dev) | `cloud.wahlberger.dev` (Hetzner Cloud VM, Debian) | **Reference design** for this repo. Pocket ID (passkey OIDC) + FreshRSS behind Caddy (HTTP-01). |
 | [`nas-de-int-wahlberger-dev`](nas-de-int-wahlberger-dev) | `nas.de.int.wahlberger.dev` (home NAS, openSUSE Tumbleweed) | Native Samba file share, Tandoor + Paperless-ngx + Immich behind Caddy (DNS-01), a Homepage dashboard. |
-| [`pi-de-int-wahlberger-dev`](pi-de-int-wahlberger-dev) | `pi.de.int.wahlberger.dev` (Raspberry Pi at home, Raspberry Pi OS) | Semaphore UI — runs all the playbooks in this repo (see [Automated runs](#automated-runs)). |
+| [`pi-de-int-wahlberger-dev`](pi-de-int-wahlberger-dev) | `pi.de.int.wahlberger.dev` (Raspberry Pi at home, Raspberry Pi OS) | Semaphore UI — runs all the playbooks in this repo (see [Automated runs](#automated-runs)). Retires at PR E. |
+| [`ops-de-wahlberger-dev`](ops-de-wahlberger-dev) | `ops.de.wahlberger.dev` (Hetzner CX23, openSUSE Tumbleweed) | Semaphore UI (over ZeroTier only), Caddy, Pocket ID login; runs all the playbooks in this repo (see [Automated runs](#automated-runs)). |
 | [`rpi-boras`](rpi-boras) | Raspberry Pi in Borås | Legacy: bind9 + isc-kea DHCP with dynamic DNS updates. No CI lint config yet. |
 | [`dns-server`](dns-server) | — | Skeleton/in-progress: bind9 + Pi-hole. No CI lint config yet. |
 
@@ -26,9 +27,10 @@ behind non-obvious decisions.
 
 Playbooks aren't run by hand or by GitHub-hosted CI — `nas` and `pi` are
 LAN-only and unreachable from GitHub's runners. Instead, **Semaphore UI**
-(`pi-de-int-wahlberger-dev`) runs inside the network it manages and applies
-all three playbooks over SSH with its own dedicated automation key. See
-[`pi-de-int-wahlberger-dev/roles/semaphore/README.md`](pi-de-int-wahlberger-dev/roles/semaphore/README.md).
+(`ops-de-wahlberger-dev`, a Hetzner VM reachable only over ZeroTier) runs inside
+the network it manages and applies the playbooks over SSH with its own dedicated
+automation key, restricted by `from=` to the VM's addresses. See
+[`ops-de-wahlberger-dev/README.md`](ops-de-wahlberger-dev/README.md).
 
 ## Design philosophy
 

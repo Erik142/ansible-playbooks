@@ -117,8 +117,8 @@ cloudflare_dns_extra_a_records:
   - record: ops.de.int.wahlberger.dev
     value: "{{ vm_zt_ip }}"
 cloudflare_dns_cname_target: ops.de.int.wahlberger.dev
-# False until pull request D: the semaphore CNAME stays on the Pi until then.
-semaphore_dns_cutover_enabled: false
+# Pull request D: the semaphore CNAME points at the VM from the cut-over on.
+semaphore_dns_cutover_enabled: true
 cloudflare_dns_cnames_enabled: "{{ semaphore_dns_cutover_enabled }}"
 
 # --- Reverse proxy (caddy role) -------------------------------------------------
@@ -140,13 +140,6 @@ semaphore_url: "https://semaphore.de.int.wahlberger.dev"
 semaphore_oidc_client_id: "63093482-d2cc-4c77-89df-9f6ff78b160e"
 # Production refuses to create an empty database (SH-E-01).
 semaphore_require_existing_db: true
-# The Pi's Semaphore runs v2.19.14 (`podman inspect` 2026-10-11, image ID
-# b5af994eb64d), older than the role default (v2.19.16, bumped by Renovate but
-# never applied on the Pi). SH-FR-50 / SH-E-04: the VM must start from the Pi's
-# image, because Semaphore migrates its database forward on first start and that
-# cannot be undone. Pull request D removes this override after the cut-over; the
-# VM then moves to the role default. Renovate does not read this file.
-semaphore_image: docker.io/semaphoreui/semaphore:v2.19.14
 # Fixed bridge subnet for semaphore.network (SH-FR-127); outside 10.10.0.0/16
 # and 10.243.0.0/16 (checked by tests/guards.d/vm_vars.yml). 172.29.30.0/24 is in
 # 172.16.0.0/12, which collides with neither the LAN, ZeroTier, podman's default

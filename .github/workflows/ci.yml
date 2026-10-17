@@ -266,4 +266,6 @@ jobs:
         env:
           # The render check ran in the previous step.
           STATIC_CHECKS_SKIP_RENDER: "1"
+          # Stage D: the Semaphore cut-over is done (PR D); PR E sets E.
+          STATIC_CHECKS_STAGE: "D"
         run: tests/static-checks.sh

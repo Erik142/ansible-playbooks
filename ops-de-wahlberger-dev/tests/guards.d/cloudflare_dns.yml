@@ -59,7 +59,7 @@
     gt_first_task: "Ensure this host's own A record exists in Cloudflare"
     gt_cases:
       - name: cutover off -> host A + extra A, no CNAME (FR-36, FR-131, FR-37)
-        vars: { vm_zt_ip: "{{ gt_zt_ip }}" }
+        vars: { vm_zt_ip: "{{ gt_zt_ip }}", semaphore_dns_cutover_enabled: false }
         rc: 0
         calls:
           - "{{ gt_call_host }}"
