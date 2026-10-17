@@ -95,3 +95,13 @@ beszel_agent_hub_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKz/U0NWhnhm19QvVrNu6
 forgejo_runner_registration_token: "{{ vault_forgejo_runner_registration_token | default('') }}"
 # Empty: system trust store. Set to the NAS CA bundle path if the chain is private.
 forgejo_runner_ca_file: ""
+
+# --- DNS (cloudflare_dns role) -------------------------------------------------
+# Only the ZeroTier name is published. The host has no public web service, and
+# the public name is not used. Records are unproxied.
+cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token | default('') }}"
+cloudflare_dns_own_record_enabled: false
+cloudflare_dns_extra_a_records:
+  - record: ci.de.int.wahlberger.dev
+    value: "{{ vm_zt_ip }}"
+cloudflare_dns_cnames_enabled: false

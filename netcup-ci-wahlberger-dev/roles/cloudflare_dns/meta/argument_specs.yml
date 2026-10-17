@@ -1,0 +1,41 @@
+---
+argument_specs:
+  main:
+    short_description: Ensures Cloudflare DNS records exist for this host, its extra A records and (optionally) its Caddy sites.
+    options:
+      cloudflare_dns_api_token:
+        type: str
+        required: true
+        description: Cloudflare API token scoped to Zone:DNS:Edit on cloudflare_dns_zone.
+      cloudflare_dns_zone:
+        type: str
+        required: false
+        description: Cloudflare zone the managed records belong to.
+      cloudflare_dns_ip:
+        type: str
+        required: false
+        description: IP address to publish in this host's own A record.
+      cloudflare_dns_extra_a_records:
+        type: list
+        elements: dict
+        required: false
+        description: >-
+          Further unproxied A records. The role fails while the list is empty or
+          an entry has an empty record or value.
+        options:
+          record:
+            type: str
+            required: true
+            description: Fully qualified record name inside cloudflare_dns_zone.
+          value:
+            type: str
+            required: true
+            description: IPv4 address the record points at.
+      cloudflare_dns_cname_target:
+        type: str
+        required: false
+        description: Hostname every per-site CNAME points at (default is inventory_hostname).
+      cloudflare_dns_cnames_enabled:
+        type: bool
+        required: false
+        description: Whether one CNAME per caddy_sites entry is managed; false leaves those names untouched.

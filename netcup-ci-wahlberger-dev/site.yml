@@ -32,6 +32,10 @@
       tags: [zerotier]
     - role: beszel_agent
       tags: [beszel_agent]
+    # Publishes ci.de.int.wahlberger.dev -> the ZeroTier address (vm_zt_ip), so the
+    # Beszel hub and operators can name the host.
+    - role: cloudflare_dns
+      tags: [cloudflare_dns]
     # Last: needs ZeroTier up (route to the NAS Forgejo) and rootless Podman.
     - role: forgejo_runner
       tags: [forgejo_runner]

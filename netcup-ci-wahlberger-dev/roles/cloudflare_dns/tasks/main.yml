@@ -1,0 +1,70 @@
+---
+# Every guard sits before the first Cloudflare call, so a bad input changes
+# nothing (SH-FR-193). vm_zt_ip comes first and has no dependency on the token,
+# so the step-2 run (token present, ZeroTier address still unknown) names it.
+- name: Refuse to run while vm_zt_ip is empty
+  ansible.builtin.assert:
+    that:
+      - (vm_zt_ip | default('', true) | string | trim) | length > 0
+    fail_msg: >-
+      vm_zt_ip is empty. Set it to the VM's ZeroTier member IP (pull request
+      A2); until then no DNS record is created. See roles/cloudflare_dns/README.md.
+    quiet: true
+
+- name: Validate Cloudflare DNS inputs
+  ansible.builtin.assert:
+    that:
+      - cloudflare_dns_api_token | length > 0
+      - cloudflare_dns_extra_a_records | length > 0
+      - cloudflare_dns_extra_a_records | map(attribute='record', default='') | map('trim') | select('equalto', '') | list | length == 0
+      - cloudflare_dns_extra_a_records | map(attribute='value', default='') | map('string') | map('trim') | select('equalto', '') | list | length == 0
+    fail_msg: >-
+      Invalid cloudflare_dns inputs. cloudflare_dns_api_token must be non-empty
+      (Vault secret vault_cloudflare_dns_api_token, run with --ask-vault-pass),
+      and cloudflare_dns_extra_a_records must be a non-empty list whose
+      entries all have a non-empty record and value. See
+      roles/cloudflare_dns/README.md.
+    quiet: true
+
+- name: Ensure this host's own A record exists in Cloudflare
+  community.general.cloudflare_dns:
+    api_token: "{{ cloudflare_dns_api_token }}"
+    zone: "{{ cloudflare_dns_zone }}"
+    record: "{{ inventory_hostname }}"
+    type: A
+    value: "{{ cloudflare_dns_ip }}"
+    proxied: false
+    state: present
+  when: cloudflare_dns_own_record_enabled | bool
+
+- name: Ensure each extra A record exists in Cloudflare
+  community.general.cloudflare_dns:
+    api_token: "{{ cloudflare_dns_api_token }}"
+    zone: "{{ cloudflare_dns_zone }}"
+    record: "{{ item.record }}"
+    type: A
+    value: "{{ item.value }}"
+    proxied: false
+    state: present
+  loop: "{{ cloudflare_dns_extra_a_records }}"
+  loop_control:
+    label: "{{ item.record }}"
+
+# One CNAME per caddy_sites entry, pointing at cloudflare_dns_cname_target.
+# The loop is empty while cloudflare_dns_cnames_enabled is false, so the
+# record stays untouched (SH-FR-37) and caddy_sites need not even be defined.
+# State is always `present` and `solo` is never set: this role only adds or
+# updates (SH-E-12: a second record instead of an update surfaces as a
+# Cloudflare API error), it never deletes.
+- name: Ensure each Caddy site has a CNAME pointing at the target
+  community.general.cloudflare_dns:
+    api_token: "{{ cloudflare_dns_api_token }}"
+    zone: "{{ cloudflare_dns_zone }}"
+    record: "{{ item.host }}"
+    type: CNAME
+    value: "{{ cloudflare_dns_cname_target }}"
+    proxied: false
+    state: present
+  loop: "{{ caddy_sites if cloudflare_dns_cnames_enabled | bool else [] }}"
+  loop_control:
+    label: "{{ item.host }}"

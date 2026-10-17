@@ -10,6 +10,5 @@ vault_notify_failure_resend_api_key: ""
 # (Site Administration > Actions > Runners). Single use per registration.
 vault_forgejo_runner_registration_token: ""
 
-# Beszel hub public key. Not secret; kept in Vault for the same key list as the
-# spec. vars.yml currently holds the same value in plaintext.
-vault_beszel_agent_hub_key: ""
+# Cloudflare DNS API token (Zone:DNS:Edit on wahlberger.dev), for cloudflare_dns.
+vault_cloudflare_dns_api_token: ""
