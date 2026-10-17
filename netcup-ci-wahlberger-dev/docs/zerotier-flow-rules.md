@@ -107,6 +107,10 @@ restore the network in the step-3 rollback.
 
 ## Network rule set in force (2026-10-17)
 
+Verified 2026-10-17 from the netcup host: NAS Forgejo answers, ZeroTier SSH works,
+cloud port 22 and the NAS SSH port are blocked, and ops port 22 was reachable
+before the first-line drop above was added.
+
 The ops playbook's rules were pasted and entered in Central. They cover only the
 ops VM (`10.243.25.185`), and they end with a final `accept` for everything else.
 The netcup host's rules below are not entered yet. Until they are, netcup traffic
@@ -115,7 +119,15 @@ is accept-all.
 ## Proposed netcup rules (not in force)
 
 ```
-# Proposed netcup rules, to insert in Central BEFORE the final `accept` line.
+# FIRST, directly after the baseline `drop` and BEFORE the ops rules. The ops
+# rules accept every ZeroTier member on 22 and 443 to the ops VM (M-03/M-04), so
+# without this line the runner could reach ops SSH (found 2026-10-17, verified).
+drop
+    ipsrc 10.243.73.1/32
+    and ipdest 10.243.25.185/32
+;
+
+# Remaining netcup rules, to insert BEFORE the final `accept` line.
 # Host 10.243.73.1 (ztmjfaojmv). Not in force until entered by hand.
 
 # C-01: runner -> NAS Forgejo, 443/tcp
