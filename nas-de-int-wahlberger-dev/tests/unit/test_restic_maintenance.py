@@ -46,6 +46,13 @@ def test_within_skew_runs_verified_sequence_in_order_and_exits_zero(script_modul
     assert "offending" not in out
 
 
+def test_output_names_the_repository_first(script_module, env):
+    env.set_snapshots([env.add_snapshot(GOOD_A, 0, 60)])
+    code, out, _ = run(script_module, env)
+    assert code == 0
+    assert out.splitlines()[0] == "restic-maintenance: repository cloud"
+
+
 def test_nothing_to_remove_skips_forget_but_still_prunes_and_checks(script_module, env):
     env.set_snapshots([env.add_snapshot(GOOD_A, 0)])
 
