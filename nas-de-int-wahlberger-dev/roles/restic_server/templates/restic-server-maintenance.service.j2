@@ -30,15 +30,21 @@ ReadWritePaths={{ restic_server_data_dir }}
 CapabilityBoundingSet=
 # 30 min lock wait (--retry-lock) plus forget/prune and a data subset check.
 TimeoutStartSec={{ restic_server_maintenance_timeout_start_sec }}
+{# One ExecStart= per repository, in list order; systemd stops at the first
+   failing one (oneshot), so a failure on one repository skips the later ones for
+   that run (SH-CC-01). A Jinja comment, so a one-entry list renders exactly as
+   the old single-repository unit (SH-FR-86). #}
+{% for entry in restic_server_maintenance_repos %}
 ExecStart={{ restic_server_maintenance_script_path }} \
   --repo-root {{ restic_server_data_dir }} \
-  --repo {{ restic_server_maintenance_repo }} \
+  --repo {{ entry.repo }} \
   --keep-daily {{ restic_server_maintenance_keep_daily }} \
   --keep-weekly {{ restic_server_maintenance_keep_weekly }} \
   --keep-monthly {{ restic_server_maintenance_keep_monthly }} \
   --check-subset {{ restic_server_maintenance_check_read_data_subset | replace('%', '%%') }} \
   --retry-lock {{ restic_server_maintenance_retry_lock }} \
   --max-skew-hours {{ restic_server_maintenance_max_time_skew_hours }}
+{% endfor %}
 # rest-server --max-size counts usage once at start; an out-of-band prune makes
 # that counter drift. Restart it after a SUCCESSFUL run only (ExecStartPost= is
 # skipped when ExecStart= fails). The `+` prefix runs the command outside the

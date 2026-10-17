@@ -40,4 +40,33 @@ render_items:
     dest: restic-maintenance.env
     kind: text
     asserts:
-      - '^RESTIC_PASSWORD="fixture-restic-repo-not-a-secret"$'
+      - '^RESTIC_PASSWORD_CLOUD="fixture-restic-repo-not-a-secret"$'
+  # Two repositories (SH-CC-01): one ExecStart= each, in list order; the
+  # passwords are in the env file only, under their own variable.
+  - role: restic_server
+    src: restic-server-maintenance.service.j2
+    dest: restic-server-maintenance-two-repos.service
+    kind: systemd-unit
+    vars:
+      restic_server_maintenance_repos:
+        - repo: cloud
+          password: fixture-restic-repo-not-a-secret
+        - repo: ops
+          password: fixture-ops-repo-not-a-secret
+    asserts:
+      - '^ExecStart=/usr/local/bin/restic-maintenance\.py \\$'
+      - '(?s)--repo cloud .*^ExecStart=.*--repo ops '
+      - '(?s)\A(?!.*fixture-(restic|ops)-repo-not-a-secret)'
+  - role: restic_server
+    src: restic-maintenance.env.j2
+    dest: restic-maintenance-two-repos.env
+    kind: text
+    vars:
+      restic_server_maintenance_repos:
+        - repo: cloud
+          password: fixture-restic-repo-not-a-secret
+        - repo: ops
+          password: fixture-ops-repo-not-a-secret
+    asserts:
+      - '^RESTIC_PASSWORD_CLOUD="fixture-restic-repo-not-a-secret"$'
+      - '^RESTIC_PASSWORD_OPS="fixture-ops-repo-not-a-secret"$'

@@ -28,8 +28,28 @@ All variables, their defaults and constraints are in `defaults/main.yml` and
       password: "{{ vault_restic_server_cloud_htpasswd_password | default('') }}"
   ```
 
-- `restic_server_maintenance_repo_password`: the encryption password of the
-  cloud repository (`vault_restic_server_cloud_repo_password`). Empty fails the role.
+- `restic_server_maintenance_repos`: list of `{repo, password}`, one per
+  repository the daily maintenance run covers (`repo` is the directory below
+  `restic_server_data_dir`, with `--private-repos` the client username;
+  `password` its restic encryption password). The role fails before any change
+  if the list is empty or not a list, an entry has an invalid or duplicate
+  name or an empty password (the message names the entry and its `vault_*` key).
+  Production has `cloud` and `ops`:
+
+  ```yaml
+  restic_server_maintenance_repos:
+    - repo: cloud
+      password: "{{ vault_restic_server_cloud_repo_password | default('') }}"
+    - repo: ops
+      password: "{{ vault_restic_server_ops_repo_password | default('') }}"
+  ```
+
+  This replaces the former single `restic_server_maintenance_repo` and
+  `restic_server_maintenance_repo_password` (SH-CC-01). They are not accepted
+  any more: setting either fails the role with a message pointing here, so a
+  stale override cannot silently skip the `ops` repository. The `ops` entry
+  must be merged only after the first VM backup created `restic-repos/ops`
+  (the run never creates a repository and fails on a missing one, SH-E-18).
 - `restic_server_allowed_sources`: list of CIDRs (production `10.10.0.0/16`
   home LAN and `10.243.0.0/16` ZeroTier). This role opens nothing itself; the
   production `firewall_rich_rules` are built from this list.
@@ -96,9 +116,20 @@ starts `restic-server-maintenance.service`, a oneshot that runs
 `/usr/local/bin/restic-maintenance.py` as `restic-server` (User/Group, so every
 file it creates is owned by that account). The role installs `restic` with zypper.
 It waits for the `/mnt/data` mount and mails through `notify-failure-immediate@%n`
-on failure. The repository password is in `/etc/restic-server-maintenance.env`
-(`0600 root:root`, `RESTIC_PASSWORD=`), which systemd reads as root; it is in no
-unit file. Order in the script: the repository must exist (it never runs
+on failure. The service has one `ExecStart=` per `restic_server_maintenance_repos`
+entry, in list order (production: `cloud`, then `ops`); the keep values and all
+other options are shared, so every repository gets the same prune guard,
+`forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6`, `prune` and `check`.
+systemd stops at the first failing `ExecStart=`, so a failure (for example a
+tripped guard) on `cloud` skips `ops` for that run; `ExecStartPost=` (the
+`restic-server` restart) runs only if all succeeded. A one-entry list renders
+the unit exactly as before SH-CC-01 (pinned by `tests/unit/test_restic_maintenance_render.py`).
+The repository passwords are in `/etc/restic-server-maintenance.env`
+(`0600 root:root`), one `RESTIC_PASSWORD_<REPO>` line per repository (name
+upper-cased, non-alphanumerics replaced by `_`: `RESTIC_PASSWORD_CLOUD`,
+`RESTIC_PASSWORD_OPS`), which systemd reads as root; they are in no
+unit file. The script picks the variable of its `--repo` and hands only that
+one to restic as `RESTIC_PASSWORD`. Order in the script: the repository must exist (it never runs
 `restic init`), the prune guard, `forget --dry-run --json` with the keep values (re-listing
 snapshots afterwards), `forget <explicit IDs>`, `prune`, then
 `check --read-data-subset`.
@@ -118,16 +149,16 @@ Only the IDs the dry run would remove are forgotten, and only if all were in the
 guarded list and the list is unchanged after the dry run (a snapshot forged
 meanwhile aborts the run with exit 3, nothing deleted).
 
-- DOC-O6, stale lock: `sudo -u restic-server env RESTIC_REPOSITORY=<data_dir>/cloud
-  RESTIC_PASSWORD=... restic unlock` (as the service account, so no root-owned
+- DOC-O6, stale lock (`<repo>` = `cloud` or `ops`): `sudo -u restic-server env RESTIC_REPOSITORY=<data_dir>/<repo>
+  RESTIC_PASSWORD=... restic --no-cache unlock` (as the service account, so no root-owned
   files appear). Read the password from the env file with `sudo`.
 - DOC-O8, guard tripped: `journalctl -u restic-server-maintenance` lists the
   offending IDs. Inspect them (`restic cat snapshot <id>`); remove forged
-  snapshots by hand by deleting their files in `<data_dir>/cloud/snapshots/`
+  snapshots by hand by deleting their files in `<data_dir>/<repo>/snapshots/`
   after confirming they are not genuine, then start the service again.
 - DOC-O10, re-baselining after a restore or copy that changed mtimes: set each
   snapshot file's mtime to its recorded time, e.g.
-  `sudo -u restic-server touch -d "<time from restic snapshots --json>" <data_dir>/cloud/snapshots/<id>`.
+  `sudo -u restic-server touch -d "<time from restic snapshots --json>" <data_dir>/<repo>/snapshots/<id>`.
 
 ## Does not do
 

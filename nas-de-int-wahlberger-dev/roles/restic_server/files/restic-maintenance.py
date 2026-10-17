@@ -23,8 +23,12 @@ exits 3 and deletes nothing.
 Recovery after a wrong prune restores with mtime-preserving copies (DOC-O7).
 
 The run never creates a repository (BD-FR-121): a missing ``<repo>/config``
-is an error. The repository password comes only from the environment
-(``RESTIC_PASSWORD``, set by systemd ``EnvironmentFile=``), never from argv.
+is an error. The repository password comes only from the environment, never
+from argv. One env file holds the passwords of all repositories, so the
+variable is named after the repository: ``RESTIC_PASSWORD_<REPO>`` (repo name
+upper-cased, every character outside ``[A-Za-z0-9]`` replaced by ``_``; ``cloud``
+-> ``RESTIC_PASSWORD_CLOUD``). The script hands only that one to restic, as
+``RESTIC_PASSWORD``, and drops the other repositories' variables (SH-CC-01).
 The repository location is handed to restic through ``RESTIC_REPOSITORY`` so
 argv carries no secret and no path. Needs restic >= 0.16 for ``--retry-lock``.
 
@@ -177,12 +181,18 @@ def _list_snapshots(ctx: Context) -> list[Mapping[str, object]]:
     return snapshots
 
 
+def password_variable(repo: str) -> str:
+    """Name of the environment variable holding the password of ``repo``."""
+    return "RESTIC_PASSWORD_" + re.sub(r"[^A-Za-z0-9]", "_", repo).upper()
+
+
 def validate_preconditions(args: argparse.Namespace, env: Mapping[str, str]) -> Path:
     """Check name, password and repository presence; return the repository path."""
     if not _REPO_NAME.fullmatch(args.repo):
         raise PreconditionError(f"invalid repository name: {args.repo!r}")
-    if not env.get("RESTIC_PASSWORD"):
-        raise PreconditionError("RESTIC_PASSWORD is not set in the environment")
+    variable = password_variable(args.repo)
+    if not env.get(variable):
+        raise PreconditionError(f"{variable} is not set in the environment")
     repo = Path(args.repo_root) / args.repo
     if not (repo / "config").is_file():
         raise PreconditionError(f"repository missing, not creating one: {repo}")
@@ -267,7 +277,10 @@ def execute_steps(ctx: Context, args: argparse.Namespace, removals: Sequence[str
 def run_maintenance(args: argparse.Namespace, env: Mapping[str, str], out: TextIO) -> None:
     """Run the maintenance steps; raise a MaintenanceError on any failure."""
     repo = validate_preconditions(args, env)
-    ctx = Context(args.restic, {**env, "RESTIC_REPOSITORY": str(repo)}, out, args.retry_lock)
+    child_env = {k: v for k, v in env.items() if k != "RESTIC_PASSWORD" and not k.startswith("RESTIC_PASSWORD_")}
+    child_env["RESTIC_PASSWORD"] = env[password_variable(args.repo)]
+    child_env["RESTIC_REPOSITORY"] = str(repo)
+    ctx = Context(args.restic, child_env, out, args.retry_lock)
     guarded = check_prune_guard(ctx, args, repo)
     removals = plan_removals(ctx, args, guarded)
     execute_steps(ctx, args, removals)

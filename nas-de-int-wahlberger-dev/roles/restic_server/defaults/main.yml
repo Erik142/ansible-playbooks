@@ -38,9 +38,13 @@ restic_server_append_only: true
 restic_server_max_size_bytes: 107374182400
 
 # --- Maintenance run (consumed by the maintenance tasks and units) ---------
-restic_server_maintenance_repo: cloud
-# REQUIRED, no usable default (empty fails the role before any change).
-restic_server_maintenance_repo_password: ""
+# REQUIRED, no usable default: one {repo, password} entry per repository the
+# daily run maintains (repo = subdirectory of restic_server_data_dir, i.e. the
+# client username with --private-repos). A missing/empty list or an entry with
+# an empty password fails the role before any change. Replaces the single
+# restic_server_maintenance_repo / _repo_password pair, which now fail the role
+# if still set (see README.md, SH-CC-01).
+restic_server_maintenance_repos: []
 restic_server_maintenance_keep_daily: 7
 restic_server_maintenance_keep_weekly: 4
 restic_server_maintenance_keep_monthly: 6

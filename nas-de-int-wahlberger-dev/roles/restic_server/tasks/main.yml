@@ -23,14 +23,62 @@
   loop_control:
     label: "{{ item.username }}"
 
-- name: Validate the maintenance repository password is set
+- name: Validate the legacy single maintenance variables are gone
   ansible.builtin.assert:
     that:
-      - restic_server_maintenance_repo_password | length > 0
+      - restic_server_maintenance_repo is not defined
+      - restic_server_maintenance_repo_password is not defined
     fail_msg: >-
-      restic_server_maintenance_repo_password is empty. It must equal the
-      encryption password of the cloud repository (vault_restic_server_cloud_repo_password).
+      restic_server_maintenance_repo and restic_server_maintenance_repo_password
+      are replaced by the list restic_server_maintenance_repos
+      ([{repo, password}, ...]). Remove them from group_vars and host_vars.
       See roles/restic_server/README.md.
+    quiet: true
+
+- name: Validate restic_server_maintenance_repos is a non-empty list
+  ansible.builtin.assert:
+    that:
+      - restic_server_maintenance_repos is sequence
+      - restic_server_maintenance_repos is not string
+      - restic_server_maintenance_repos is not mapping
+      - restic_server_maintenance_repos | length > 0
+    fail_msg: >-
+      restic_server_maintenance_repos must be a non-empty list of
+      {repo, password} entries. See roles/restic_server/README.md.
+    quiet: true
+
+- name: Validate each maintenance repository entry has a valid name and a password
+  ansible.builtin.assert:
+    that:
+      - item is mapping
+      - item.repo | default('') is match('^[A-Za-z0-9][A-Za-z0-9._-]*$')
+      - item.password | default('') | length > 0
+    fail_msg: >-
+      restic_server_maintenance_repos entry "{{ item.repo | default('<no repo>') if item is mapping else item }}"
+      has a missing/invalid repo name or an empty password. Set the entry's
+      matching vault_* secret (cloud: vault_restic_server_cloud_repo_password,
+      ops: vault_restic_server_ops_repo_password). See roles/restic_server/README.md.
+    quiet: true
+  loop: "{{ restic_server_maintenance_repos }}"
+  loop_control:
+    label: "{{ item.repo | default('<no repo>') if item is mapping else '<invalid entry>' }}"
+
+# The password reaches the run as RESTIC_PASSWORD_<REPO> (non-alphanumerics -> _),
+# so two names must not map to the same variable.
+- name: Validate the maintenance repository names are unique
+  vars:
+    restic_server_maintenance_variables: >-
+      {{ restic_server_maintenance_repos
+      | map(attribute='repo')
+      | map('regex_replace', '[^A-Za-z0-9]', '_')
+      | map('upper') | list }}
+  ansible.builtin.assert:
+    that:
+      - restic_server_maintenance_variables | unique | length == restic_server_maintenance_variables | length
+    fail_msg: >-
+      restic_server_maintenance_repos has two names that map to the same
+      password variable RESTIC_PASSWORD_<REPO> ({{ restic_server_maintenance_variables | join(', ') }}).
+      Rename one. See roles/restic_server/README.md.
     quiet: true
 
 # BD-FR-97: the repositories must sit on the data filesystem, but never inside

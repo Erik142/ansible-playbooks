@@ -60,6 +60,8 @@ backup_disk_freshness_checks:
     max_age_hours: 26
   - path: /mnt/data/restic-repos/cloud/snapshots
     max_age_hours: 26
+  - path: /mnt/data/restic-repos/ops/snapshots
+    max_age_hours: 26
 
 # Removes the old NAS-to-Pi restic job from step 5 of the runbook; the old
 # job is removed from that step on and keeps running until then.
@@ -244,7 +246,15 @@ restic_server_clients:
     password: "{{ vault_restic_server_cloud_htpasswd_password | default('') }}"
   - username: ops
     password: "{{ vault_restic_server_ops_htpasswd_password | default('') }}"
-restic_server_maintenance_repo_password: "{{ vault_restic_server_cloud_repo_password | default('') }}"
+# Maintained by the daily run, in this order (SH-CC-01). Each password is the
+# encryption password of that repository; an empty one fails the role before
+# any change. Merge the `ops` entry only after the first VM backup created
+# restic-repos/ops (SH-E-18).
+restic_server_maintenance_repos:
+  - repo: cloud
+    password: "{{ vault_restic_server_cloud_repo_password | default('') }}"
+  - repo: ops
+    password: "{{ vault_restic_server_ops_repo_password | default('') }}"
 
 # Resend API key for failure notification emails (notify_failure role). Same
 # account/key as cloud-wahlberger-dev and pi-de-int-wahlberger-dev.
