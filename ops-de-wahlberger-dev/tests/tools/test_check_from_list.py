@@ -243,3 +243,17 @@ def test_check_returns_per_directory_lines(tmp_path):
 def test_check_raises_on_unreadable_input(tmp_path):
     with pytest.raises(CheckError, match="cannot read"):
         check(tmp_path, PUBLIC)
+
+
+def test_list_entries_joins_a_folded_quoted_entry():
+    text = (
+        "ssh_authorized_keys_list:\n"
+        '  - "ssh-ed25519 AAAA personal"\n'
+        "  - 'from=\"1.2.3.4\"\n"
+        "    ssh-ed25519 BBBB semaphore-automation@ops.de.wahlberger.dev'\n"
+        "other: 1\n"
+    )
+    assert list_entries(text) == [
+        "ssh-ed25519 AAAA personal",
+        'from="1.2.3.4" ssh-ed25519 BBBB semaphore-automation@ops.de.wahlberger.dev',
+    ]

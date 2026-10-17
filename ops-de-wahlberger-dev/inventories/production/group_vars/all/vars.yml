@@ -73,10 +73,12 @@ security_sudoers_passwordless:
 
 # --- SSH access (ssh_authorized_keys role) ----------------------------------
 # Entries are full authorized_keys lines (options such as from= are allowed).
-# Public keys, so plaintext. Steps 0 to 5: the personal key only (SH-BR-10,
-# SH-FR-62); the new automation key joins in pull request C.
+# Public keys, so plaintext. The personal key plus the new automation key,
+# which only works from the VM's addresses (SH-BR-10, SH-FR-62, SH-FR-126).
 ssh_authorized_keys_list:
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJSKdeHoK+WkyBI69OSZqn0sVqZPPDRs082S/IVoOeSu erikwahlberger@personal"
+  - 'from="62.238.112.178,10.243.25.185,172.29.30.0/24"
+    ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFWZ1IpLXNuFDDynKMtnh6q62R8cu+ojBoB2h0/QMPlr semaphore-automation@ops.de.wahlberger.dev'
 # Keys listed here are removed from the host; set by pull request E.
 ssh_authorized_keys_revoked: []
 

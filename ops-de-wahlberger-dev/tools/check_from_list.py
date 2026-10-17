@@ -44,7 +44,7 @@ def _unquote(raw: str) -> str:
 
 def list_entries(text: str) -> list[str]:
     """Entries of the top-level ``ssh_authorized_keys_list`` block, comments skipped."""
-    entries: list[str] = []
+    raw: list[str] = []
     inside = False
     for line in text.splitlines():
         if re.match(rf"^{LIST_VAR}:\s*$", line):
@@ -53,8 +53,11 @@ def list_entries(text: str) -> list[str]:
         if inside and re.match(r"^\S", line) and not line.startswith("#"):
             break
         if inside and (m := _ENTRY.match(line)):
-            entries.append(_unquote(m.group(1)))
-    return entries
+            raw.append(m.group(1))
+        elif inside and raw and re.match(r"^\s{4,}\S", line):
+            # A quoted scalar folded over several lines: YAML joins them with one space.
+            raw[-1] = raw[-1] + " " + line.strip()
+    return [_unquote(r) for r in raw]
 
 
 def read_var(text: str, name: str) -> str | None:
