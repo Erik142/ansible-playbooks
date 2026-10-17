@@ -1,0 +1,34 @@
+---
+# REQUIRED: scoped Cloudflare API token (Zone:DNS:Edit on cloudflare_dns_zone
+# below). Set vault_cloudflare_dns_api_token in Ansible Vault — the same
+# token the caddy role already uses for DNS-01, reused here rather than
+# minting a new one.
+cloudflare_dns_api_token: ""
+
+# Cloudflare zone the records below belong to. Every hostname managed here
+# must be a (sub)domain of this zone.
+cloudflare_dns_zone: wahlberger.dev
+
+# IP address for this host's own A record. Defaults to the address Ansible
+# actually gathered for this host, so it can't drift out of sync with the
+# real host. On Hetzner Cloud this is the public IPv4 (SH-A-19).
+cloudflare_dns_ip: "{{ ansible_facts.default_ipv4.address }}"
+
+# REQUIRED (an empty list fails the role, SH-CC-08): further unproxied A
+# records, each a dict with `record` (FQDN) and `value` (IPv4). Production
+# sets the ZeroTier name of the VM here, valued with vm_zt_ip.
+cloudflare_dns_extra_a_records: []
+
+# Target of the per-site CNAMEs. Defaults to this host's own A record; the
+# VM points them at its ZeroTier name instead so the UI is reachable over
+# ZeroTier only.
+cloudflare_dns_cname_target: "{{ inventory_hostname }}"
+
+# Whether the per-`caddy_sites` CNAMEs are managed at all. Production ties
+# this to semaphore_dns_cutover_enabled, so the records stay untouched until
+# the cut-over (SH-FR-37).
+cloudflare_dns_cnames_enabled: true
+
+# Create this host's own A record (public name -> cloudflare_dns_ip). Netcup
+# sets this to false: only the ZeroTier name is published.
+cloudflare_dns_own_record_enabled: true
