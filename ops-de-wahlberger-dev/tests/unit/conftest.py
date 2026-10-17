@@ -133,8 +133,7 @@ def template_repo(tmp_path_factory):
     # tests below add it themselves.
     for d in (N, C, V):
         p = root / d / "inventories/production/group_vars/all/vars.yml"
-        kept = [ln for ln in p.read_text().splitlines(keepends=True) if "semaphore-automation@ops.de.wahlberger.dev" not in ln]
-        p.write_text("".join(kept))
+        p.write_text(re.sub(r"  - 'from=.*?semaphore-automation@ops\.de\.wahlberger\.dev'\n", "", p.read_text(), flags=re.S))
     (root / V / "README.md").write_text(README)
     (root / V / "CLAUDE.md").write_text("# conventions\n")
     (root / V / "docs").mkdir()

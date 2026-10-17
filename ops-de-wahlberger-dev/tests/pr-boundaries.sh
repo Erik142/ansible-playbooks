@@ -46,7 +46,7 @@ B)
 B2)
     allowed="$N/inventories/production/group_vars/all/* $N/inventories/vm/* $N/roles/restic_server/* $N/tests/* $docs_any" ;;
 C | C2 | C-R)
-    allowed="$keys_vars $V/tests/unit/conftest.py" ;;
+    allowed="$keys_vars $V/tests/unit/conftest.py $V/tools/check_from_list.py $V/tests/tools/test_check_from_list.py" ;;
 D)
     allowed="$V/inventories/production/group_vars/all/vars.yml $N/roles/homepage/* renovate.json $docs_any" ;;
 E)
