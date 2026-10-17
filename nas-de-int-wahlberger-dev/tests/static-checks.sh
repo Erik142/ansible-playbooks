@@ -309,9 +309,10 @@ for key, step in (("backup_disk_enabled", "step 3"), ("restic_backup_decommissio
         errors.append(f"{key} needs a comment naming runbook {step}")
 if v.get("disk_space_paths") != ["/", "/mnt/data", "/mnt/containers", "/mnt/backup/btrbk"]:
     errors.append(f"disk_space_paths is {v.get('disk_space_paths')}")
-if v.get("restic_server_clients") != [{"username": "cloud",
-        "password": "{{ vault_restic_server_cloud_htpasswd_password | default('') }}"}]:
-    errors.append("restic_server_clients differs from BD-FR-138")
+if v.get("restic_server_clients") != [
+        {"username": "cloud", "password": "{{ vault_restic_server_cloud_htpasswd_password | default('') }}"},
+        {"username": "ops", "password": "{{ vault_restic_server_ops_htpasswd_password | default('') }}"}]:
+    errors.append("restic_server_clients differs from BD-FR-138 (cloud, ops)")
 if v.get("restic_server_maintenance_repos") != [
         {"repo": "cloud", "password": "{{ vault_restic_server_cloud_repo_password | default('') }}"},
         {"repo": "ops", "password": "{{ vault_restic_server_ops_repo_password | default('') }}"}]:
@@ -327,7 +328,9 @@ ex = open(example_path).read().splitlines()
 for key, needle in (("vault_restic_backup_repo_password", "frozen"),
                     ("vault_restic_backup_rest_server_password", "frozen"),
                     ("vault_restic_server_cloud_htpasswd_password", "vault_restic_backup_rest_server_password"),
-                    ("vault_restic_server_cloud_repo_password", "vault_restic_backup_repo_password")):
+                    ("vault_restic_server_cloud_repo_password", "vault_restic_backup_repo_password"),
+                    ("vault_restic_server_ops_htpasswd_password", "vault_restic_backup_rest_server_password"),
+                    ("vault_restic_server_ops_repo_password", "vault_restic_backup_repo_password")):
     c = comment_above(ex, rf"{key}:")
     if c is None:
         errors.append(f"vault.yml.example lacks {key}")

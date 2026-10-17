@@ -160,7 +160,7 @@ Three layers, all local to this host plus one remote client:
   just before each run. Live Postgres/SQLite files in the snapshots are
   crash-consistent only; the dumps are the restorable copy.
 - **restic rest-server** (`restic-server.service`, host networking, append-only,
-  quota) serves `cloud-wahlberger-dev`'s backups from `/mnt/data/restic-repos`.
+  quota) serves `cloud-wahlberger-dev`'s and `ops-de-wahlberger-dev`'s backups from `/mnt/data/restic-repos`.
   That directory is part of `@data`, so snapper and btrbk cover it. It is
   reachable only from `10.10.0.0/16` (home LAN) and `10.243.0.0/16`
   (ZeroTier) through firewalld rich rules built from
