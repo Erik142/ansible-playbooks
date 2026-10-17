@@ -48,11 +48,167 @@ Explicitly denied, so the rules document it even though C-05 covers it:
 - Entries carry the same dated before/after record as the ops file. The "before"
   section is filled from Central's rule set at the time of the change.
 
-## Before
+## Before (Central's rule set in force before the change)
 
-Not yet recorded. Save Central's current Flow Rules text verbatim before any
-change (default rule set expected, as on the ops network on 2026-10-10).
+Saved in step 0 (SH-FR-33), before the flow rules are changed. Filled in by the
+pull-request-A packaging task (T-19) from the text you save in step 0; used to
+restore the network in the step-3 rollback.
 
-## In force
+- Date: 2026-10-11
+- Source: ZeroTier Central, Flow Rules editor, network `8056c2e21cc5c789`
+- Rule set (paste verbatim): Per the spec, no flow rules existed on 2026-10-10 (Central default rule set).
+  ```
+  #
+  # This is a default rule set that allows IPv4 and IPv6 traffic but otherwise
+  # behaves like a standard Ethernet switch.
+  #
+  # Please keep in mind that ZeroTier versions prior to 1.2.0 do NOT support advanced
+  # network rules.
+  #
+  # Since both senders and receivers enforce rules, you will get the following
+  # behavior in a network with both old and new versions:
+  #
+  # (old: 1.1.14 and older, new: 1.2.0 and newer)
+  #
+  # old <--> old: No rules are honored.
+  # old <--> new: Rules work but are only enforced by new side. Tags will NOT work, and
+  #               capabilities will only work if assigned to the new side.
+  # new <--> new: Full rules engine support including tags and capabilities.
+  #
+  # We recommend upgrading all your devices to 1.2.0 as soon as convenient. Version
+  # 1.2.0 also includes a significantly improved software update mechanism that is
+  # turned on by default on Mac and Windows. (Linux and mobile are typically kept up
+  # to date using package/app management.)
+  #
 
-Not in force.
+  #
+  # Allow only IPv4, IPv4 ARP, and IPv6 Ethernet frames.
+  #
+  drop
+      not ethertype ipv4
+      and not ethertype arp
+      and not ethertype ipv6
+  ;
+
+  #
+  # Uncomment to drop non-ZeroTier issued and managed IP addresses.
+  #
+  # This prevents IP spoofing but also blocks manual IP management at the OS level and
+  # bridging unless special rules to exempt certain hosts or traffic are added before
+  # this rule.
+  #
+  #drop
+  #	not chr ipauth
+  #;
+
+  # Accept anything else. This is required since default is 'drop'.
+  accept;
+  ```
+
+## Network rule set in force (2026-10-17)
+
+The ops playbook's rules were pasted and entered in Central. They cover only the
+ops VM (`10.243.25.185`), and they end with a final `accept` for everything else.
+The netcup host's rules below are not entered yet. Until they are, netcup traffic
+is accept-all.
+
+## Proposed netcup rules (not in force)
+
+```
+# Proposed netcup rules, to insert in Central BEFORE the final `accept` line.
+# Host 10.243.73.1 (ztmjfaojmv). Not in force until entered by hand.
+
+# C-01: runner -> NAS Forgejo, 443/tcp
+accept
+    ipsrc 10.243.73.1/32
+    and ipdest 10.10.0.100/32
+    and ipprotocol tcp
+    and dport 443
+;
+
+# C-01 reply: NAS Forgejo -> runner (source port 443)
+accept
+    ipsrc 10.10.0.100/32
+    and ipdest 10.243.73.1/32
+    and ipprotocol tcp
+    and sport 443
+;
+
+# C-02: ZeroTier members -> runner, 22/tcp
+accept
+    ipsrc 10.243.0.0/16
+    and ipdest 10.243.73.1/32
+    and ipprotocol tcp
+    and dport 22
+;
+
+# C-02 reply: runner -> ZeroTier members (source port 22)
+accept
+    ipsrc 10.243.73.1/32
+    and ipdest 10.243.0.0/16
+    and ipprotocol tcp
+    and sport 22
+;
+
+# C-03: cloud -> runner, 45876/tcp (Beszel hub)
+accept
+    ipsrc 10.243.203.116/32
+    and ipdest 10.243.73.1/32
+    and ipprotocol tcp
+    and dport 45876
+;
+
+# C-03 reply: runner -> cloud (source port 45876)
+accept
+    ipsrc 10.243.73.1/32
+    and ipdest 10.243.203.116/32
+    and ipprotocol tcp
+    and sport 45876
+;
+
+# C-04: echo request, ZeroTier members and home LAN -> runner
+accept
+    ipsrc 10.243.0.0/16
+    and ipdest 10.243.73.1/32
+    and ipprotocol 1
+    and icmp 8 0
+;
+
+accept
+    ipsrc 10.10.0.0/16
+    and ipdest 10.243.73.1/32
+    and ipprotocol 1
+    and icmp 8 0
+;
+
+# C-04 reply: echo reply, runner -> ZeroTier members and home LAN
+accept
+    ipsrc 10.243.73.1/32
+    and ipdest 10.243.0.0/16
+    and ipprotocol 1
+    and icmp 0 0
+;
+
+accept
+    ipsrc 10.243.73.1/32
+    and ipdest 10.10.0.0/16
+    and ipprotocol 1
+    and icmp 0 0
+;
+
+# C-05: runner -> any other ZeroTier or home-LAN address
+drop
+    ipsrc 10.243.73.1/32
+    and ipdest 10.243.0.0/16
+;
+
+drop
+    ipsrc 10.243.73.1/32
+    and ipdest 10.10.0.0/16
+;
+
+# C-06: anything else to the runner
+drop
+    ipdest 10.243.73.1/32
+;
+```
