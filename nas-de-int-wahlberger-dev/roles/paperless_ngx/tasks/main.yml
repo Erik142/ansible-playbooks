@@ -5,6 +5,7 @@
       - paperless_ngx_db_password | length > 0
       - paperless_ngx_oidc_client_id | length > 0
       - paperless_ngx_oidc_client_secret | length > 0
+      - paperless_ngx_secret_key | length >= 32
     fail_msg: >-
       Paperless is not fully configured. Set paperless_ngx_oidc_client_id in
       group_vars and provide the Vault secrets vault_paperless_ngx_db_password and
