@@ -5,37 +5,39 @@
 # commands name /bin/forgejo-runner explicitly.
 forgejo_runner_image: "code.forgejo.org/forgejo/runner:9.1.1"
 
-# Forgejo instance on the NAS. Reached over ZeroTier (see README, "Confirm
-# before implementing"). The runner connects outbound only.
+# Forgejo instance on the NAS. Reached over ZeroTier (see README). The runner
+# connects outbound only.
 forgejo_runner_instance_url: "https://git.de.int.wahlberger.dev"
 forgejo_runner_name: "netcup-ci"
 
-# Runner registration token. Secret: vault_forgejo_runner_registration_token (vars.yml passes it through).
+# Runner registration token. Secret: vault_forgejo_runner_registration_token
+# (vars.yml passes it through).
 forgejo_runner_registration_token: ""
 
-# Concurrency cap. Each job also gets per-container limits (below), because
-# job containers are created by podman through the socket and live outside
-# this unit's cgroup, so the unit's MemoryMax/CPUQuota do not cover them.
-# One job at a time: a single bitbake build takes the whole host, and two jobs
-# with these limits would oversubscribe 12 vCPU / 32 GB.
+# One job at a time. A single bitbake build takes the whole host, and job
+# containers are created through the socket, so the unit's MemoryMax/CPUQuota do
+# not cover them. Jobs are uncapped; see the README for the decision.
 forgejo_runner_capacity: 1
-# Per-job ceiling for one bitbake build. Leaves ~4 GB for the OS, the runner
-# daemon and the manual builds' overhead. Raise to 30g if the OS stays idle.
-forgejo_runner_job_memory: 28g
-forgejo_runner_job_cpus: 12
 
-# systemd limits for the runner daemon itself (12 vCPU, 32 GB host; leaves room
-# for manual bitbake builds).
+# systemd limits for the runner daemon itself (12 vCPU, 32 GB host).
 forgejo_runner_memory_max: 4G
 forgejo_runner_cpu_quota: "200%"
 
-# Labels offered to workflows: `<label>:<image>`. Proposal, not final.
-# Every image must contain node: actions/checkout and other JavaScript actions run
-# under it. The podman image is built on the host (images/Containerfile.podman-node).
+# Job images. Each must contain node: actions/checkout and other JavaScript
+# actions run under it. Pinned by digest; Renovate tracks the digests through
+# the netcup entry in renovate.json. The podman image is built on the host from
+# forgejo_runner_podman_base_image (see the Containerfile template).
+forgejo_runner_ubuntu_image: "docker.io/library/node:22-bookworm@sha256:0e5f906573693feaa1e21057ebdcfdb5bd5021f050b2dc7c9deceb629c7da2a8"
+forgejo_runner_python_image: "docker.io/nikolaik/python-nodejs:python3.12-nodejs22@sha256:db26be1b6abe7718d6b92c8fa0e37b2812fbc1abd5970cb2d8e8f4f775d962e1"
+forgejo_runner_node_image: "docker.io/library/node:22-bookworm@sha256:0e5f906573693feaa1e21057ebdcfdb5bd5021f050b2dc7c9deceb629c7da2a8"
+forgejo_runner_podman_base_image: "quay.io/podman/stable@sha256:2fb39ca923dd9e0ee33f9e319c3a107a2bfde022a6a31560cbd56a862821e7d3"
+forgejo_runner_podman_image: "localhost/ci-podman-node:1"
+
+# Labels offered to workflows: `<label>:<image>`.
 forgejo_runner_labels:
-  - "ubuntu-latest:docker://docker.io/library/node:22-bookworm"
-  - "python:docker://docker.io/nikolaik/python-nodejs:python3.12-nodejs22"
-  - "node:docker://docker.io/library/node:22-bookworm"
+  - "ubuntu-latest:docker://{{ forgejo_runner_ubuntu_image }}"
+  - "python:docker://{{ forgejo_runner_python_image }}"
+  - "node:docker://{{ forgejo_runner_node_image }}"
   - "podman:docker://{{ forgejo_runner_podman_image }}"
 
 # Dedicated unprivileged account running rootless Podman. No login shell.
@@ -47,10 +49,11 @@ forgejo_runner_config_dir: "{{ forgejo_runner_home }}/config"
 # socket, and podman resolves them on the host.
 forgejo_runner_state_dir: "{{ forgejo_runner_home }}/state"
 forgejo_runner_quadlet_dir: "{{ forgejo_runner_home }}/.config/containers/systemd"
+forgejo_runner_images_dir: "{{ forgejo_runner_home }}/images"
 
 # Persistent build cache (bitbake sstate + downloads). Outside the job
-# workspace, so job cleanup does not touch it. Created as a btrfs subvolume
-# (snapper does not snapshot nested subvolumes). Not in restic.
+# workspace, so job cleanup does not touch it. A nested btrfs subvolume of @/srv,
+# which snapper does not snapshot. Not in restic.
 forgejo_runner_cache_dir: /srv/ci-cache
 forgejo_runner_cache_subvolume: true
 
@@ -58,11 +61,10 @@ forgejo_runner_cache_subvolume: true
 # public CA. Empty means the system trust store (public CA only).
 forgejo_runner_ca_file: ""
 
+# Unused images: dangling layers older than this are pruned weekly by the
+# runner's own user timer. Tagged images stay until their tag moves.
+forgejo_runner_prune_until: "168h"
+
 # Molecule only: skip everything that needs a real user manager, lingering, the
 # rootless socket or btrfs. Rendering (account files, config, Quadlet) still runs.
 forgejo_runner_skip_runtime: false
-
-# Base for the `podman` label image, which is built on the host (see tasks).
-forgejo_runner_podman_base_image: "quay.io/podman/stable"
-forgejo_runner_podman_image: "localhost/ci-podman-node:1"
-forgejo_runner_images_dir: "{{ forgejo_runner_home }}/images"
