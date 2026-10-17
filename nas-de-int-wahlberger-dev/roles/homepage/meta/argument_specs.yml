@@ -34,7 +34,7 @@ argument_specs:
       homepage_semaphore_url:
         type: str
         required: false
-        description: Semaphore UI URL linked from the dashboard (pi-de-int-wahlberger-dev).
+        description: Semaphore UI URL linked from the dashboard (ops-de-wahlberger-dev).
       homepage_truenas_url:
         type: str
         required: false
