@@ -3,7 +3,7 @@ Description=A isc-kea DHCP DDNS container
 After=network-online.target
 
 [Container]
-Image=docker.io/jonasal/kea-dhcp-ddns:2
+Image=docker.io/jonasal/kea-dhcp-ddns:3
 AddCapability=NET_ADMIN
 AddCapability=NET_RAW
 SecurityLabelDisable=true
