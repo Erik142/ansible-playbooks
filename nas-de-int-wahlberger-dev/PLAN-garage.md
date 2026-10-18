@@ -255,7 +255,7 @@ Critical path: T-09 -> T-10 -> T-16 -> T-17 -> T-18 -> T-19 -> T-21 -> T-23 -> T
 - Verification: `tests/vm/scenarios/garage-v1-*.sh` exits 0 and `tests/vm/results/garage-v1.md` shows all PASS.
 - Where: VM. Gate: simulator    Risk/notes: failures go back to the owning task, not patched here. GS-A-29/30 outcomes are recorded.
 
-#### T-17 — VM run V2: test setup, README steps, routing, user-state untouched          [ ] todo
+#### T-17 — VM run V2: test setup, README steps, routing, user-state untouched          [~] 2026-10-18: all scenarios PASS on the VM (GS-AC-70, 07, 10, 30, 31, 52, 58, 73; GS-AC-10 [H] not run), see tests/vm/results/garage-v2.md
 - Type: slice
 - Requirements: GS-FR-30, 31, 36, 37, 93, 94, 95, 97, 137, 138, 139, 68, 21; GS-BR-09, BR-15; GS-E-13, E-23, E-24, E-25; GS-A-15, A-16, A-23
 - Agent: ansible-doctor    Priority: P0    Size: M    Parallel group: VM sequence (2)

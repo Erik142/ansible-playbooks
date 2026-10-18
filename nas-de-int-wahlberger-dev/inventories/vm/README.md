@@ -159,7 +159,7 @@ Details: `PLAN-backup.md`, tasks T-27 to T-30.
 ## Garage fixture inputs
 
 `group_vars/all/vars.yml` sets `garage_enabled: true`, `garage_s3_domain:
-s3.example.test` and two fake secrets (nothing else: no buckets, keys, grants
+s3.de.int.wahlberger.dev` and two fake secrets (nothing else: no buckets, keys, grants
 or layout capacity; the role does not manage them):
 
 - `vault_garage_rpc_secret`: `0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef`

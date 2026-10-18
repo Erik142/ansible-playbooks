@@ -68,7 +68,7 @@ restic_backup_decommission_enabled: true
 # Inputs only: the role creates no layout, no storage objects and no access keys. Those come from
 # tests/vm/scenarios/garage-test-setup.sh, which stands in for the user.
 garage_enabled: true
-garage_s3_domain: s3.example.test
+garage_s3_domain: s3.de.int.wahlberger.dev
 # Fixed 64-hex fixture string (also listed in README.md). Fake.
 vault_garage_rpc_secret: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 vault_garage_admin_token: "fixture-garage-not-a-secret-0123456789"
