@@ -57,15 +57,31 @@ backup_disk_enabled: true
 # backup_disk role fails with a pointer to its README while this is empty.
 backup_disk_uuid: "80cb7856-915a-42de-b56d-431d17606b70"
 # Newest direct child of each path must be younger than max_age_hours.
-backup_disk_freshness_checks:
-  - path: /mnt/backup/btrbk/data
-    max_age_hours: 26
-  - path: /mnt/backup/btrbk/containers
-    max_age_hours: 26
-  - path: /mnt/data/restic-repos/cloud/snapshots
-    max_age_hours: 26
-  - path: /mnt/data/restic-repos/ops/snapshots
-    max_age_hours: 26
+# The two Garage targets (GS-FR-74) exist only while garage_enabled is true.
+backup_disk_freshness_checks: >-
+  {{ [
+    {'path': '/mnt/backup/btrbk/data', 'max_age_hours': 26},
+    {'path': '/mnt/backup/btrbk/containers', 'max_age_hours': 26},
+    {'path': '/mnt/data/restic-repos/cloud/snapshots', 'max_age_hours': 26},
+    {'path': '/mnt/data/restic-repos/ops/snapshots', 'max_age_hours': 26}
+  ] + ([
+    {'path': '/mnt/backup/btrbk/garage', 'max_age_hours': 26},
+    {'path': '/mnt/backup/btrbk/garage-meta', 'max_age_hours': 26}
+  ] if garage_enabled | bool else []) }}
+
+# data and containers restate roles/btrbk/defaults/main.yml (unchanged, GS-FR-127);
+# garage-meta comes before garage so its snapshot is taken first (GS-FR-79).
+# The Garage entries exist only while garage_enabled is true (GS-FR-126).
+btrbk_sources: >-
+  {{ [
+    {'name': 'data', 'path': '/mnt/data'},
+    {'name': 'containers', 'path': '/mnt/containers'}
+  ] + ([
+    {'name': 'garage-meta', 'path': '/mnt/containers/garage/meta',
+     'mount_path': '/mnt/containers', 'snapshot_dir': '/mnt/containers/.btrbk-garage-meta'},
+    {'name': 'garage', 'path': '/mnt/data/garage',
+     'mount_path': '/mnt/data', 'snapshot_dir': '/mnt/data/.btrbk-garage'}
+  ] if garage_enabled | bool else []) }}
 
 # Removes the old NAS-to-Pi restic job from step 5 of the runbook; the old
 # job is removed from that step on and keeps running until then.
@@ -100,7 +116,7 @@ firewall_rich_rules: >-
 # so certificates are issued via a Cloudflare DNS API token instead. See
 # roles/caddy/README.md.
 caddy_acme_email: "ewahlberger@gmail.com"
-caddy_sites:
+caddy_sites_base:
   - host: recipes.de.int.wahlberger.dev
     upstream: "tandoor:80"
     extra: |
@@ -117,6 +133,38 @@ caddy_sites:
     upstream: "forgejo:3000"
   - host: www.de.int.wahlberger.dev
     upstream: "homepage:3000"
+# The existing sites above plus, only while garage_enabled is true, the one
+# S3 site of GS-FR-32 (body: O-6 of reqs/garage-sstate.md, GS-FR-129).
+caddy_sites: >-
+  {{ caddy_sites_base + ([{'host': garage_s3_domain, 'body': garage_s3_caddy_body}]
+  if garage_enabled | bool else []) }}
+
+# --- Garage (garage role, GS-FR-61) -------------------------------------------
+# Off: nothing Garage-related is applied and no list above contains a Garage
+# entry. Set to true only after the enable checklist (GS-FR-115 to GS-FR-118,
+# GS-FR-120). Buckets, keys and the node layout are user-owned (GS-CC-40) and
+# are deliberately not declared here.
+garage_enabled: false
+garage_s3_domain: s3.de.int.wahlberger.dev
+# Caddy site body of the S3 host (O-6): anonymous GET/HEAD without a signature
+# go to the web endpoint with the bucket taken from the path; the rest goes to
+# the S3 API. Tabs are indentation inside the Caddyfile block.
+garage_s3_caddy_body: "\
+  @web {\n\
+  \tmethod GET HEAD\n\
+  \theader !Authorization\n\
+  \tnot query X-Amz-Signature=*\n\
+  \tpath_regexp bucket ^/([^/]+)(/.*)?$\n\
+  }\n\
+  handle @web {\n\
+  \trewrite * {re.bucket.2}\n\
+  \treverse_proxy garage:3902 {\n\
+  \t\theader_up Host {re.bucket.1}\n\
+  \t}\n\
+  }\n\
+  handle {\n\
+  \treverse_proxy garage:3900\n\
+  }\n"
 
 # --- Identity provider (Pocket ID) -------------------------------------------
 # Public issuer URL of the Pocket ID instance (served by cloud-wahlberger-dev)
@@ -264,3 +312,8 @@ restic_server_maintenance_repos:
 # Resend API key for failure notification emails (notify_failure role). Same
 # account/key as cloud-wahlberger-dev and pi-de-int-wahlberger-dev.
 notify_failure_resend_api_key: "{{ vault_notify_failure_resend_api_key | default('') }}"
+
+# Garage's cluster RPC secret and admin API token (formats in
+# roles/garage/README.md); the role fails before any change while one is empty.
+garage_rpc_secret: "{{ vault_garage_rpc_secret | default('') }}"
+garage_admin_token: "{{ vault_garage_admin_token | default('') }}"
