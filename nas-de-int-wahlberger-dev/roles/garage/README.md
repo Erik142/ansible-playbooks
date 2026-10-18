@@ -80,7 +80,7 @@ All user-owned; nothing here is managed or reverted by Ansible.
 podman exec garage /garage bucket create sstate
 # 2. key (prints the key ID; read the secret later with --show-secret)   (VM)
 podman exec garage /garage key create ci-upload
-podman exec garage /garage key info --show-secret ci-upload
+podman exec garage /garage key info --show-secret ci-upload   # prints to the terminal: do not paste it into a command line
 # 3. grant read/write                                               (VM)
 podman exec garage /garage bucket allow sstate --key ci-upload --read --write
 # 4. website access (default index document index.html)            (VM)
@@ -95,12 +95,19 @@ Lifecycle is an S3 API call, not a `garage` subcommand. Spike-verified form
 (aws-cli 2.38.1, container on the same network as the node, endpoint
 `http://garage:3900`; the VM script uses the same container form for `put-object`):
 
+Never put the secret on a command line (visible in `ps` and shell history).
+Read it into the shell without echo and let podman inherit it by name:
+
 ```
+read -rs AWS_SECRET_ACCESS_KEY && export AWS_SECRET_ACCESS_KEY
 podman run --rm --network systemd-caddy -v <dir>:/w:Z \
-  -e AWS_ACCESS_KEY_ID=<GK...> -e AWS_SECRET_ACCESS_KEY=<64 hex> -e AWS_DEFAULT_REGION=garage \
+  -e AWS_ACCESS_KEY_ID=<GK...> -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION=garage \
   docker.io/amazon/aws-cli:2.38.1 --endpoint-url http://garage:3900 s3api \
   put-bucket-lifecycle-configuration --bucket sstate --lifecycle-configuration file:///w/lc.json   # spike
+unset AWS_SECRET_ACCESS_KEY
 ```
+
+Alternative: a `--env-file` with mode 0600 (`umask 077`), deleted after the run.
 
 `lc.json` (spike): `{"Rules":[{"ID":"expire-90d","Status":"Enabled","Filter":{"Prefix":""},"Expiration":{"Days":90}}]}`.
 Read back with `s3api get-bucket-lifecycle-configuration --bucket sstate` (an

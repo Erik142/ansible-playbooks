@@ -24,9 +24,22 @@
       - cloudflare_dns_zone is defined
       - cloudflare_dns_zone | string | length > 0
       - garage_s3_domain.endswith('.' ~ cloudflare_dns_zone)
+      - garage_s3_domain is match('^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$')
+      - "'..' not in garage_s3_domain"
     fail_msg: >-
-      Invalid garage_s3_domain: it must be non-empty and end in
-      .cloudflare_dns_zone (which must be defined).
+      Invalid garage_s3_domain: it must be non-empty, end in
+      .cloudflare_dns_zone (which must be defined) and contain only letters,
+      digits, dots and hyphens (it is written into garage.toml and the Caddyfile).
+    quiet: true
+
+- name: Validate garage_s3_region
+  ansible.builtin.assert:
+    that:
+      - garage_s3_region is string
+      - garage_s3_region is match('^[a-z0-9]([a-z0-9-]*[a-z0-9])?$')
+    fail_msg: >-
+      Invalid garage_s3_region: it must be non-empty and consist of lowercase
+      letters, digits and hyphens (it is written into garage.toml).
     quiet: true
 
 - name: Validate secret formats
@@ -39,6 +52,29 @@
       64 lowercase hex characters, and vault_garage_admin_token
       (garage_admin_token) at least 32 characters. Both come from Vault.
     quiet: true
+
+- name: Validate the path charset (written into TOML and Quadlet lines)
+  ansible.builtin.assert:
+    that:
+      - item.value is string
+      - item.value is match('^/[A-Za-z0-9._/-]+$')
+      - "'..' not in item.value.split('/')"
+    fail_msg: >-
+      Invalid {{ item.key }}: it must be an absolute path of letters, digits,
+      '.', '_', '-' and '/' without '..' (it is written into garage.toml and
+      the Quadlet).
+    quiet: true
+  loop: "{{ garage_path_inputs | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  vars:
+    garage_path_inputs:
+      garage_mount_path: "{{ garage_mount_path }}"
+      garage_store_path: "{{ garage_store_path }}"
+      garage_meta_mount_path: "{{ garage_meta_mount_path }}"
+      garage_config_dir: "{{ garage_config_dir }}"
+      garage_meta_path: "{{ garage_meta_path }}"
+      garage_secrets_dir: "{{ garage_secrets_dir }}"
 
 - name: Validate paths
   ansible.builtin.assert:

@@ -7,10 +7,14 @@
     that:
       - site.body is not defined or (site.upstream is not defined and site.extra is not defined)
       - site.body is defined or site.upstream is defined
+      - site.host is defined
+      - site.host is string
+      - site.host is match('^([*][.])?[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$')
     fail_msg: >-
       caddy_sites entry '{{ site.host | default('<no host>') }}' is invalid:
       set either body (a complete site block, no upstream or extra) or
-      upstream (optionally with extra). See roles/caddy/README.md.
+      upstream (optionally with extra), and host must be a hostname of letters,
+      digits, dots and hyphens (optionally starting with '*.'). See roles/caddy/README.md.
     quiet: true
   loop: "{{ caddy_sites }}"
   loop_control:

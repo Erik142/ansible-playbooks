@@ -26,6 +26,10 @@ Volume={{ garage_config_dir }}/garage.toml:{{ garage_config_dir }}/garage.toml:r
 Volume={{ garage_secrets_dir }}:{{ garage_secrets_dir }}:ro
 # Config file location: to verify against v2.4.1 in spike T-02 / task T-10.
 Environment=GARAGE_CONFIG_FILE={{ garage_config_dir }}/garage.toml
+# Hardening (security review finding 2).
+NoNewPrivileges=true
+DropCapability=ALL
+ReadOnly=true
 HealthCmd=["/garage","status"]
 # Lets Restart=always restart an unhealthy container.
 HealthOnFailure=kill
