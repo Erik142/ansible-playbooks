@@ -277,7 +277,7 @@ Critical path: T-09 -> T-10 -> T-16 -> T-17 -> T-18 -> T-19 -> T-21 -> T-23 -> T
 - Verification: `tests/vm/scenarios/garage-v3-*.sh` exits 0; results file all PASS and quoted into the enable PR (T-22).
 - Where: VM. Gate: simulator    Risk/notes: GS-AC-55 and GS-AC-56 are enable preconditions (GS-FR-118).
 
-#### T-19 — VM run V4: secrets out of logs, idempotency (lifecycle part dropped)          [ ] todo
+#### T-19 — VM run V4: secrets out of logs, idempotency (lifecycle part dropped)          [x] 2026-10-19: GS-AC-23 (fresh store and user-made state, -vvv, output and garage.service journal clean) and GS-AC-12 (changed=0, --check --diff empty) PASS on the VM, see tests/vm/results/garage-v4.md
 - Type: slice
 - Requirements: GS-FR-21, GS-FR-61, GS-FR-138 (re-run on user-made state), GS-AC-12, GS-AC-23
 - Agent: ansible-doctor    Priority: P1    Size: S    Parallel group: VM sequence (4)
