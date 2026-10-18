@@ -266,7 +266,7 @@ Critical path: T-09 -> T-10 -> T-16 -> T-17 -> T-18 -> T-19 -> T-21 -> T-23 -> T
 - Verification: `tests/vm/scenarios/garage-v2-*.sh` exits 0; results file all PASS.
 - Where: VM. Gate: simulator    Risk/notes: any deviation from the T-03 LOCAL result goes to `requirements-engineer`. The saved user-state of GS-AC-73 is reused by T-18/T-19 (do not reset in between).
 
-#### T-18 — VM run V3: btrbk Garage sources, backup, restore drill, skew          [ ] todo
+#### T-18 — VM run V3: btrbk Garage sources, backup, restore drill, skew          [~] 2026-10-18: all scenarios PASS on the VM (GS-AC-04, 20, 21, 45 [V], 53, 55, 56, 67, 68), see tests/vm/results/garage-v3.md; restore needs btrfs send/receive (T-21), GS-AC-67 root-ID wording (spec)
 - Type: slice
 - Requirements: GS-FR-70..72, 75, 76, 77, 78, 79, 90, 91, 92, 74; GS-BR-03, BR-11; GS-NFR-06; GS-E-15, E-22, E-26, E-27; GS-A-17, A-19, A-24, A-25, A-27; GS-R-01, GS-R-03
 - Agent: ansible-doctor    Priority: P0    Size: M    Parallel group: VM sequence (3)
