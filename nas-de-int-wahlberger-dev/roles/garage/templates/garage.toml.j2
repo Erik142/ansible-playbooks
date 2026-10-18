@@ -1,0 +1,24 @@
+# Managed by Ansible (role garage). Do not edit by hand.
+# Garage v2.4.1 configuration; container paths equal host paths. No secret
+# value lives here: both secrets are read from files below {{ garage_secrets_dir }}.
+replication_factor = 1
+
+metadata_dir = "{{ garage_meta_path }}"
+data_dir = "{{ garage_store_path }}/data"
+
+rpc_bind_addr = "127.0.0.1:3901"
+rpc_public_addr = "127.0.0.1:3901"
+rpc_secret_file = "{{ garage_secrets_dir }}/rpc_secret"
+
+[s3_api]
+api_bind_addr = "0.0.0.0:3900"
+s3_region = "{{ garage_s3_region }}"
+
+[s3_web]
+bind_addr = "0.0.0.0:3902"
+# Required by Garage v2.4.1 (it refuses to start without it); no leading dot.
+root_domain = "{{ garage_s3_domain }}"
+
+[admin]
+api_bind_addr = "127.0.0.1:3903"
+admin_token_file = "{{ garage_secrets_dir }}/admin_token"
