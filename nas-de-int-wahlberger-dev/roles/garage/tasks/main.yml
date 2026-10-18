@@ -4,6 +4,9 @@
 - name: Validate inputs and refuse to run without the backup disk
   ansible.builtin.import_tasks: preflight.yml
 
+- name: Refuse a secrets directory that a snapshot config covers
+  ansible.builtin.import_tasks: secrets_guard.yml
+
 - name: Create the account, subvolumes and directories
   ansible.builtin.import_tasks: storage.yml
 

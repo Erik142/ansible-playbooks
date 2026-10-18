@@ -16,7 +16,7 @@ render_items:
       - '(?s)\A(?!.*^Network=.*^Network=)'
       - '^User=991$'
       - '^Group=990$'
-      - '^HealthCmd=/garage status$'
+      - '^HealthCmd=\["/garage","status"\]$'
       - '^HealthOnFailure=kill$'
       - '^OnFailure=notify-failure@%n\.service$'
       - '^Restart=always$'

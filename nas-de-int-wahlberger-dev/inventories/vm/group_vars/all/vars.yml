@@ -71,7 +71,7 @@ garage_enabled: true
 garage_s3_domain: s3.example.test
 # Fixed 64-hex fixture string (also listed in README.md). Fake.
 vault_garage_rpc_secret: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-vault_garage_admin_token: "fixture-garage-not-a-secret"
+vault_garage_admin_token: "fixture-garage-not-a-secret-0123456789"
 # Same indirection as production vars.yml (GS-FR-12).
 garage_rpc_secret: "{{ vault_garage_rpc_secret | default('') }}"
 garage_admin_token: "{{ vault_garage_admin_token | default('') }}"

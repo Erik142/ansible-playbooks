@@ -244,7 +244,7 @@ Critical path: T-09 -> T-10 -> T-16 -> T-17 -> T-18 -> T-19 -> T-21 -> T-23 -> T
 - Verification: the assert commands above; `head -c 20 vault.yml`.
 - Where: LOCAL (Vault file only, no NAS). Gate: host    Risk/notes: **A1**.
 
-#### T-16 — VM run V1: storage, secrets, service, ports, restarts, no-layout state          [ ] todo
+#### T-16 — VM run V1: storage, secrets, service, ports, restarts, no-layout state          [~] 2026-10-18: 33 PASS, 2 FAIL (GS-AC-36 spec GS-FR-16 exec form; GS-AC-46 container role handler in check mode), GS-AC-05 skipped; see tests/vm/results/garage-v1.md
 - Type: slice
 - Requirements: GS-FR-01..06, 09, 83, 106, 107, 132, 134, 20, 13, 16, 17, 22, 29, 80..82, 108, 109, 111, 60, 61, 67, 85, 135, 136; GS-BR-02, GS-BR-14, GS-BR-16; GS-NFR-05, GS-NFR-09; GS-E-01, E-02, E-05, E-19, E-20, E-21, E-32, E-33
 - Agent: ansible-doctor    Priority: P0    Size: M    Parallel group: VM sequence (1)

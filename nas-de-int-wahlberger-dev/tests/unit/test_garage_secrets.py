@@ -30,10 +30,11 @@ PLAY = """---
   connection: local
   gather_facts: false
   tasks:
-    - name: Run only the secrets stage
+    - name: Run the guard, then the secrets stage
       ansible.builtin.include_role:
         name: garage
-        tasks_from: secrets
+        tasks_from: "{{ item }}"
+      loop: [secrets_guard, secrets]
 """
 
 SECRETS = ("a1" * 32, "tok" * 15)

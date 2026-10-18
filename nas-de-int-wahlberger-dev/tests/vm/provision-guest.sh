@@ -84,6 +84,19 @@ done
 # --- ac45-allowed Podman network (BD-AC-45) ---------------------------------
 podman network exists ac45-allowed || podman network create --subnet 10.89.45.0/24 ac45-allowed
 
+# --- caddy.network Quadlet (Garage joins it; the Caddy role itself is not applied on the VM) ---
+mkdir -p /etc/containers/systemd
+cat >/etc/containers/systemd/caddy.network <<'NET'
+[Unit]
+Description=Caddy reverse-proxy network
+
+[Network]
+Driver=bridge
+DNS=1.1.1.1
+DNS=8.8.8.8
+NET
+systemctl daemon-reload
+
 # --- Make ip_forward persistent (Podman published ports; see memory note) ---
 echo 'net.ipv4.ip_forward = 1' >/etc/sysctl.d/99-podman-ip-forward.conf
 /usr/lib/systemd/systemd-sysctl /etc/sysctl.d/99-podman-ip-forward.conf

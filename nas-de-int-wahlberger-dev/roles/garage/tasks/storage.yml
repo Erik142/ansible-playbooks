@@ -159,6 +159,7 @@
   ansible.builtin.command:
     argv: [find, "{{ garage_meta_path }}", -mindepth, "1", -print, -quit]
   register: garage_storage_meta_entry
+  when: garage_storage_stat.results[1].stat.exists or not ansible_check_mode
   changed_when: false
   check_mode: false
 
@@ -166,6 +167,7 @@
   ansible.builtin.command:
     argv: [lsattr, -d, "{{ garage_meta_path }}"]
   register: garage_storage_meta_attr
+  when: garage_storage_stat.results[1].stat.exists or not ansible_check_mode
   changed_when: false
   check_mode: false
 
@@ -173,6 +175,7 @@
   ansible.builtin.command:
     argv: [chattr, +C, "{{ garage_meta_path }}"]
   when:
+    - garage_storage_meta_entry is not skipped
     - garage_storage_meta_entry.stdout | trim | length == 0
     - "'C' not in (garage_storage_meta_attr.stdout.split()[0])"
   changed_when: true
