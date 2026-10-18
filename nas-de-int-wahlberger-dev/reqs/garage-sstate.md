@@ -1,11 +1,11 @@
 ## Feature: Provide a Garage S3 store on the NAS (first bucket: Yocto sstate)
-status:            ready
+status:            draft
 priority:          should
-version:           1.2
+version:           1.3
 quality-pillars:   4,4,3,4,4,5,4,5
 quality-reviewed:  2026-10-18
 
-Open Questions are empty (all resolved, see "Resolved questions"); accepted risks are GS-R-01 to GS-R-03. Final requirements-auditor verdict READY, 0 blocking (2026-10-17); 0.7 is an editorial pass on that verdict, 0.8 records the spike T-03 result (`tests/spikes/garage-caddy-routing.md`), 0.9 three implementation points from task T-01, 1.0 the secret-handling pattern for assert tasks (T-07), 1.1 Erik's scope change: Ansible sets up only the Garage service; everything the Garage or S3 CLI can do is left to the user (GS-CC-40), 1.2 a cleanup after the re-audit of 1.1 (GS-CC-41). IDs carry the prefix `GS-`. IDs marked "[Deleted 0.x]" are kept and never reused. "[Amended 0.x]" marks an entry whose text changed in that version, "[New 0.x]" an entry added in it; "split from" names the FR a new ID was cut out of. The changes from 0.1 to 1.1 are listed under "Contract changes from 0.1" to "... from 1.1", and in the change log at the end of this file.
+Open Questions: GS-Q-17 (blocking GS-AC-46 only); all others resolved, see "Resolved questions". accepted risks are GS-R-01 to GS-R-03. Final requirements-auditor verdict READY, 0 blocking (2026-10-17); 0.7 is an editorial pass on that verdict, 0.8 records the spike T-03 result (`tests/spikes/garage-caddy-routing.md`), 0.9 three implementation points from task T-01, 1.0 the secret-handling pattern for assert tasks (T-07), 1.1 Erik's scope change: Ansible sets up only the Garage service; everything the Garage or S3 CLI can do is left to the user (GS-CC-40), 1.2 a cleanup after the re-audit of 1.1 (GS-CC-41), 1.3 two corrections from VM run V1 (GS-CC-42). Status is `draft` while GS-Q-17 is open. IDs carry the prefix `GS-`. IDs marked "[Deleted 0.x]" are kept and never reused. "[Amended 0.x]" marks an entry whose text changed in that version, "[New 0.x]" an entry added in it; "split from" names the FR a new ID was cut out of. The changes from 0.1 to 1.2 are listed under "Contract changes from 0.1" to "... from 1.2", and in the change log at the end of this file.
 
 ### Problem Statement
 
@@ -143,6 +143,10 @@ Note [New 1.2]: GS-CC-01 to GS-CC-39 are the history of earlier versions. Entrie
 
 - GS-CC-41 [New 1.2]: Re-audit cleanup of 1.1. Stale contract entries GS-CC-08, -22, -26, -28, -30, -34, -38 and the GS-Q-07 resolved row are tagged "Superseded by GS-CC-40"; the other historical entries that cite deleted IDs are tagged "Historical". New GS-FR-141 governs the secret-format and path rows of GS-E-04 and GS-AC-25. GS-E-03 now says "fail at that command" (it cannot always fail before any change) and gets GS-AC-76. GS-FR-139 is verified by GS-AC-50, which also asserts the capacity note. `garage block list-errors` is pinned from spike T-02 (GS-FR-77, GS-AC-55). GS-A-10 points to spike T-02 and GS-AC-07; the Out of Scope quota entry no longer cites a deleted error case. "realistic" and "visibly" are replaced. Erik's decisions of 2026-10-18, also in GS-CC-41: (1) GS-NFR-04 is an observation, not a gate: the day-30 and day-120 sizes (GS-AC-51, GS-AC-65) are recorded in the README, the 1 TiB limit is removed, and the 85 % `disk_space` alert (GS-NFR-03) is the backstop; (2) the enable gate GS-FR-120 and GS-NFR-02 read no quota figure: the only size gate is `/mnt/data` usage <= 85 % (GS-AC-47). GS-FR-140 keeps the 500 GiB quota as a README recommendation only.
 
+#### Contract changes from 1.2 (in 1.3; implementers and tests must follow)
+
+- GS-CC-42 [New 1.3] (VM run V1, T-16): (1) GS-FR-16, O-2, GS-AC-36 and GS-AC-38 use the exec form `HealthCmd=["/garage","status"]`; the shell form fails because the image has no `/bin/sh` (verified by hand on the VM). (2) The VM fixture domain is `s3.de.int.wahlberger.dev` (GS-FR-65, GS-AC-38), because GS-FR-135 refuses `s3.example.test`. Open item GS-Q-17 (shared `roles/container` restart handler on a fresh host, GS-AC-46) is recorded for Erik; status is `draft` until it is answered.
+
 #### External preconditions (not deliverables of this feature)
 
 - GS-P-01 [Amended 0.3]: A ZeroTier flow rule limits the netcup CI member `10.243.73.1` (GS-F-17) to the NAS's `:443` (W1). Owner: Erik, by hand in ZeroTier Central. It is recorded in `ops-de-wahlberger-dev/docs/zerotier-flow-rules.md`. Until it exists, the netcup flow is blocked (GS-BR-08). The LAN build hosts do not depend on it.
@@ -235,7 +239,7 @@ Note [New 1.2]: GS-CC-01 to GS-CC-39 are the history of earlier versions. Entrie
 - GS-FR-25 [Deleted 1.1]: Key secret comparison; user-owned keys are not in Vault (GS-CC-40).
 - GS-FR-26 [Deleted 1.1]: Grants; user-owned (GS-CC-40).
 - GS-FR-29 [Must] [Amended 1.1]: After the container starts or restarts, the role shall wait until `podman exec garage /garage status` exits 0. The wait lasts at most `garage_ready_timeout_sec` (60). On timeout the role fails. The check passes without a layout (spike T-02: `garage status` exits 0 with "NO ROLE ASSIGNED"); it checks only that Garage runs.
-- GS-FR-16 [Must]: The Quadlet shall set `HealthCmd=/garage status`.
+- GS-FR-16 [Must] [Amended 1.3]: The Quadlet shall set the health check in exec form, `HealthCmd=["/garage","status"]`. The shell form `HealthCmd=/garage status` fails because Podman runs it through `/bin/sh` (CMD-SHELL) and the image has no shell (spike T-02; verified by hand on the VM in run V1, T-16 report).
 - GS-FR-80 [Should]: The Quadlet shall set `HealthOnFailure=kill`, so that `Restart=always` restarts an unhealthy container.
 - GS-FR-17 [Must]: The role shall deploy `garage.container` through the `container` role with `Restart=always` and `WantedBy=default.target`.
 - GS-FR-81 [Must]: The Quadlet shall set `OnFailure=notify-failure@%n.service`, the flap-limited variant used by `restic-server`.
@@ -296,7 +300,7 @@ Note [New 1.2]: GS-CC-01 to GS-CC-39 are the history of earlier versions. Entrie
 - GS-FR-64 [Must]: `roles/garage/meta/argument_specs.yml` shall declare every `garage_*` input in the Inputs table.
 - GS-FR-135 [Must] [Amended 1.1]: Before any change, the role's preflight check shall fail, naming the variable and never a value, when `garage_s3_domain` is empty or does not end in `.{{ cloudflare_dns_zone }}` (GS-E-04). This check, not the argument spec (`required: false`, GS-CC-38), enforces that it is set.
 - GS-FR-141 [Must] [New 1.2]: Before any change, the role's preflight check shall fail, naming the variable and never a value, when `garage_rpc_secret` does not match `^[0-9a-f]{64}$`, when `garage_admin_token` is shorter than 32 characters, when `garage_meta_path` is not a direct child of `garage_config_dir`, or when `garage_config_dir` is not below `garage_meta_mount_path` (GS-E-04). Sources: the RPC secret format is Garage's 32-byte hex `rpc_secret` (configuration reference, generated with `openssl rand -hex 32`); the admin-token minimum and the path rules are this spec's Inputs constraints since 0.2 and 0.3.
-- GS-FR-65 [Must] [Amended 1.1]: The VM fixture inventory shall define a fake value for `vault_garage_rpc_secret` (a fixed 64-hex fixture string listed in `inventories/vm/README.md`) and for `vault_garage_admin_token` (contains the marker `fixture-garage-not-a-secret`). These are the "fixture secret values" in GS-AC-23 and GS-AC-24.
+- GS-FR-65 [Must] [Amended 1.3]: The VM fixture inventory shall define a fake value for `vault_garage_rpc_secret` (a fixed 64-hex fixture string listed in `inventories/vm/README.md`) and for `vault_garage_admin_token` (contains the marker `fixture-garage-not-a-secret`). These are the "fixture secret values" in GS-AC-23 and GS-AC-24. The VM fixture sets `garage_s3_domain: s3.de.int.wahlberger.dev`, which ends in the fixture's `cloudflare_dns_zone` (`wahlberger.dev`, role default) and so passes GS-FR-135; the 0.2 fixture name `s3.example.test` is refused by GS-FR-135.
 - GS-FR-68 [Must] [Amended 1.1]: The [V] scenarios that need data shall run the test setup (Terms) first: README layout steps, buckets `sstate` (website access) and `private-test` (no website access), key `test-rw` with read and write on both, object `selftest/up`. It uses only the Garage CLI and an S3 client, never role variables, and is used by GS-AC-07, GS-AC-10, GS-AC-30, GS-AC-31, GS-AC-52, GS-AC-55, GS-AC-56 and GS-AC-73.
 - GS-FR-66 [Should]: `vault.yml.example` shall list every `vault_garage_*` variable with its generation command (GS-P-03).
 - GS-FR-67 [Must] [Amended 0.5]: If `garage_enabled` is true and `backup_disk_enabled` is false, the role shall fail before any change, because the store must be backed up (decision 2026-10-17).
@@ -397,7 +401,7 @@ O-1 [Amended 0.3] `garage.toml` at `<garage_config_dir>/garage.toml`, `root:root
 O-2 [Amended 0.5] Quadlet `/etc/containers/systemd/garage.container`:
 - `ContainerName=garage`, `Image=<garage_image>`, `Network=caddy.network` (only), `User=`/`Group=` numeric `garage_user` IDs;
 - `Volume=` for `/mnt/data/garage/data` and `/mnt/containers/garage/meta` (`:Z`), `garage.toml` (`:ro`) and `garage_secrets_dir` (`:ro`);
-- `HealthCmd=/garage status`, `HealthOnFailure=kill`;
+- `HealthCmd=["/garage","status"]` (exec form), `HealthOnFailure=kill`;
 - `RequiresMountsFor=<garage_mount_path> <garage_config_dir>`, `OnFailure=notify-failure@%n.service`, `Restart=always`, `WantedBy=default.target`;
 - no `PublishPort=`, no `SecurityLabelDisable=`.
 
@@ -690,10 +694,10 @@ Scenario GS-AC-35 [V] [Amended 0.9]: Ready within 60 s, config read from the dec
 - Then `podman exec garage /garage status` exits 0 within 60 s, polled every 2 s
 - And because the image has no `/etc/garage.toml` (its default path, spike T-02), the exit 0 shows that the server and the CLI read `<garage_config_dir>/garage.toml` (GS-FR-136)
 
-Scenario GS-AC-36 [V]: Healthcheck (GS-FR-16, GS-FR-80)
+Scenario GS-AC-36 [V] [Amended 1.3]: Healthcheck (GS-FR-16, GS-FR-80)
 - Given `garage.service` is active
 - Then `podman healthcheck run garage` exits 0
-- And `podman inspect garage` shows a healthcheck command containing `/garage status`
+- And `podman inspect --format '{{.Config.Healthcheck.Test}}' garage` shows the exec form `[CMD /garage status]`, not `CMD-SHELL`
 
 Scenario GS-AC-37 [V]: Unit wiring (GS-FR-17, GS-FR-81, GS-FR-82)
 - When `systemctl show garage.service -p OnFailure -p Restart -p RequiresMountsFor` runs
@@ -705,7 +709,7 @@ Scenario GS-AC-38 [S] [Amended 0.9]: Render-check asserts (GS-FR-136, GS-FR-07, 
 - When `tests/render-check.sh` runs `40-garage.yml`
 - Then `garage.container` matches:
   - `^ContainerName=garage$`, `^Network=caddy\.network$` (exactly one `Network=` line);
-  - `^User=<fixture uid>$`, `^HealthCmd=/garage status$`, `^HealthOnFailure=kill$`;
+  - `^User=<fixture uid>$`, `^HealthCmd=\["/garage","status"\]$`, `^HealthOnFailure=kill$`; no `HealthCmd=` line in shell form;
   - `^OnFailure=notify-failure@%n\.service$`, `^Restart=always$`;
   - `Volume=` lines for `/mnt/data/garage/data` and `/mnt/containers/garage/meta` ending in `:Z`, and for `garage.toml` and `<garage_secrets_dir>` containing `ro`;
   - exactly four `Volume=` lines;
@@ -717,7 +721,7 @@ Scenario GS-AC-38 [S] [Amended 0.9]: Render-check asserts (GS-FR-136, GS-FR-07, 
   - `api_bind_addr = "0.0.0.0:3900"`, `bind_addr = "0.0.0.0:3902"`, `api_bind_addr = "127.0.0.1:3903"`;
   - `metadata_dir = "/mnt/containers/garage/meta"`, `data_dir = "/mnt/data/garage/data"`;
   - `rpc_secret_file` and `admin_token_file` pointing below `<garage_secrets_dir>`;
-  - exactly one `root_domain` line: `root_domain = "s3.example.test"` (fixture domain, no leading dot) under `[s3_web]`; none under `[s3_api]` (GS-FR-38);
+  - exactly one `root_domain` line: `root_domain = "s3.de.int.wahlberger.dev"` (fixture domain, GS-FR-65; no leading dot) under `[s3_web]`; none under `[s3_api]` (GS-FR-38);
   - no `metadata_snapshots_dir` line and no `metadata_auto_snapshot_interval` line (GS-FR-08);
   - no `[k2v_api]`
 - And in the render-check container, `/usr/libexec/podman/quadlet -dryrun` on the rendered `garage.container` exits 0, and the generated `garage.service` passes `systemd-analyze verify` (GS-CC-36, GS-A-30; [V] fallback through GS-AC-37 if the generator cannot run there)
@@ -761,6 +765,7 @@ Scenario GS-AC-46 [V]: Check mode on a fresh host (GS-FR-85, GS-E-21)
 - Given `garage_enabled: true` and no `garage.service` on the VM
 - When `ansible-playbook -i inventories/vm site.yml --check --tags garage` runs
 - Then it exits 0 and the readiness wait is reported as skipped
+- Note [1.3]: fails in VM run V1 because the shared `roles/container` restart handler errors on a fresh host (`Could not find the requested service garage.service`); open in GS-Q-17
 
 Scenario GS-AC-47 [H] [Amended 1.2]: Size gate on `/mnt/data` (GS-NFR-02, GS-FR-120)
 - Given `df -B1 --output=size,used /mnt/data` gives S and U
@@ -1069,7 +1074,9 @@ Scenario GS-AC-76 [V] [New 1.2]: A failing btrfs command stops the role (GS-E-03
 
 ### Open Questions
 
-None. All questions are resolved; see the table below.
+| ID | Question | Proposed default | Who answers | Blocks |
+|---|---|---|---|---|
+| GS-Q-17 [New 1.3] | On a fresh host, the shared `roles/container` handler "Restart the container service" (`ansible.builtin.systemd: state: restarted`) fails with `Could not find the requested service garage.service`, because the unit does not exist yet (in check mode the Quadlet is never written, so the generator never creates the unit). GS-AC-46 fails (VM run V1). The handler is shared by every containerized service, so this is Erik's decision. (a) Guard the shared handler: skip the restart when the unit is not loaded yet (for example `systemctl show -p LoadState <unit>` reports `not-found`) or when the Quadlet change was only reported in check mode. (b) Leave the shared handler unchanged and make the `garage` role start the unit itself only after the first deploy. | (a): one fix in one place covers every service that uses `roles/container` and the next new service; it matches what check mode and a first deploy mean (nothing to restart yet); and the `garage` role stays a plain user of the shared role. (b) fixes only `garage` and keeps a garage-specific start path next to the shared one | Erik | yes: GS-AC-46 (GS-FR-85); a `roles/container` change outside this feature's files |
 
 #### Resolved questions (kept for traceability, not open)
 
@@ -1127,6 +1134,7 @@ None. All questions are resolved; see the table below.
 
 ### Change log
 
+- 1.3 (2026-10-18): VM run V1 corrections (GS-CC-42): exec-form `HealthCmd`, fixture domain `s3.de.int.wahlberger.dev`; new open question GS-Q-17 (shared container restart handler, recommendation (a)); status `draft` until GS-Q-17 is answered.
 - 1.2 (2026-10-18): cleanup after the re-audit of 1.1 (READY with gaps), GS-CC-41: superseded and historical tags on stale contract entries (G1), GS-FR-141 for input formats (G4), GS-A-10 and the quota Out of Scope entry repointed (G5), GS-AC-76 for GS-E-03 and GS-AC-50 for GS-FR-139 (G6), `block list-errors` pinned from spike T-02 (G7), ambiguous terms replaced. Erik's decisions applied: GS-NFR-04 observe-only (no 1 TiB gate) and GS-FR-120/GS-NFR-02/GS-AC-47 without a quota figure. Quality metadata refreshed with the requirements engineer's self-score (Atomic 3: compound FRs such as GS-FR-02, GS-FR-09 and GS-FR-92 remain).
 - 1.1 (2026-10-18): Erik's scope change and clarification (GS-CC-40): Ansible sets up only the Garage service; everything the Garage or S3 CLI can do (node layout, buckets, keys, grants, quotas, website access, lifecycle) is user-owned and documented in the README (GS-FR-139, GS-FR-140). Removed IDs are marked [Deleted 1.1]; GS-Q-08 retired; GS-A-20 to GS-A-22 and GS-A-28 moved to Out of Scope; new GS-FR-137 to GS-FR-140, GS-BR-15, GS-BR-16, GS-E-33, GS-AC-73 to GS-AC-75; [V] test setup replaces the role-managed fixture (GS-FR-68, GS-AC-70); Verification table rebuilt. Consequence recorded: Garage runs without a layout until the user runs the README steps (GS-BR-16). Status kept `ready`; the quality scores date from 0.7.
 - 1.0 (2026-10-18): GS-CC-39 (T-07): GS-FR-21 gains the approved exception for assert-only input checks (untemplated conditions, static messages that name the variable, `quiet: true`, no `no_log`), proven by GS-AC-25 at `-vvv` and GS-AC-23. Status stays `ready`.
