@@ -1,6 +1,27 @@
 ---
+# Guarded restart (GS-AC-46). In check mode the Quadlet file is not written, so
+# the unit does not exist on a fresh host and a restart would fail. Check mode
+# therefore does nothing; a real apply reloads systemd, then restarts only if
+# the unit is installed. Handlers sharing a `listen` topic run in this order.
 - name: Restart the container service
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: not ansible_check_mode
+
+- name: Query whether the container unit is installed
+  ansible.builtin.command: "systemctl cat {{ container_name }}.service"  # noqa command-instead-of-module
+  register: container_unit_installed
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: not ansible_check_mode
+  listen: Restart the container service
+
+- name: Restart the container unit if installed
   ansible.builtin.systemd:
     name: "{{ container_name }}.service"
     state: restarted
-    daemon_reload: true
+  when:
+    - not ansible_check_mode
+    - container_unit_installed.rc == 0
+  listen: Restart the container service
