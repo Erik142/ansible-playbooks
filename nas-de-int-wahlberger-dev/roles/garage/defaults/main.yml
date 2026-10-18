@@ -1,0 +1,43 @@
+---
+# Default variables for the `garage` role. Every variable here is declared in
+# meta/argument_specs.yml.
+#
+# NOT defaulted on purpose:
+#   garage_s3_domain        FQDN ending in .<cloudflare_dns_zone>.
+# Layout, buckets, keys, grants, quotas, website access and lifecycle are
+# user-owned (Garage CLI, see README), not role inputs.
+#
+# Runtime facts (not inputs): garage_uid / garage_gid are read with getent in
+# tasks/storage.yml and consumed by the Quadlet and tasks/secrets.yml. See
+# README.md.
+
+# Off until the enable preconditions hold (GS-FR-61, GS-FR-115 to GS-FR-120).
+garage_enabled: false
+
+# Single line, matched by the Renovate custom manager in renovate.json.
+garage_image: docker.io/dxflrs/garage:v2.4.1
+
+# Data subvolume: a direct child of the data filesystem mount.
+garage_mount_path: /mnt/data
+garage_store_path: "{{ garage_mount_path }}/garage"
+
+# Metadata subvolume (on the containers filesystem) and the config directory
+# that holds garage.toml and the metadata subvolume. No secret lives here.
+garage_meta_mount_path: /mnt/containers
+garage_config_dir: /mnt/containers/garage
+garage_meta_path: "{{ garage_config_dir }}/meta"
+
+# Holds rpc_secret and admin_token only; covered by no btrbk source and no
+# snapper config (it is in subvolume /@/var). root:<garage_user> 0750.
+garage_secrets_dir: /var/lib/garage/secrets
+
+# System account (UID < 1000, nologin) the container runs as.
+garage_user: garage
+
+garage_s3_region: garage
+
+# Secrets come from Vault through the production vars.yml indirection.
+garage_rpc_secret: "{{ vault_garage_rpc_secret | default('') }}"
+garage_admin_token: "{{ vault_garage_admin_token | default('') }}"
+
+garage_ready_timeout_sec: 60

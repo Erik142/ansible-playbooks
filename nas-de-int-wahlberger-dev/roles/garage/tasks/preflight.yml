@@ -1,0 +1,57 @@
+---
+# GS-FR-67 (GS-E-20): the store must be backed up. First task of the role, so
+# the failure happens before any change. T-07 adds the input validation below.
+- name: Fail when garage is enabled without the backup disk
+  ansible.builtin.assert:
+    that:
+      - garage_enabled | bool
+      - backup_disk_enabled | default(false) | bool
+    fail_msg: >-
+      garage_enabled is true but backup_disk_enabled is false. The Garage store
+      must be backed up: enable backup_disk_enabled (runbook step 3) before
+      garage_enabled. See roles/garage/README.md.
+    quiet: true
+
+# T-07, GS-E-04: input validation, all before any change. Every fail_msg names
+# the variable and never a value. No no_log: it would censor the message that
+# names the input; the conditions are untemplated and carry no value.
+- name: Validate garage_s3_domain
+  ansible.builtin.assert:
+    that:
+      - garage_s3_domain is defined
+      - garage_s3_domain is string
+      - garage_s3_domain | trim | length > 0
+      - cloudflare_dns_zone is defined
+      - cloudflare_dns_zone | string | length > 0
+      - garage_s3_domain.endswith('.' ~ cloudflare_dns_zone)
+    fail_msg: >-
+      Invalid garage_s3_domain: it must be non-empty and end in
+      .cloudflare_dns_zone (which must be defined).
+    quiet: true
+
+- name: Validate secret formats
+  ansible.builtin.assert:
+    that:
+      - garage_rpc_secret | string is match('^[0-9a-f]{64}$')
+      - garage_admin_token | string | length >= 32
+    fail_msg: >-
+      Invalid secret input: vault_garage_rpc_secret (garage_rpc_secret) must be
+      64 lowercase hex characters, and vault_garage_admin_token
+      (garage_admin_token) at least 32 characters. Both come from Vault.
+    quiet: true
+
+- name: Validate paths
+  ansible.builtin.assert:
+    that:
+      - garage_store_path | dirname == garage_mount_path
+      - garage_config_dir is match(garage_meta_mount_path ~ '/[^/]')
+      - garage_meta_path | dirname == garage_config_dir
+      - garage_secrets_dir is match('^/')
+      - (garage_store_path ~ garage_meta_path) is not search('/(\.snapshots|\.btrbk[^/]*)(/|$)')
+    fail_msg: >-
+      Invalid garage path input. garage_store_path must be a direct child of
+      garage_mount_path, garage_config_dir must be below garage_meta_mount_path,
+      garage_meta_path must be a direct child of garage_config_dir (not at or
+      below .snapshots or a .btrbk* directory) and garage_secrets_dir must be
+      absolute.
+    quiet: true

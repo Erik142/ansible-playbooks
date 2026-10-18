@@ -1,0 +1,178 @@
+---
+# Stage 2: filesystem checks, account, two btrfs subvolumes, ownership, No_COW.
+# Every read-only check runs first and fails before any change (GS-FR-01,
+# GS-FR-09, GS-E-01 to GS-E-03). This is the only file in the repository outside
+# backup_disk/init*.yml that may hold `btrfs subvolume create` and `chattr +C`
+# (A0 carve-out in tests/static-checks.sh, GS-FR-02, GS-FR-06).
+# Sets the runtime facts garage_uid and garage_gid (README.md).
+
+- name: Check that the btrfs and lsattr tools exist
+  ansible.builtin.command:
+    cmd: sh -c 'command -v btrfs && command -v findmnt && command -v lsattr && command -v chattr'
+  register: garage_storage_tools
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Fail when a required tool is missing
+  ansible.builtin.fail:
+    msg: >-
+      A required tool (btrfs, findmnt, lsattr, chattr) is missing on {{ inventory_hostname }};
+      nothing was changed. Install btrfsprogs and e2fsprogs (GS-E-03).
+  when: garage_storage_tools.rc != 0
+
+- name: Read the filesystem type of both mount paths (GS-FR-01)
+  ansible.builtin.command:
+    cmd: findmnt -no FSTYPE {{ item | quote }}
+  loop:
+    - "{{ garage_mount_path }}"
+    - "{{ garage_meta_mount_path }}"
+  register: garage_storage_fstype
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Fail unless both mount paths are mounted btrfs (GS-E-01)
+  ansible.builtin.fail:
+    msg: >-
+      {{ item.item }} is not a mounted btrfs filesystem (found:
+      {{ (item.stdout | trim) if (item.stdout | trim | length > 0) else 'not mounted' }});
+      nothing was changed. Garage needs subvolumes on btrfs (GS-FR-01).
+  loop: "{{ garage_storage_fstype.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: (item.stdout | trim) != 'btrfs'
+
+- name: Stat both subvolume paths without following symlinks
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+    get_checksum: false
+    get_mime: false
+    get_attributes: false
+  loop:
+    - "{{ garage_store_path }}"
+    - "{{ garage_meta_path }}"
+  register: garage_storage_stat
+  check_mode: false
+
+- name: Ask btrfs whether each existing path is a subvolume (GS-FR-09)
+  ansible.builtin.command:
+    cmd: btrfs subvolume show {{ item.item | quote }}
+  loop: "{{ garage_storage_stat.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.stat.exists
+  register: garage_storage_show
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Fail when an existing path is a plain directory, file or symlink (GS-E-02)
+  ansible.builtin.fail:
+    msg: >-
+      {{ item.item.item }} exists but is not a btrfs subvolume
+      ({{ 'symlink' if item.item.stat.islnk else (item.stderr | default('btrfs subvolume show failed') | trim) }}).
+      Nothing was moved, deleted or converted. Move or remove it yourself, then rerun (GS-FR-09, GS-BR-02).
+  loop: "{{ garage_storage_show.results | selectattr('rc', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.item.item }}"
+  when: item.rc != 0 or item.item.stat.islnk
+
+- name: Create the system group (GS-FR-83)
+  ansible.builtin.group:
+    name: "{{ garage_user }}"
+    system: true
+    state: present
+
+- name: Create the system account, UID below 1000, no login (GS-FR-83)
+  ansible.builtin.user:
+    name: "{{ garage_user }}"
+    group: "{{ garage_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+    state: present
+
+- name: Read the numeric ids of the account
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ garage_user }}"
+    fail_key: "{{ not ansible_check_mode }}"
+
+- name: Set garage_uid and garage_gid (GS-FR-05)
+  ansible.builtin.set_fact:
+    # Check mode on a host without the account yet: placeholder, never applied.
+    garage_uid: "{{ (getent_passwd[garage_user][1] | int) if getent_passwd[garage_user] is defined and getent_passwd[garage_user] else 999 }}"
+    garage_gid: "{{ (getent_passwd[garage_user][2] | int) if getent_passwd[garage_user] is defined and getent_passwd[garage_user] else 999 }}"
+
+- name: Assert the ids are a system account and not root (GS-FR-05, GS-FR-83)
+  ansible.builtin.assert:
+    that:
+      - garage_uid | int > 0
+      - garage_gid | int > 0
+      - garage_uid | int < 1000
+    fail_msg: "{{ garage_user }} has uid {{ garage_uid }} gid {{ garage_gid }}; expected a system uid between 1 and 999."
+    quiet: true
+
+- name: Create the config directory, parent of the metadata subvolume (GS-FR-02)
+  ansible.builtin.file:
+    path: "{{ garage_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create the missing subvolumes (GS-FR-02)
+  ansible.builtin.command:
+    cmd: btrfs subvolume create {{ item | quote }}
+    creates: "{{ item }}"
+  loop:
+    - "{{ garage_store_path }}"
+    - "{{ garage_meta_path }}"
+
+- name: Data subvolume root owned by root, mode 0700 (GS-FR-04)
+  ansible.builtin.file:
+    path: "{{ garage_store_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Create data/ in the data subvolume, owned by the account (GS-FR-03, GS-FR-106)
+  ansible.builtin.file:
+    path: "{{ garage_store_path }}/data"
+    state: directory
+    owner: "{{ garage_user }}"
+    group: "{{ garage_user }}"
+    mode: "0700"
+
+- name: Metadata subvolume root owned by the account, mode 0700 (GS-FR-107)
+  ansible.builtin.file:
+    path: "{{ garage_meta_path }}"
+    state: directory
+    owner: "{{ garage_user }}"
+    group: "{{ garage_user }}"
+    mode: "0700"
+
+- name: List the first entry of the metadata subvolume (GS-FR-06)
+  ansible.builtin.command:
+    argv: [find, "{{ garage_meta_path }}", -mindepth, "1", -print, -quit]
+  register: garage_storage_meta_entry
+  changed_when: false
+  check_mode: false
+
+- name: Read the attributes of the metadata subvolume root (GS-FR-06)
+  ansible.builtin.command:
+    argv: [lsattr, -d, "{{ garage_meta_path }}"]
+  register: garage_storage_meta_attr
+  changed_when: false
+  check_mode: false
+
+- name: Set No_COW only on an empty metadata subvolume, otherwise leave it (GS-FR-06)
+  ansible.builtin.command:
+    argv: [chattr, +C, "{{ garage_meta_path }}"]
+  when:
+    - garage_storage_meta_entry.stdout | trim | length == 0
+    - "'C' not in (garage_storage_meta_attr.stdout.split()[0])"
+  changed_when: true

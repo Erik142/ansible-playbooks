@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: garage
+  author: Erik Wahlberger
+  description: Garage S3 object store (Podman Quadlet) on btrfs subvolumes, with declarative buckets, keys and lifecycle.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - s3
+    - garage
+    - podman
+
+dependencies: []

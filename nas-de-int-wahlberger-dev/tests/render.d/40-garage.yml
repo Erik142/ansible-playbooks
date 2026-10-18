@@ -1,0 +1,35 @@
+---
+# garage role (T-01): the Quadlet (kind text: systemd-analyze cannot verify
+# .container files). garage_uid/garage_gid are runtime facts (getent), so the
+# item supplies fixture values. garage.toml is added by T-10.
+render_items:
+  - role: garage
+    src: garage.container.j2
+    dest: garage.container
+    kind: text
+    vars:
+      garage_uid: "991"
+      garage_gid: "990"
+    asserts:
+      - '^ContainerName=garage$'
+      - '^Network=caddy\.network$'
+      - '(?s)\A(?!.*^Network=.*^Network=)'
+      - '^User=991$'
+      - '^Group=990$'
+      - '^HealthCmd=/garage status$'
+      - '^HealthOnFailure=kill$'
+      - '^OnFailure=notify-failure@%n\.service$'
+      - '^Restart=always$'
+      - '^WantedBy=default\.target$'
+      - '^RequiresMountsFor=/mnt/data /mnt/containers/garage$'
+      - '^Image=docker\.io/dxflrs/garage:v2\.4\.1$'
+      - '^Volume=/mnt/data/garage/data:/mnt/data/garage/data:Z$'
+      - '^Volume=/mnt/containers/garage/meta:/mnt/containers/garage/meta:Z$'
+      - '^Volume=/mnt/containers/garage/garage\.toml:\S*garage\.toml:ro$'
+      - '^Volume=/var/lib/garage/secrets:/var/lib/garage/secrets:ro$'
+      - '(?s)\A(?!(?:.*?^Volume=){5})'
+      - '(?s)\A(?!.*^PublishPort=)'
+      - '(?s)\A(?!.*SecurityLabelDisable)'
+      - '(?s)\A(?!.*^Volume=/mnt/data/garage:)'
+      - '(?s)\A(?!.*^Volume=/mnt/containers/garage:)'
+      - '(?s)\A(?!.*^Volume=[^\n]*\.btrbk)'

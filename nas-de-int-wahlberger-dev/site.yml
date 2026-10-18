@@ -66,6 +66,12 @@
     # Reverse proxy (creates the shared network) for tandoor/paperless-ngx/immich/forgejo.
     - role: caddy
       tags: [caddy]
+    # Garage S3 store (sstate). After caddy (shared caddy.network) and before
+    # btrbk: both subvolumes must exist before btrbk checks or snapshots them.
+    # Off until the enable preconditions hold (garage_enabled in vars.yml).
+    - role: garage
+      tags: [garage]
+      when: garage_enabled | bool
     # Native Samba file server (not a container) with guest access.
     - role: samba
       tags: [samba]

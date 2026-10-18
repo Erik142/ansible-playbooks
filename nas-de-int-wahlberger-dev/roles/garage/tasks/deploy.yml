@@ -1,0 +1,4 @@
+---
+# Stub (T-01): filled by a later task of PLAN-garage.md.
+- name: Garage deploy stage not implemented yet
+  ansible.builtin.meta: noop
