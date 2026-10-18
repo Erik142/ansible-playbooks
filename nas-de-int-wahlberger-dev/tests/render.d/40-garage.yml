@@ -46,7 +46,7 @@ render_items:
       - '^rpc_public_addr = "127\.0\.0\.1:3901"$'
       - '^rpc_secret_file = "/var/lib/garage/secrets/rpc_secret"$'
       - '^admin_token_file = "/var/lib/garage/secrets/admin_token"$'
-      - '(?s)\[s3_api\]\napi_bind_addr = "0\.0\.0\.0:3900"\ns3_region = "garage"\n\n\[s3_web\]\nbind_addr = "0\.0\.0\.0:3902"\n[^\n]*\nroot_domain = "s3\.example\.test"\n\n\[admin\]\napi_bind_addr = "127\.0\.0\.1:3903"'
+      - '(?s)\[s3_api\]\napi_bind_addr = "0\.0\.0\.0:3900"\ns3_region = "garage"\n\n\[s3_web\]\nbind_addr = "0\.0\.0\.0:3902"\n[^\n]*\nroot_domain = "s3\.de\.int\.wahlberger\.dev"\n\n\[admin\]\napi_bind_addr = "127\.0\.0\.1:3903"'
       - '(?s)\A(?!.*^root_domain[^\n]*\n.*^root_domain)'
       - '(?s)\A(?!.*\[s3_api\][^\[]*root_domain)'
       - '(?s)\A(?!.*^\s*(rpc_secret|admin_token)\s*=)'
