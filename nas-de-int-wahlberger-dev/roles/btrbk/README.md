@@ -32,6 +32,22 @@ OBS repository, writes `/etc/btrbk/btrbk.conf` and runs it daily from
 8. Installs `/usr/local/bin/btrbk-key-refresh.py` with `btrbk-key-refresh.service`
    and a weekly `btrbk-key-refresh.timer` (see "Signing key renewal").
 
+## Per-source keys `mount_path` and `snapshot_dir` (GS-FR-75, GS-FR-76, GS-FR-90 to GS-FR-92)
+
+Both are optional; an entry without them behaves and renders exactly as before.
+
+| Key | Effect |
+|---|---|
+| `mount_path` | A `storage_mounts` path. The mount guard (and `RequiresMountsFor=`) uses it instead of `path`, which is then a nested subvolume. `path` must lie strictly below `mount_path`, and `btrfs subvolume show <path>` must succeed. The role fails before any change otherwise and never creates `path`. |
+| `snapshot_dir` | Absolute directory for this source's snapshots, rendered into `btrbk.conf` and created `root:root 0700` after the guard. Refused (naming the source and value) when relative, containing `..`, at or below `samba_data_dir`, at or below `path`, or when `findmnt --target` reports another mount for its parent than for `path`. Default: `<path>/<btrbk_snapshot_dirname>`. |
+
+```yaml
+btrbk_sources:
+  - {name: garage, path: /mnt/data/garage, mount_path: /mnt/data, snapshot_dir: /mnt/data/.btrbk-garage}
+```
+
+Sources are snapshotted in list order within one run.
+
 ## Retention (independent of snapper, BD-BR-15)
 
 | Side | Variables | Default | Effect |

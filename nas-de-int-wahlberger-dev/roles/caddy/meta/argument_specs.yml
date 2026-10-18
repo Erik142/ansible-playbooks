@@ -39,9 +39,19 @@ argument_specs:
             description: Public hostname to serve.
           upstream:
             type: str
-            required: true
-            description: container_name:port to reverse_proxy to.
+            required: false
+            description: >-
+              container_name:port to reverse_proxy to. Required unless body is
+              set; not allowed together with body.
           extra:
             type: str
             required: false
-            description: Optional raw Caddy directives for the site block.
+            description: >-
+              Optional raw Caddy directives appended to the generated site
+              block. Not allowed together with body.
+          body:
+            type: str
+            required: false
+            description: >-
+              Complete site block contents, rendered as "<host> { <body> }"
+              with no generated reverse_proxy. Excludes upstream and extra.

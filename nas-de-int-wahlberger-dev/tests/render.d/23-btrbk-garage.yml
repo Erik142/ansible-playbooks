@@ -1,0 +1,44 @@
+---
+# btrbk role, Garage sources (GS-AC-54): role defaults + garage-meta + garage
+# (GS-FR-78, GS-FR-70, GS-FR-79), each with its own absolute snapshot_dir
+# (GS-FR-90). The data/containers sections keep `snapshot_dir .btrbk`.
+render_items:
+  - role: btrbk
+    src: btrbk.conf.j2
+    dest: btrbk-garage.conf
+    kind: btrbk-conf
+    vars:
+      btrbk_sources:
+        - name: data
+          path: /mnt/data
+        - name: containers
+          path: /mnt/containers
+        - name: garage-meta
+          path: /mnt/containers/garage/meta
+          mount_path: /mnt/containers
+          snapshot_dir: /mnt/containers/.btrbk-garage-meta
+        - name: garage
+          path: /mnt/data/garage
+          mount_path: /mnt/data
+          snapshot_dir: /mnt/data/.btrbk-garage
+    asserts:
+      - '^  snapshot_dir /mnt/containers/\.btrbk-garage-meta$'
+      - '^  snapshot_dir /mnt/data/\.btrbk-garage$'
+      # data and containers: same asserts as 20-btrbk.yml.
+      - '^  snapshot_dir \.btrbk$'
+      - '(?s)\A(?!.*snapshot_dir[^\n]*\.snapshots)'
+      - '(?s)\A(?!.*snapshot_dir[^\n]*samba)'
+      - '(?s)\A(?!.*exclude)'
+      # GS-FR-79: garage-meta is snapshotted before garage.
+      - '(?s)snapshot_name garage-meta\n.*snapshot_name garage\n'
+      - '(?s)volume /mnt/data\n.*volume /mnt/containers\n.*volume /mnt/containers/garage/meta\n.*volume /mnt/data/garage\n'
+    print_asserts:
+      - 'snapshot_dir\s+/mnt/containers/\.btrbk-garage-meta'
+      - 'snapshot_dir\s+/mnt/data/\.btrbk-garage\b'
+      - 'target\s+send-receive\s+/mnt/backup/btrbk/garage-meta'
+      - 'target\s+send-receive\s+/mnt/backup/btrbk/garage\b'
+      - 'target\s+send-receive\s+/mnt/backup/btrbk/data'
+      - 'target\s+send-receive\s+/mnt/backup/btrbk/containers'
+      - 'snapshot_dir\s+\.btrbk'
+      - 'snapshot_preserve_min\s+2d'
+      - 'target_preserve\s+14d 8w 12m 3y\b'

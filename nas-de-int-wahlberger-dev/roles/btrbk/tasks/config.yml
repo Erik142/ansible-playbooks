@@ -9,10 +9,13 @@
     mode: "0755"
 
 # btrbk does not create the snapshot directory and aborts with exit 10 without
-# it (A-07 spike). It sits inside the mounted source, never below an unmounted path.
-- name: Create the btrbk snapshot directory inside every source
+# it (A-07 spike). It sits inside the mounted source (or, with `snapshot_dir`, on
+# the same mount, GS-FR-91), never below an unmounted path.
+- name: Create the btrbk snapshot directory of every source
   ansible.builtin.file:
-    path: "{{ item.path | regex_replace('/+$', '') }}/{{ btrbk_snapshot_dirname }}"
+    path: >-
+      {{ (item.snapshot_dir | regex_replace('(.)/+$', '\1')) if item.snapshot_dir | default('') | length > 0
+         else (item.path | regex_replace('/+$', '')) ~ '/' ~ btrbk_snapshot_dirname }}
     state: directory
     owner: root
     group: root

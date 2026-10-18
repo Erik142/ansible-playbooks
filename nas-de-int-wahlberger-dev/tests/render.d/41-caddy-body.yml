@@ -1,0 +1,36 @@
+---
+# caddy role (T-06): a site with `body` renders as "<host> { <body> }" with no
+# generated reverse_proxy (GS-FR-95); the body is the O-6 fragment of
+# reqs/garage-sstate.md. Byte-identity for entries without `body` and
+# `caddy adapt` are checked by tests/unit/test_caddy_body.py.
+render_items:
+  - role: caddy
+    src: Caddyfile.j2
+    dest: caddy-body.Caddyfile
+    kind: text
+    vars:
+      caddy_acme_email: ""
+      caddy_sites:
+        - host: a.example.test
+          body: |
+            @web {
+            	method GET HEAD
+            	header !Authorization
+            	not query X-Amz-Signature=*
+            	path_regexp bucket ^/([^/]+)(/.*)?$
+            }
+            handle @web {
+            	rewrite * {re.bucket.2}
+            	reverse_proxy garage:3902 {
+            		header_up Host {re.bucket.1}
+            	}
+            }
+            handle {
+            	reverse_proxy garage:3900
+            }
+    asserts:
+      - '^a\.example\.test \{$'
+      - '(?s)\A(?!.*^    reverse_proxy)'
+      - '^    handle @web \{$'
+      - '^    handle \{\n    \treverse_proxy garage:3900\n    \}\n\}$'
+      - '(?s)\A(?:(?!reverse_proxy).)*reverse_proxy garage:3902(?:(?!reverse_proxy).)*reverse_proxy garage:3900(?:(?!reverse_proxy).)*\Z'

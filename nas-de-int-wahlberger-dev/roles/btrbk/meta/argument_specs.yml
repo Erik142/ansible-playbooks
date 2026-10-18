@@ -16,7 +16,21 @@ argument_specs:
           path:
             type: path
             required: true
-            description: Mounted btrfs subvolume to snapshot.
+            description: Btrfs subvolume to snapshot. A mount point, or (with mount_path) a nested subvolume below mount_path.
+          mount_path:
+            type: path
+            required: false
+            description: >-
+              Optional storage_mounts path that path lies strictly below. The
+              mount guard then checks mount_path with findmnt and path with
+              `btrfs subvolume show` (must exist, never created).
+          snapshot_dir:
+            type: path
+            required: false
+            description: >-
+              Optional absolute directory for this source's snapshots, created
+              root:root 0700. Not at or below samba_data_dir or path; on the same
+              mount as path. Default is <path>/<btrbk_snapshot_dirname>.
       btrbk_target_dir:
         type: path
         required: false

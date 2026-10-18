@@ -9,9 +9,13 @@
 }
 {% for site in caddy_sites %}
 {{ site.host }} {
+{% if site.body is defined %}
+{{ site.body | trim | indent(4, true) }}
+{% else %}
     reverse_proxy {{ site.upstream }}
 {% if site.extra | default("", true) | length > 0 %}
     {{ site.extra }}
+{% endif %}
 {% endif %}
 }
 {% endfor %}
