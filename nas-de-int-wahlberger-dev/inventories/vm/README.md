@@ -155,3 +155,17 @@ is cheap.
    55, 57 to 60).
 
 Details: `PLAN-backup.md`, tasks T-27 to T-30.
+
+## Garage fixture inputs
+
+`group_vars/all/vars.yml` sets `garage_enabled: true`, `garage_s3_domain:
+s3.example.test` and two fake secrets (nothing else: no buckets, keys, grants
+or layout capacity; the role does not manage them):
+
+- `vault_garage_rpc_secret`: `0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef`
+- `vault_garage_admin_token`: contains the marker `fixture-garage-not-a-secret`
+
+Layout, buckets `sstate` (website access) and `private-test`, key `test-rw`
+and the test objects are created by `tests/vm/scenarios/garage-test-setup.sh`
+(it stands in for the user; Garage CLI and an S3 client only). Re-run it after
+`reset.sh clean`.

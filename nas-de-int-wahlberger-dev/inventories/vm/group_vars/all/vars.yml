@@ -63,3 +63,15 @@ notify_failure_resend_api_key: re_fixture_not_a_real_key
 # --- Cut-over flags: both on, except where a scenario sets them ---------------
 backup_disk_enabled: true
 restic_backup_decommission_enabled: true
+
+# --- Garage (GS-FR-65, GS-CC-40) ----------------------------------------------
+# Inputs only: the role creates no layout, no storage objects and no access keys. Those come from
+# tests/vm/scenarios/garage-test-setup.sh, which stands in for the user.
+garage_enabled: true
+garage_s3_domain: s3.example.test
+# Fixed 64-hex fixture string (also listed in README.md). Fake.
+vault_garage_rpc_secret: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+vault_garage_admin_token: "fixture-garage-not-a-secret"
+# Same indirection as production vars.yml (GS-FR-12).
+garage_rpc_secret: "{{ vault_garage_rpc_secret | default('') }}"
+garage_admin_token: "{{ vault_garage_admin_token | default('') }}"

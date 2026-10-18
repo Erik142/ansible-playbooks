@@ -105,3 +105,13 @@ vault_restic_server_ops_repo_password: "REPLACE-with-ops-restic-repo-password"
 # Resend API key for failure notification emails. Same key as
 # cloud-wahlberger-dev and pi-de-int-wahlberger-dev — one Resend account.
 vault_notify_failure_resend_api_key: "REPLACE-with-a-resend-api-key"
+
+# Garage (S3 sstate store) RPC secret: 64 hex characters, shared by the cluster
+# nodes (one node here). S3 access keys are NOT in Vault: the user creates them
+# with the Garage CLI.
+#     openssl rand -hex 32
+vault_garage_rpc_secret: "REPLACE-with-64-hex-characters"
+
+# Garage admin API token (bearer token, written to a root-owned secrets file).
+#     openssl rand -base64 32
+vault_garage_admin_token: "REPLACE-with-a-generated-token"
