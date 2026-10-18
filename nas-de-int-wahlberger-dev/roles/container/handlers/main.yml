@@ -8,12 +8,8 @@
     daemon_reload: true
   when: not ansible_check_mode
 
-- name: Query whether the container unit is installed
-  ansible.builtin.command: "systemctl cat {{ container_name }}.service"  # noqa command-instead-of-module
-  register: container_unit_installed
-  changed_when: false
-  failed_when: false
-  check_mode: false
+- name: Gather service facts for the container unit check
+  ansible.builtin.service_facts:
   when: not ansible_check_mode
   listen: Restart the container service
 
@@ -23,5 +19,5 @@
     state: restarted
   when:
     - not ansible_check_mode
-    - container_unit_installed.rc == 0
+    - (container_name ~ '.service') in ansible_facts.services
   listen: Restart the container service
