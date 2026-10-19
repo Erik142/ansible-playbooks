@@ -12,6 +12,18 @@
     mode: "0644"
   notify: Restart garage
 
+# The dedicated network of Garage and Caddy. It must exist before the
+# container starts. The Quadlet is read at daemon-reload, which the restart
+# handler (and the container role's flushed handler) performs.
+- name: Deploy the Garage network Quadlet
+  ansible.builtin.template:
+    src: garage.network.j2
+    dest: /etc/containers/systemd/garage.network
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart garage
+
 # The container role renders the Quadlet and flushes handlers, so a changed
 # garage.toml or secret restarts the service once the Quadlet exists.
 - name: Deploy the Garage container

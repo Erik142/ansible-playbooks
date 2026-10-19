@@ -6,7 +6,9 @@ ZeroTier/LAN, not a public VM like cloud-wahlberger-dev), so Let's Encrypt
 can't reach it on port 80 to validate a certificate. DNS-01 only needs
 outbound access to Cloudflare's API and Let's Encrypt, which the host already
 has. It also creates the shared `caddy.network` Podman network that backend
-services (`tandoor`, `paperless_ngx`) attach to.
+services (`tandoor`, `paperless_ngx`) attach to. `caddy_extra_networks` (default
+`[]`) lists further Quadlet networks the container joins, for example
+`garage.network`; the role that owns that network must run before this one.
 
 ## Why a custom-built image
 

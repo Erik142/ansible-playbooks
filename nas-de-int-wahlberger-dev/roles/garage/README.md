@@ -35,7 +35,8 @@ naming both flags).
 ## What this role does not do
 
 - It does not publish any Garage port (no `PublishPort=`); Caddy reaches it over
-  `caddy.network`.
+  the dedicated `garage.network` (only Garage and Caddy join it; the role
+  deploys the network Quadlet, and `caddy_extra_networks` makes Caddy join it).
 - It does not create DNS records (`cloudflare_dns` does, from `caddy_sites`).
 - It does not generate or rotate keys; Vault is the source of truth.
 - It does not remove Garage when `garage_enabled` is set back to `false`.
@@ -100,7 +101,7 @@ Read it into the shell without echo and let podman inherit it by name:
 
 ```
 read -rs AWS_SECRET_ACCESS_KEY && export AWS_SECRET_ACCESS_KEY
-podman run --rm --network systemd-caddy -v <dir>:/w:Z \
+podman run --rm --network systemd-garage -v <dir>:/w:Z \
   -e AWS_ACCESS_KEY_ID=<GK...> -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION=garage \
   docker.io/amazon/aws-cli:2.38.1 --endpoint-url http://garage:3900 s3api \
   put-bucket-lifecycle-configuration --bucket sstate --lifecycle-configuration file:///w/lc.json   # spike

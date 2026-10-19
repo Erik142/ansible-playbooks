@@ -3,7 +3,7 @@
 #   garage-v2-state.sh set            user sets a 10 MiB quota on private-test and a lifecycle rule on sstate
 #   garage-v2-state.sh save <dir>     save the four outputs and the lifecycle configuration
 set -uo pipefail
-N=systemd-caddy
+N=systemd-garage
 AWS_IMAGE=docker.io/amazon/aws-cli:2.38.1
 G() { podman exec garage /garage "$@" 2>/dev/null; }
 info=$(G key info --show-secret test-rw)

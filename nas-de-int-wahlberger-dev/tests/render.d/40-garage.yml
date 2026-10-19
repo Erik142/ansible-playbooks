@@ -1,5 +1,5 @@
 ---
-# garage role (T-01): the Quadlet (kind text: systemd-analyze cannot verify
+# garage role (T-01): the Quadlets (container and network) (kind text: systemd-analyze cannot verify
 # .container files). garage_uid/garage_gid are runtime facts (getent), so the
 # item supplies fixture values.
 render_items:
@@ -12,8 +12,9 @@ render_items:
       garage_gid: "990"
     asserts:
       - '^ContainerName=garage$'
-      - '^Network=caddy\.network$'
+      - '^Network=garage\.network$'
       - '(?s)\A(?!.*^Network=.*^Network=)'
+      - '(?s)\A(?!.*^Network=caddy\.network)'
       - '^User=991$'
       - '^Group=990$'
       - '^HealthCmd=\["/garage","status"\]$'
@@ -34,6 +35,14 @@ render_items:
       - '(?s)\A(?!.*^Volume=/mnt/data/garage:)'
       - '(?s)\A(?!.*^Volume=/mnt/containers/garage:)'
       - '(?s)\A(?!.*^Volume=[^\n]*\.btrbk)'
+  - role: garage
+    src: garage.network.j2
+    dest: garage.network
+    kind: text
+    asserts:
+      - '^\[Network\]$'
+      - '^Driver=bridge$'
+      - '(?s)\A(?!.*^Internal=)'
   - role: garage
     src: garage.toml.j2
     dest: garage.toml

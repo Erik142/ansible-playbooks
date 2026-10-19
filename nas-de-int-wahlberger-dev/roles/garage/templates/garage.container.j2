@@ -11,9 +11,11 @@ OnFailure=notify-failure@%n.service
 [Container]
 ContainerName=garage
 Image={{ garage_image }}
-# Only the shared Caddy network: no PublishPort, so no Garage port (3900-3903)
-# is reachable on any host address. Caddy reaches garage:3900 / garage:3902.
-Network=caddy.network
+# Only the dedicated garage.network (Garage and Caddy only): no PublishPort, so
+# no Garage port (3900-3903) is reachable on any host address, and no container
+# on caddy.network or any other network can reach it. Caddy joins garage.network
+# and reaches garage:3900 / garage:3902 there.
+Network=garage.network
 # Numeric ids of {{ garage_user }}: never root. Set at run time (getent).
 User={{ garage_uid }}
 Group={{ garage_gid }}

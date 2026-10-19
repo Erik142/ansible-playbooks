@@ -133,6 +133,9 @@ caddy_sites_base:
     upstream: "forgejo:3000"
   - host: www.de.int.wahlberger.dev
     upstream: "homepage:3000"
+# Caddy joins the dedicated garage.network only while Garage is enabled (the
+# garage role creates the network unit and runs before caddy in site.yml).
+caddy_extra_networks: "{{ ['garage.network'] if garage_enabled | bool else [] }}"
 # The existing sites above plus, only while garage_enabled is true, the one
 # S3 site of GS-FR-32 (body: O-6 of reqs/garage-sstate.md, GS-FR-129).
 caddy_sites: >-

@@ -33,14 +33,14 @@ for b in sstate private-test; do
   G bucket allow "$b" --key test-rw --read --write >/dev/null
 done
 
-# 3. Objects through the S3 API (path-style, region garage) from a container on caddy.network.
+# 3. Objects through the S3 API (path-style, region garage) from a container on garage.network.
 info=$(G key info --show-secret test-rw)
 akid=$(awk -F': *' '/^Key ID/{print $2; exit}' <<<"$info")
 sec=$(awk -F': *' '/^Secret key/{print $2; exit}' <<<"$info")
 w=$(mktemp -d)
 head -c 1048576 /dev/urandom >"$w/up"
 head -c 4096 /dev/urandom >"$w/k"
-s3() { podman run --rm --network systemd-caddy -v "$w":/w:Z \
+s3() { podman run --rm --network systemd-garage -v "$w":/w:Z \
   -e AWS_ACCESS_KEY_ID="$akid" -e AWS_SECRET_ACCESS_KEY="$sec" -e AWS_DEFAULT_REGION=garage \
   -e AWS_EC2_METADATA_DISABLED=true "$AWS_IMAGE" --endpoint-url http://garage:3900 s3api "$@"; }
 s3 put-object --bucket sstate --key selftest/up --body /w/up >/dev/null

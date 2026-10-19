@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Guest half of VM run V2 (T-17). Runs as root in the VM; started by garage-v2-run.sh.
 # Prints one line per check: "R <id> PASS|FAIL <evidence>". Never prints key secrets.
-# Uses the route test Caddy (caddy-route-test) on caddy.network (systemd-caddy).
+# Uses the route test Caddy (caddy-route-test) on garage.network (systemd-garage).
 set -uo pipefail
-N=systemd-caddy
+N=systemd-garage
 AWS_IMAGE=docker.io/amazon/aws-cli:2.38.1
 CURL_IMAGE=docker.io/curlimages/curl:8.11.1
 CADDY_IMAGE=docker.io/library/caddy:2
@@ -60,7 +60,7 @@ aws s3api put-object --bucket private-test --key obj --body /w/obj >/dev/null 2>
 ok GS-AC-07/role "garage status shows a role" "! G status | grep -q 'NO ROLE ASSIGNED' && G status | grep -q dc1"
 head -c $Z /dev/urandom >"$w/up"; S2=$(sha256sum "$w/up" | cut -c1-64)
 c=$(cu -s -o /dev/null -w '%{http_code}' -m 60 --user "$akid:$sec" --aws-sigv4 aws:amz:garage:s3 -H "x-amz-content-sha256: UNSIGNED-PAYLOAD" -T /w/up http://garage:3900/sstate/selftest/up)
-ok GS-AC-07/put "signed 1 MiB PUT selftest/up from caddy.network -> $c" "[ '$c' = 200 ]"
+ok GS-AC-07/put "signed 1 MiB PUT selftest/up from garage.network -> $c" "[ '$c' = 200 ]"
 [ "$c" = 200 ] && { sed -i "s/^[0-9a-f]\{64\}  up\$/$S2  up/" /var/tmp/garage-test-setup.sha256; S=$S2; }
 h=$(cu -sI -m 20 --user "$akid:$sec" --aws-sigv4 aws:amz:garage:s3 -H "x-amz-content-sha256: $EMPTY" http://garage:3900/sstate/selftest/up | tr -d '\r')
 ok GS-AC-07/head "signed HEAD: $(grep -i '^content-length' <<<"$h") (expected $Z)" "grep -qi '^content-length: $Z' <<<\"\$h\""

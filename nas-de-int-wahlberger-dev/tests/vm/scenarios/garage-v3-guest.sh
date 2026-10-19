@@ -8,7 +8,7 @@ creds() {
   local info; info=$(G key info --show-secret test-rw)
   AKID=$(awk -F': *' '/^Key ID/{print $2; exit}' <<<"$info"); SEC=$(awk -F': *' '/^Secret key/{print $2; exit}' <<<"$info")
 }
-s3() { podman run --rm --network systemd-caddy -v "$W":/w:Z \
+s3() { podman run --rm --network systemd-garage -v "$W":/w:Z \
   -e AWS_ACCESS_KEY_ID="$AKID" -e AWS_SECRET_ACCESS_KEY="$SEC" -e AWS_DEFAULT_REGION=garage \
   -e AWS_EC2_METADATA_DISABLED=true "$AWS_IMAGE" --endpoint-url http://garage:3900 s3api "$@"; }
 put() { head -c "${3:-65536}" /dev/urandom >"$W/put.$$"; s3 put-object --bucket sstate --key "$1" --body "/w/put.$$" >/dev/null 2>&1 || { rm -f "$W/put.$$"; return 1; }
@@ -18,7 +18,7 @@ head404() { s3 head-object --bucket sstate --key "$1" >/dev/null 2>"$W/err"; loc
 objcount() { G bucket info sstate | awk -F': *' '/^Objects/{print $2; exit}' | awk '{print $1}'; }
 load_start() { # three parallel uploaders of 64 KiB objects until $W/run disappears
   touch "$W/run"; podman rm -f garage-load >/dev/null 2>&1
-  podman run -d --name garage-load --network systemd-caddy -v "$W":/w:Z \
+  podman run -d --name garage-load --network systemd-garage -v "$W":/w:Z \
     -e AWS_ACCESS_KEY_ID="$AKID" -e AWS_SECRET_ACCESS_KEY="$SEC" -e AWS_DEFAULT_REGION=garage -e AWS_EC2_METADATA_DISABLED=true \
     --entrypoint sh "$AWS_IMAGE" -c 'for w in 1 2 3; do ( i=0; while [ -f /w/run ]; do i=$((i+1)); head -c 65536 /dev/urandom >/tmp/f$w; aws --endpoint-url http://garage:3900 s3api put-object --bucket sstate --key load/$w-$i --body /tmp/f$w >/dev/null 2>&1; done ) & done; wait' >/dev/null
 }

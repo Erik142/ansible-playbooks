@@ -27,6 +27,11 @@ argument_specs:
         type: str
         required: false
         description: Email for Let's Encrypt registration (optional).
+      caddy_extra_networks:
+        type: list
+        elements: str
+        required: false
+        description: Quadlet network units (for example garage.network) the Caddy container joins in addition to caddy.network.
       caddy_sites:
         type: list
         elements: dict
