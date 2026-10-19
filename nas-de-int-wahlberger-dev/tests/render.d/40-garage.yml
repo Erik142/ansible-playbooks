@@ -24,7 +24,7 @@ render_items:
       - '^WantedBy=default\.target$'
       - '^RequiresMountsFor=/mnt/data /mnt/containers/garage$'
       - '^Environment=GARAGE_CONFIG_FILE=/mnt/containers/garage/garage\.toml$'
-      - '^Image=docker\.io/dxflrs/garage:v2\.4\.1$'
+      - '^Image=docker\.io/dxflrs/garage:v2\.4\.1@sha256:[0-9a-f]{64}$'
       - '^Volume=/mnt/data/garage/data:/mnt/data/garage/data:Z$'
       - '^Volume=/mnt/containers/garage/meta:/mnt/containers/garage/meta:Z$'
       - '^Volume=/mnt/containers/garage/garage\.toml:\S*garage\.toml:ro$'

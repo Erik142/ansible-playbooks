@@ -14,8 +14,10 @@
 # Off until the enable preconditions hold (GS-FR-61, GS-FR-115 to GS-FR-120).
 garage_enabled: false
 
-# Single line, matched by the Renovate custom manager in renovate.json.
-garage_image: docker.io/dxflrs/garage:v2.4.1
+# Single line, matched by the Renovate custom manager in renovate.json. Tag plus
+# digest of the multi-arch index (skopeo inspect --override-os linux), so the
+# pull is immutable and Renovate keeps both in step.
+garage_image: docker.io/dxflrs/garage:v2.4.1@sha256:9c96caa2612d3411acc5b0e6701fb238dbfba33e533a6d7d3d811a4b12d0d020
 
 # Data subvolume: a direct child of the data filesystem mount.
 garage_mount_path: /mnt/data

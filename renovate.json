@@ -7,7 +7,7 @@
       "customType": "regex",
       "managerFilePatterns": ["/(^|/)roles/[^/]+/defaults/main\\.ya?ml$/"],
       "matchStrings": [
-        "(?:^|\\n)\\w+_image:\\s*\"?(?<depName>[a-z0-9./_-]+):(?<currentValue>[\\w.-]+)\"?[ \\t]*"
+        "(?:^|\\n)\\w+_image:\\s*\"?(?<depName>[a-z0-9./_-]+):(?<currentValue>[\\w.-]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?\"?[ \\t]*"
       ],
       "datasourceTemplate": "docker"
     },
