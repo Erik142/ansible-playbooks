@@ -1,11 +1,11 @@
 ## Feature: Provide a Garage S3 store on the NAS (first bucket: Yocto sstate)
-status:            draft
+status:            ready
 priority:          should
-version:           1.3
+version:           1.6
 quality-pillars:   4,4,3,4,4,5,4,5
 quality-reviewed:  2026-10-18
 
-Open Questions: GS-Q-17 (blocking GS-AC-46 only); all others resolved, see "Resolved questions". accepted risks are GS-R-01 to GS-R-03. Final requirements-auditor verdict READY, 0 blocking (2026-10-17); 0.7 is an editorial pass on that verdict, 0.8 records the spike T-03 result (`tests/spikes/garage-caddy-routing.md`), 0.9 three implementation points from task T-01, 1.0 the secret-handling pattern for assert tasks (T-07), 1.1 Erik's scope change: Ansible sets up only the Garage service; everything the Garage or S3 CLI can do is left to the user (GS-CC-40), 1.2 a cleanup after the re-audit of 1.1 (GS-CC-41), 1.3 two corrections from VM run V1 (GS-CC-42). Status is `draft` while GS-Q-17 is open. IDs carry the prefix `GS-`. IDs marked "[Deleted 0.x]" are kept and never reused. "[Amended 0.x]" marks an entry whose text changed in that version, "[New 0.x]" an entry added in it; "split from" names the FR a new ID was cut out of. The changes from 0.1 to 1.2 are listed under "Contract changes from 0.1" to "... from 1.2", and in the change log at the end of this file.
+Open Questions are empty (all resolved, see "Resolved questions"); accepted risks are GS-R-01 to GS-R-03. Final requirements-auditor verdict READY, 0 blocking (2026-10-17); 0.7 is an editorial pass on that verdict, 0.8 records the spike T-03 result (`tests/spikes/garage-caddy-routing.md`), 0.9 three implementation points from task T-01, 1.0 the secret-handling pattern for assert tasks (T-07), 1.1 Erik's scope change: Ansible sets up only the Garage service; everything the Garage or S3 CLI can do is left to the user (GS-CC-40), 1.2 a cleanup after the re-audit of 1.1 (GS-CC-41), 1.3 two corrections from VM run V1 (GS-CC-42), 1.4 three wording fixes from VM runs V2 and V3 (GS-CC-43), 1.5 the GS-Q-17 decision (GS-CC-44), 1.6 the merged security fixes: dedicated network, web-route headers, image digest (GS-CC-45). IDs carry the prefix `GS-`. IDs marked "[Deleted 0.x]" are kept and never reused. "[Amended 0.x]" marks an entry whose text changed in that version, "[New 0.x]" an entry added in it; "split from" names the FR a new ID was cut out of. The changes from 0.1 to 1.5 are listed under "Contract changes from 0.1" to "... from 1.5", and in the change log at the end of this file.
 
 ### Problem Statement
 
@@ -36,7 +36,7 @@ The Yocto / meta-sluss build hosts and the netcup CI runner share no sstate cach
 - GS-F-09: NAS LAN address `10.10.0.100` (`ops-de-wahlberger-dev/docs/zerotier-flow-rules.md`). ZeroTier-to-LAN traffic is not NATed. Only the ops VM's ZeroTier traffic is filtered. All other members have Central's accept-all behaviour.
 - GS-F-10: The Renovate custom manager in the top-level `renovate.json` matches `<name>_image: registry/repo:tag` lines in `roles/*/defaults/main.yml`.
 - GS-F-11: `disk_space` checks `/`, `/mnt/data`, `/mnt/containers` and `/mnt/backup/btrbk` every 15 min. It emails when usage crosses `disk_space_threshold_percent` (85).
-- GS-F-12: Caddy sets no request-body limit and no upstream timeout by default (`vars.yml`, Forgejo comment). Every site on `caddy.network` reaches its upstream by container name.
+- GS-F-12: Caddy sets no request-body limit and no upstream timeout by default (`vars.yml`, Forgejo comment). Every site on `caddy.network` reaches its upstream by container name. [Amended 1.6: Garage is the exception; Caddy reaches it on `garage.network`, GS-FR-143.]
 - GS-F-13 [New 0.3]: The NAS SSH host key matches the existing `known_hosts` entry for `nas.de.int.wahlberger.dev` (ED25519, `SHA256:uTBodckkm18YMLjOM356EYKJmoexQzSfYH+A8ePL80w`), checked by Erik on 2026-10-17 (GS-Q-01, GS-P-02).
 - GS-F-14 [New 0.3]: `/mnt/data` is btrfs, subvolume `@data` on `/dev/sdb1`, an HDD: 5.5T, 76G used (Erik's check on the NAS, 2026-10-17).
 - GS-F-15 [New 0.3]: `/mnt/containers` is btrfs on `/dev/nvme0n1p1`, the NVMe: 1.8T, 3G used; `findmnt` reports `btrfs` (same check). It is a different filesystem from `/mnt/data` (`storage_mounts` lists different UUIDs).
@@ -61,7 +61,7 @@ The Yocto / meta-sluss build hosts and the netcup CI runner share no sstate cach
 - **API route** [New 0.3]: the S3 host's route for every other request. Caddy forwards it to Garage's S3 API (`garage:3900`) with path, query and `Host` unchanged (GS-FR-94). Garage accepts only signed requests there (W1).
 - **user-owned state** [New 1.1]: the node layout, buckets, access keys, grants, quotas, website flags and lifecycle rules. The user creates and changes them with the Garage CLI or an S3 client; the role never touches them (GS-BR-15).
 - **test setup** [New 1.1] [V]: the step that, before the [V] scenarios that need data, runs the README layout steps and creates with the Garage CLI the buckets `sstate` (website access) and `private-test` (no website access), the key `test-rw` with read and write on both, and the object `selftest/up` (GS-FR-68). It stands in for the user.
-- **route test Caddy** [New 0.3] [V]: a disposable container `caddy-route-test` from `caddy_image` on `caddy.network`. Its Caddyfile consists of `http://:8080 { <rendered body of the S3 host site> }`. It exists only during the test and reaches the same Garage. It is used because Caddy on [V] has no real certificate.
+- **route test Caddy** [Amended 1.6] [V]: a disposable container `caddy-route-test` from `caddy_image` on `garage.network` [Amended 1.6] (on `caddy.network` it cannot reach Garage, GS-FR-145). Its Caddyfile consists of `http://:8080 { <rendered body of the S3 host site> }`. It exists only during the test and reaches the same Garage. It is used because Caddy on [V] has no real certificate.
 - **[S] / [V] / [H]**: where a scenario runs. [S] means static, in the repository. [V] means on the VM fixture (`inventories/vm`, two btrfs disks for `/mnt/data` and `/mnt/containers`). [H] means on production. On [V], Caddy has no real certificate (fake Cloudflare token), so [V] scenarios reach Garage directly or through the route test Caddy.
 
 #### Contract changes from 0.1 (implementers and tests must follow)
@@ -147,6 +147,18 @@ Note [New 1.2]: GS-CC-01 to GS-CC-39 are the history of earlier versions. Entrie
 
 - GS-CC-42 [New 1.3] (VM run V1, T-16): (1) GS-FR-16, O-2, GS-AC-36 and GS-AC-38 use the exec form `HealthCmd=["/garage","status"]`; the shell form fails because the image has no `/bin/sh` (verified by hand on the VM). (2) The VM fixture domain is `s3.de.int.wahlberger.dev` (GS-FR-65, GS-AC-38), because GS-FR-135 refuses `s3.example.test`. Open item GS-Q-17 (shared `roles/container` restart handler on a fresh host, GS-AC-46) is recorded for Erik; status is `draft` until it is answered.
 
+#### Contract changes from 1.3 (in 1.4; implementers and tests must follow)
+
+- GS-CC-43 [New 1.4] (VM runs V2 and V3): (1) GS-FR-134 and GS-AC-67 compare the pair (filesystem UUID, root ID), because btrfs root IDs repeat across filesystems (`/var/lib/garage/secrets` and `/mnt/data/garage` both have 258 on the VM). (2) GS-AC-73 compares the saved and new outputs as line sets in any row order. (3) The restore (GS-FR-77, GS-AC-55) uses `btrfs send | btrfs receive` into staging directories and then writable snapshots, because a snapshot straight from the backup disk fails with "Invalid cross-device link".
+
+#### Contract changes from 1.4 (in 1.5; implementers and tests must follow)
+
+- GS-CC-44 [New 1.5]: GS-Q-17 closed with option (a) (Erik, 2026-10-18; commit 21090f9): new GS-FR-142 records the guarded restart handlers (shared `roles/container` handler and the `garage` role's "Restart garage": nothing in check mode, restart only if the unit is installed). GS-FR-85 and GS-AC-46 refer to it. The shared handler change reaches every service that uses `roles/container`. Status is `ready` again.
+
+#### Contract changes from 1.5 (in 1.6; implementers and tests must follow)
+
+- GS-CC-45 [New 1.6] (security fixes merged in the PR; commits d0cce7a, e37840b, dade0f9): (1) Garage moves from `caddy.network` to a dedicated `garage.network` that only Garage and Caddy join; Caddy keeps `caddy.network` for the other services (GS-FR-22, GS-FR-143 to GS-FR-145, O-2, O-12, GS-AC-11, GS-AC-38, GS-AC-77; [V] test containers and the route test Caddy now use `garage.network`). The `garage` role now runs before `caddy` in `site.yml` (GS-FR-60, GS-BR-10, GS-AC-39), and the `caddy` role gains the input `caddy_extra_networks` (GS-FR-144). Replaces the `caddy.network` statements of earlier versions (GS-FR-22, O-2, GS-A-08, GS-A-14, Terms). (2) The web route adds `header X-Content-Type-Options nosniff` and `header Content-Security-Policy "sandbox"` (O-6, GS-FR-146, GS-AC-48, GS-AC-78). (3) `garage_image` pins the index digest `sha256:9c96caa2612d3411acc5b0e6701fb238dbfba33e533a6d7d3d811a4b12d0d020` next to the tag (GS-FR-10, Inputs, GS-AC-44). VM evidence: `tests/vm/results/garage-decided-items.md`.
+
 #### External preconditions (not deliverables of this feature)
 
 - GS-P-01 [Amended 0.3]: A ZeroTier flow rule limits the netcup CI member `10.243.73.1` (GS-F-17) to the NAS's `:443` (W1). Owner: Erik, by hand in ZeroTier Central. It is recorded in `ops-de-wahlberger-dev/docs/zerotier-flow-rules.md`. Until it exists, the netcup flow is blocked (GS-BR-08). The LAN build hosts do not depend on it.
@@ -161,7 +173,7 @@ Note [New 1.2]: GS-CC-01 to GS-CC-39 are the history of earlier versions. Entrie
 | Ansible control host | System | Erik's Mac or Semaphore on ops-de-wahlberger-dev; applies `site.yml` |
 | `garage` role | System | New role in this repository; creates the two subvolumes, the secrets, `garage.toml` and the Quadlet, and checks that Garage runs. It creates no Garage state [Amended 1.1] |
 | Garage | System | Container `garage` (`docker.io/dxflrs/garage:v2.4.1`) on the NAS: S3 API, s3_web, RPC and admin endpoints |
-| Caddy (`caddy` role) | System | Existing reverse proxy on `caddy.network`; serves TLS (DNS-01) for the S3 host and splits its requests into the web route and the API route |
+| Caddy (`caddy` role) | System | Existing reverse proxy on `caddy.network`, and on `garage.network` for the Garage upstream [Amended 1.6]; serves TLS (DNS-01) for the S3 host and splits its requests into the web route and the API route |
 | Build host | System | Yocto/BitBake host on the LAN or ZeroTier; reads through the web route and uploads through the API route with a key the user created |
 | netcup CI runner | System | `forgejo_runner` on netcup-ci-wahlberger-dev (`10.243.73.1`), over ZeroTier; uploads and reads like a build host (blocked until GS-P-01) |
 | btrbk | System | Existing role; snapshots the two Garage subvolumes and replicates them to the backup disk |
@@ -205,7 +217,14 @@ Note [New 1.2]: GS-CC-01 to GS-CC-39 are the history of earlier versions. Entrie
 - GS-FR-90 [Must] [New 0.3] (`btrbk` role contract change, approved 2026-10-17): `btrbk_sources` entries shall accept an optional key `snapshot_dir` (absolute path). Where it is set, `btrbk.conf` shall place that source's snapshots in `snapshot_dir`. Entries without it keep `<path>/<btrbk_snapshot_dirname>` (GS-F-19, GS-A-18).
 - GS-FR-91 [Must] [New 0.3] (`btrbk` role contract change, approved 2026-10-17): After the mount guard passes, the btrbk role shall create each per-source `snapshot_dir` with `root:root 0700`, instead of `<path>/<btrbk_snapshot_dirname>` for that source.
 - GS-FR-92 [Must] [New 0.3] (`btrbk` role contract change, approved 2026-10-17): If a per-source `snapshot_dir` is not absolute, is at or below `samba_data_dir`, is at or below the source `path`, or is on another mount than the source (`findmnt --noheadings --output TARGET --target` reports different targets for the parent of `snapshot_dir` and for `path`), the btrbk role shall fail before any change.
-- GS-FR-77 [Must] [Amended 0.7, label aligned with GS-FR-118]: The role README shall describe the restore of the store: stop `garage.service`; restore `data/` from `/mnt/backup/btrbk/garage/garage.<ts>` and the metadata subvolume content from `/mnt/backup/btrbk/garage-meta/garage-meta.<ts>`, both with the same `<ts>` (GS-BR-11); re-render the secret files from Vault with `ansible-playbook site.yml --tags garage` (they are not in any backup, GS-BR-14); start the service; run `garage status` and `garage block list-errors`, which exits 0 and prints only its header line `Hash  RC  Errors  Last error  Next try` when no block has an error (verified in spike T-02, `tests/spikes/garage-v2.4.1-cli-config.md`).
+- GS-FR-77 [Must] [Amended 1.4]: The role README shall describe the restore of the store, using the `garage` and `garage-meta` snapshots with the same `<ts>` (GS-BR-11). A `btrfs subvolume snapshot` straight from the backup disk fails with "Invalid cross-device link" (VM run V3), so the steps are:
+  1. stop `garage.service`;
+  2. receive each backup snapshot into a staging directory on the target filesystem, outside the store and outside Samba: `btrfs send /mnt/backup/btrbk/garage/garage.<ts> | btrfs receive /mnt/data/.garage-restore/` and `btrfs send /mnt/backup/btrbk/garage-meta/garage-meta.<ts> | btrfs receive /mnt/containers/.garage-restore-meta/` (the received snapshots are read-only);
+  3. move the current subvolumes aside (`/mnt/data/garage` and `/mnt/containers/garage/meta` to `<path>.pre-restore-<date>`);
+  4. create writable snapshots in their place: `btrfs subvolume snapshot /mnt/data/.garage-restore/garage.<ts> /mnt/data/garage` and `btrfs subvolume snapshot /mnt/containers/.garage-restore-meta/garage-meta.<ts> /mnt/containers/garage/meta`;
+  5. re-render the secret files from Vault with `ansible-playbook site.yml --tags garage` (they are not in any backup, GS-BR-14);
+  6. start the service; run `garage status` and `garage block list-errors`, which exits 0 and prints only its header line `Hash  RC  Errors  Last error  Next try` when no block has an error (verified in spike T-02, `tests/spikes/garage-v2.4.1-cli-config.md`);
+  7. after the check, delete the staging subvolumes and the `.pre-restore-<date>` subvolumes with `btrfs subvolume delete`. If btrbk finds no common parent for the restored subvolumes, its next run sends a full copy of each Garage source; the `disk_space` alert (GS-NFR-03) covers the space.
 - GS-FR-110 [Must] [Amended 0.7] (task, cross-feature): [backup-btrbk-and-db-dump.md](backup-btrbk-and-db-dump.md) shall be updated by its own refactor in these places:
   - BD-FR-51 (snapshots in `<source path>/<btrbk_snapshot_dirname>`): add "or in the entry's `snapshot_dir` where set" (GS-FR-90 to GS-FR-92);
   - the Inputs row `btrbk_sources` ("Each path is a `storage_mounts` path"): add the optional keys `mount_path` (a `storage_mounts` path; `path` is a btrfs subvolume below it, checked with `btrfs subvolume show`) and `snapshot_dir` (GS-FR-75, GS-FR-76);
@@ -214,7 +233,7 @@ Note [New 1.2]: GS-CC-01 to GS-CC-39 are the history of earlier versions. Entrie
 
 #### C. Garage service
 
-- GS-FR-10 [Must]: `roles/garage/defaults/main.yml` shall pin `garage_image: docker.io/dxflrs/garage:v2.4.1` on a single line. The tag shall never be `latest`.
+- GS-FR-10 [Must] [Amended 1.6] (commit dade0f9): `roles/garage/defaults/main.yml` shall pin `garage_image: docker.io/dxflrs/garage:v2.4.1@sha256:9c96caa2612d3411acc5b0e6701fb238dbfba33e533a6d7d3d811a4b12d0d020` on a single line: the tag and the index (multi-arch) digest, resolved with `skopeo`. The tag shall never be `latest`.
 - GS-FR-18 [Should]: The `garage_image` line shall match the Renovate custom-manager regex in the top-level `renovate.json` (GS-F-10).
 - GS-FR-11 [Must]: The role shall render `garage.toml` from `roles/garage/templates/garage.toml.j2` with exactly the keys and values in Output O-1.
 - GS-FR-137 [Must] [New 1.1]: After the role has run and the user has run the README layout steps (GS-FR-139), a bucket and key the user creates with the Garage CLI shall accept signed uploads and downloads through the API route, with no further Ansible change.
@@ -223,10 +242,13 @@ Note [New 1.2]: GS-CC-01 to GS-CC-39 are the history of earlier versions. Entrie
 - GS-FR-20 [Must] [Amended 0.5]: The role shall write the RPC secret to `<garage_secrets_dir>/rpc_secret` and the admin token to `<garage_secrets_dir>/admin_token`, each owned by `<garage_user>:<garage_user>` with mode `0400` (GS-A-03, GS-Q-15 closed).
 - GS-FR-132 [Must] [New 0.5]: `garage_secrets_dir` shall be a directory owned by `root:<garage_user>` with mode `0750`.
 - GS-FR-133 [Must] [Amended 1.1]: The only Garage secret files on the host shall be `rpc_secret` and `admin_token` in `garage_secrets_dir`.
-- GS-FR-134 [Must] [New 0.5]: Before any change, the role shall check that no btrbk source and no snapper config covers `garage_secrets_dir`: where the path (or, before it exists, its nearest existing parent) is on btrfs, `btrfs inspect-internal rootid` of it shall differ from the root ID of every `btrbk_sources` path and of every subvolume listed by `snapper list-configs`. If the check fails, the role shall fail before any change, naming the path and the covering source or config (GS-E-32). For the default `/var/lib/garage/secrets` the check passes (GS-F-22).
+- GS-FR-134 [Must] [Amended 1.4]: Before any change, the role shall check that no btrbk source and no snapper config covers `garage_secrets_dir`: where the path (or, before it exists, its nearest existing parent) is on btrfs, its pair (filesystem UUID from `findmnt -no UUID -T <path>`, root ID from `btrfs inspect-internal rootid <path>`) shall differ from the same pair of every `btrbk_sources` path and of every subvolume listed by `snapper list-configs`. A root ID alone is not enough: it is unique only within one filesystem (VM run V3: `/var/lib/garage/secrets` and `/mnt/data/garage` both have root ID 258 on different filesystems). If the check fails, the role shall fail before any change, naming the path and the covering source or config (GS-E-32). For the default `/var/lib/garage/secrets` the check passes (GS-F-22).
 - GS-FR-21 [Must] [Amended 1.0]: Every task that receives a secret value shall set `no_log: true`. This covers the secret files [Amended 1.1: key and lifecycle tasks no longer exist]. Approved exception for assert-only input checks (GS-CC-39): an `ansible.builtin.assert` task may omit `no_log` when its `that` conditions are untemplated expressions that read the secret variable (no `{{ }}`, so the echoed `assertion` text holds no value), its `fail_msg` and `success_msg` are static text that names the variable and never templates a secret, and it sets `quiet: true`. GS-AC-23 and GS-AC-25 prove that no fixture secret value appears in the output.
 - GS-FR-13 [Must]: The Quadlet shall contain no `PublishPort=` line: no Garage port (3900 to 3903) is published on any host address (GS-CC-03, W1).
-- GS-FR-22 [Must]: The Quadlet shall set `ContainerName=garage` and attach the container to `caddy.network` only.
+- GS-FR-22 [Must] [Amended 1.6]: The Quadlet shall set `ContainerName=garage` and attach the container to `garage.network` only (`Network=garage.network`).
+- GS-FR-143 [Must] [New 1.6] (commit d0cce7a): The role shall deploy the Quadlet network unit `/etc/containers/systemd/garage.network` (`[Network]`, `Driver=bridge`). Only Garage and Caddy join it.
+- GS-FR-144 [Must] [New 1.6] (commit d0cce7a): Production `vars.yml` shall set `caddy_extra_networks` (a `caddy` role input added in d0cce7a, default `[]`; Caddy joins each listed network) to `['garage.network']` only while `garage_enabled` is true. Caddy keeps `caddy.network` for the other services.
+- GS-FR-145 [Must] [New 1.6] (commit d0cce7a): Garage's ports 3900 and 3902 shall be unreachable from `caddy.network` and from every network other than `garage.network`: the name `garage` does not resolve there, and a direct connection to Garage's `garage.network` address does not connect.
 - GS-FR-23 [Must] [Amended 0.5]: Garage's S3 API shall listen on `0.0.0.0:3900` inside the container's network namespace (O-1).
 - GS-FR-108 [Must] [New 0.5, split from GS-FR-23]: Garage's s3_web endpoint shall listen on `0.0.0.0:3902` inside the container's network namespace.
 - GS-FR-109 [Must] [New 0.5, split from GS-FR-23]: Garage's RPC endpoint shall listen on `127.0.0.1:3901`, the container's loopback.
@@ -242,13 +264,14 @@ Note [New 1.2]: GS-CC-01 to GS-CC-39 are the history of earlier versions. Entrie
 - GS-FR-16 [Must] [Amended 1.3]: The Quadlet shall set the health check in exec form, `HealthCmd=["/garage","status"]`. The shell form `HealthCmd=/garage status` fails because Podman runs it through `/bin/sh` (CMD-SHELL) and the image has no shell (spike T-02; verified by hand on the VM in run V1, T-16 report).
 - GS-FR-80 [Should]: The Quadlet shall set `HealthOnFailure=kill`, so that `Restart=always` restarts an unhealthy container.
 - GS-FR-17 [Must]: The role shall deploy `garage.container` through the `container` role with `Restart=always` and `WantedBy=default.target`.
+- GS-FR-142 [Must] [New 1.5] (GS-Q-17 decided, option (a); commit 21090f9): The restart handlers that a Quadlet change notifies, the shared `roles/container` handler "Restart the container service" and the `garage` role handler "Restart garage", shall not fail on a host where the unit is not installed yet. In check mode they do nothing. In a real apply they reload systemd, read service facts, and restart the unit only if the facts list it. The shared handler change applies to every service that uses `roles/container`.
 - GS-FR-81 [Must]: The Quadlet shall set `OnFailure=notify-failure@%n.service`, the flap-limited variant used by `restic-server`.
 - GS-FR-82 [Must]: The Quadlet shall set `RequiresMountsFor=` to `garage_mount_path` and `garage_config_dir`.
 - GS-FR-19 [Must]: The Quadlet shall not set `SecurityLabelDisable=true`.
 - GS-FR-138 [Must] [New 1.1]: The role shall run no Garage or S3 command that creates, changes or deletes a layout, bucket, access key, grant, quota, website flag or lifecycle rule. Its only Garage CLI call is `garage status` (GS-FR-29, GS-BR-15).
 - GS-FR-83 [Must]: The role shall create `garage_user` as a system account: UID below 1000, shell `/usr/sbin/nologin`.
 - GS-FR-84 [Should]: The role README shall record the image's built-in user, read with `podman run --rm docker.io/dxflrs/garage:v2.4.1 id`. If the image has no `id` binary, use `podman image inspect --format '{{.Config.User}}' docker.io/dxflrs/garage:v2.4.1` instead; empty output means root.
-- GS-FR-85 [Should] [Amended 1.1]: In check mode, on a host where `garage.service` is not running yet, the role shall skip the readiness wait (GS-FR-29) instead of failing.
+- GS-FR-85 [Should] [Amended 1.5]: In check mode, on a host where `garage.service` is not running yet, the role shall skip the readiness wait (GS-FR-29) instead of failing; the restart handlers follow GS-FR-142.
 
 #### D. Read path (option B, decided 2026-10-17; addressing amended in 0.3, decision A)
 
@@ -260,6 +283,7 @@ Note [New 1.2]: GS-CC-01 to GS-CC-39 are the history of earlier versions. Entrie
 - GS-FR-129 [Must] [New 0.5]: Production `vars.yml` shall define `caddy_sites` as its existing entries unchanged, followed by the entry of GS-FR-32 only when `garage_enabled | bool` is true (same Jinja pattern as GS-FR-126).
 - GS-FR-93 [Must] [New 0.3] (web route): When a request to the S3 host has method `GET` or `HEAD`, carries no `Authorization` header and no `X-Amz-Signature` query parameter, and its path matches `^/([^/]+)(/.*)?$`, Caddy shall forward it to `garage:3902` with the first path segment removed from the path and the `Host` header set to that segment (GS-A-15, GS-A-16).
 - GS-FR-94 [Must] [New 0.3] (API route): Caddy shall forward every other request to the S3 host to `garage:3900` with path, query and `Host` header unchanged.
+- GS-FR-146 [Must] [New 1.6] (commit e37840b): Every response of the web route shall carry the headers `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox`, set by Caddy (O-6), so that a browser does not run content from a public bucket in the S3 host's origin.
 - GS-FR-38 [Must] [Amended 0.8]: `garage.toml` shall set `[s3_web] root_domain = "{{ garage_s3_domain }}"`, without a leading dot. Garage v2.4.1 refuses to start without it, and the bare-`Host` bucket mapping of the web route works with it (GS-A-01, GS-A-15, verified by spike T-03).
 - GS-FR-33 [Deleted 1.1]: `mirror-read` key; user-owned (GS-CC-40).
 - GS-FR-34 [Must] [Amended 1.1]: The role README shall give consumers the S3 settings: endpoint `https://s3.de.int.wahlberger.dev`, path-style addressing, region `garage`, and, once the user has enabled a bucket for website access, the mirror line `SSTATE_MIRRORS ?= "file://.* https://s3.de.int.wahlberger.dev/<bucket>/PATH"` (for example `<bucket>` = `sstate`).
@@ -287,7 +311,7 @@ Note [New 1.2]: GS-CC-01 to GS-CC-39 are the history of earlier versions. Entrie
 
 #### G. Wiring
 
-- GS-FR-60 [Must]: `site.yml` shall run `- role: garage` with `tags: [garage]` and `when: garage_enabled | bool`, placed after `caddy` and before `btrbk` (GS-BR-10).
+- GS-FR-60 [Must] [Amended 1.6] (commit d0cce7a): `site.yml` shall run `- role: garage` with `tags: [garage]` and `when: garage_enabled | bool`, placed before `caddy` (it creates `garage.network`, which the Caddy container joins) and before `btrbk` (GS-BR-10).
 - GS-FR-61 [Must] [Amended 1.1]: `garage_enabled` shall default to `false` in the role defaults. Production `vars.yml` sets it to `true` only when GS-FR-115 to GS-FR-118 and GS-FR-120 hold.
 - GS-FR-115 [Must] [New 0.5, split from GS-FR-61]: Production `garage_enabled` shall be set to `true` only after the `btrbk` role changes (GS-FR-75, GS-FR-76, GS-FR-90 to GS-FR-92) are merged.
 - GS-FR-116 [Must] [New 0.5, split from GS-FR-61]: Production `garage_enabled` shall be set to `true` only after the `caddy` role change (GS-FR-95 to GS-FR-97, GS-FR-130) is merged.
@@ -337,7 +361,7 @@ Note [New 1.2]: GS-CC-01 to GS-CC-39 are the history of earlier versions. Entrie
 - GS-BR-07 [Deleted 1.1]: The role compares no keys (GS-CC-40).
 - GS-BR-08: The ZeroTier rule GS-P-01 does not exist -> the netcup runner is not configured to use the store.
 - GS-BR-09 [Amended 1.1]: The user has enabled a bucket for website access -> every client that reaches the S3 host can read every object of it with an unsigned `GET` or `HEAD` on the web route. A bucket without website access -> only requests signed with a key that has a read grant can read; unsigned reads get 404.
-- GS-BR-10: The `garage` role runs before `btrbk` in `site.yml` -> both Garage subvolumes exist before btrbk checks or snapshots them.
+- GS-BR-10 [Amended 1.6]: The `garage` role runs before `caddy` and before `btrbk` in `site.yml` -> `garage.network` exists before Caddy joins it, and both Garage subvolumes exist before btrbk checks or snapshots them.
 - GS-BR-11 [New 0.3]: A restore of the store uses the `garage` and `garage-meta` snapshots of the same btrbk run (same `<ts>`) -> snapshots of different runs are never combined (GS-FR-77).
 - GS-BR-12 [Deleted 1.1]: Retention is user-owned (GS-CC-40).
 - GS-BR-13 [Deleted 1.1]: Quotas are user-owned (GS-CC-40); README recommendation in GS-FR-140.
@@ -349,7 +373,7 @@ Note [New 1.2]: GS-CC-01 to GS-CC-39 are the history of earlier versions. Entrie
 | Name | Type | Required | Default | Constraints |
 |---|---|---|---|---|
 | `garage_enabled` | bool | no | `false` | `site.yml` gate (GS-FR-60, GS-FR-61) |
-| `garage_image` | str | no | `docker.io/dxflrs/garage:v2.4.1` | Fully qualified; tag is not `latest`; single line (GS-FR-10) |
+| `garage_image` [Amended 1.6] | str | no | `docker.io/dxflrs/garage:v2.4.1@sha256:9c96caa2612d3411acc5b0e6701fb238dbfba33e533a6d7d3d811a4b12d0d020` | Fully qualified; tag is not `latest`; index digest pinned; single line (GS-FR-10) |
 | `garage_mount_path` | path | no | `/mnt/data` | Equals a `storage_mounts` path; btrfs (GS-FR-01); mount of the data subvolume |
 | `garage_store_path` | path | no | `{{ garage_mount_path }}/garage` | Data subvolume; direct child of `garage_mount_path`; not at or below `samba_data_dir`, `.snapshots` or a `.btrbk*` directory |
 | `garage_meta_mount_path` [New 0.3] | path | no | `/mnt/containers` | Equals a `storage_mounts` path; btrfs (GS-FR-01); mount of the metadata subvolume |
@@ -371,6 +395,7 @@ Note [New 1.2]: GS-CC-01 to GS-CC-39 are the history of earlier versions. Entrie
 | `garage_s3_publish_ip` | — | — | — | [Deleted 0.3] W3 only; W1 is final (GS-CC-21) |
 | `garage_allowed_sources` | — | — | — | [Deleted 0.3] W2 only; W1 is final (GS-CC-21) |
 | Vault [Amended 1.1]: `vault_garage_rpc_secret`, `vault_garage_admin_token` | str | yes | none | Formats above; stored in the existing `vault.yml`, encrypted with the 1Password item `Ansible Vault - nas-de-int-wahlberger-dev` (GS-P-03, GS-Q-10 closed). The S3-key entries of 0.4 are deleted (GS-CC-40) |
+| `caddy_extra_networks` [New 1.6] (`caddy` role) | list[str] | no | `[]`; production `['garage.network']` while `garage_enabled` is true | Extra Quadlet networks Caddy joins besides `caddy.network` (GS-FR-144) |
 | `caddy_sites[].body` [New 0.3] (`caddy` role) | str | no | none | Raw site-block body; excludes `upstream` and `extra` (GS-FR-95, GS-FR-97; approved 2026-10-17) |
 | `btrbk_sources[].mount_path` [New 0.3] (`btrbk` role) | path | no | none | A `storage_mounts` path; `path` must be below it (GS-FR-75, GS-FR-76) |
 | `btrbk_sources[].snapshot_dir` [New 0.3] (`btrbk` role) | path | no | none (`<path>/<btrbk_snapshot_dirname>`) | Absolute; not at or below `samba_data_dir` or `path`; same mount as `path` (GS-FR-90 to GS-FR-92) |
@@ -398,8 +423,8 @@ O-1 [Amended 0.3] `garage.toml` at `<garage_config_dir>/garage.toml`, `root:root
 | `[admin] admin_token_file` | `"<garage_secrets_dir>/admin_token"` (container path equals host path) |
 | `[k2v_api]`, inline `rpc_secret`, inline `admin_token` | absent |
 
-O-2 [Amended 0.5] Quadlet `/etc/containers/systemd/garage.container`:
-- `ContainerName=garage`, `Image=<garage_image>`, `Network=caddy.network` (only), `User=`/`Group=` numeric `garage_user` IDs;
+O-2 [Amended 1.6] Quadlet `/etc/containers/systemd/garage.container`:
+- `ContainerName=garage`, `Image=<garage_image>`, `Network=garage.network` (only), `User=`/`Group=` numeric `garage_user` IDs;
 - `Volume=` for `/mnt/data/garage/data` and `/mnt/containers/garage/meta` (`:Z`), `garage.toml` (`:ro`) and `garage_secrets_dir` (`:ro`);
 - `HealthCmd=["/garage","status"]` (exec form), `HealthOnFailure=kill`;
 - `RequiresMountsFor=<garage_mount_path> <garage_config_dir>`, `OnFailure=notify-failure@%n.service`, `Restart=always`, `WantedBy=default.target`;
@@ -409,7 +434,7 @@ O-3 [Amended 0.3]: data subvolume `/mnt/data/garage` with `data/`; metadata subv
 O-4 [Amended 0.5]: `garage_secrets_dir` (`root:<garage_user> 0750`) with `rpc_secret` and `admin_token`, each `0400`, owned by `garage_user`; in no snapshot or backup (GS-BR-14).
 O-5 [Amended 1.1]: Garage state: none. The role creates no layout, bucket, key, grant, quota, website flag or lifecycle rule; Garage runs with no layout until the user runs the README steps (GS-BR-15, GS-BR-16).
 
-O-6 [Amended 0.3]: one `caddy_sites` entry `{host: "{{ garage_s3_domain }}", body: <body>}`. The rendered site block for production is the fragment below; `body` is the text between the outer braces. Route order: Caddy evaluates the `handle @web` block before the matcher-less `handle` block and runs only one of them; inside `handle @web`, `rewrite` runs before `reverse_proxy` (Caddy's directive order). To verify in a Caddy container (GS-A-16, GS-AC-52). The fragment contains no other directive.
+O-6 [Amended 1.6]: one `caddy_sites` entry `{host: "{{ garage_s3_domain }}", body: <body>}`. The rendered site block for production is the fragment below; `body` is the text between the outer braces. Route order: Caddy evaluates the `handle @web` block before the matcher-less `handle` block and runs only one of them; inside `handle @web`, `rewrite` runs before `reverse_proxy` (Caddy's directive order). To verify in a Caddy container (GS-A-16, GS-AC-52). The fragment contains no other directive.
 
 ```caddyfile
 s3.de.int.wahlberger.dev {
@@ -420,6 +445,8 @@ s3.de.int.wahlberger.dev {
 		path_regexp bucket ^/([^/]+)(/.*)?$
 	}
 	handle @web {
+		header X-Content-Type-Options nosniff
+		header Content-Security-Policy "sandbox"
 		rewrite * {re.bucket.2}
 		reverse_proxy garage:3902 {
 			header_up Host {re.bucket.1}
@@ -435,6 +462,7 @@ O-7 [Amended 0.3]: one Cloudflare CNAME `s3.de.int.wahlberger.dev` to `nas.de.in
 O-8 [Amended 0.5]: production `vars.yml` compositions of `btrbk_sources` (restated `data`, `containers`, then `garage-meta` and `garage`), `backup_disk_freshness_checks` and `caddy_sites`, the Garage entries only while `garage_enabled` is true (GS-FR-126, GS-FR-128, GS-FR-129); target directories `/mnt/backup/btrbk/garage-meta` and `/mnt/backup/btrbk/garage`.
 O-9 [Amended 1.1]: `roles/garage/README.md` with the consumer settings (GS-FR-34), the layout steps (GS-FR-139), the user steps for buckets, keys, grants, website access, quotas and lifecycle (GS-FR-140), the restore steps and the recorded image user.
 O-10: `tests/render.d/40-garage.yml`.
+O-12 [New 1.6]: Quadlet network `/etc/containers/systemd/garage.network` (`Driver=bridge`), Podman network `systemd-garage`; production `caddy_extra_networks: ['garage.network']` while `garage_enabled` is true (GS-FR-143, GS-FR-144).
 O-11 [New 0.3]: `caddy` role: `body` key in `Caddyfile.j2` and `meta/argument_specs.yml`; `btrbk` role: `mount_path` and `snapshot_dir` keys in `btrbk.conf.j2`, `tasks/main.yml`, `tasks/config.yml` and `meta/argument_specs.yml`.
 
 ### Error Cases
@@ -520,7 +548,7 @@ Scenario GS-AC-07 [V] [Amended 1.1]: README steps make the service usable (GS-FR
 - Given a fresh store after a successful role run, and `garage status` shows the node with "NO ROLE ASSIGNED"
 - When the README layout steps run, then a bucket `sstate` and a key `test-rw` with read and write on it are created with the Garage CLI
 - Then `garage status` shows the node with a role
-- And a 1 MiB object `selftest/up`, put by a container on `caddy.network` to `http://garage:3900/sstate/` and signed with `test-rw` (path-style, region `garage`), returns 200
+- And a 1 MiB object `selftest/up`, put by a container on `garage.network` to `http://garage:3900/sstate/` and signed with `test-rw` (path-style, region `garage`), returns 200
 - And a signed `HEAD` returns the same size, and a signed `GET` returns the same sha256
 
 Scenario GS-AC-08 [Deleted 1.1]: `mirror-read` key; user-owned (GS-CC-40).
@@ -529,19 +557,20 @@ Scenario GS-AC-09 [Deleted 1.1]: Read-only key refused a write; user-owned keys 
 
 Scenario GS-AC-10 [V] [H] [Amended 0.5]: Anonymous read on the web route, bare-Host mapping, the key K defined in the scenario and the production URL (GS-FR-30, GS-FR-31, GS-FR-93, GS-A-15, GS-A-16)
 - Given an object `selftest/up` with sha256 S in `sstate`, and an object with the key K = `ab/cd/sstate:pn-foo:x86_64:1.0+git-r0:0123abcd_populate_sysroot.tar.zst` and sha256 R, both uploaded with `test-rw` by the test setup (GS-FR-68)
-- When a container on `caddy.network` runs `curl -s -H 'Host: sstate' http://garage:3902/selftest/up` [V]
+- When a container on `garage.network` runs `curl -s -H 'Host: sstate' http://garage:3902/selftest/up` [V]
 - Then the status is 200 and the sha256 is S
 - And `GET /<K>` with `Host: sstate` on `garage:3902` returns 200 with sha256 R
 - And `GET /selftest/missing` with `Host: sstate` returns 404
 - And [V] unsigned `GET /sstate/<K>` through the route test Caddy returns 200 with sha256 R, both with `:` and `+` literal and with them percent-encoded (`%3A`, `%2B`)
 - And [H] from a LAN host, `curl -s -o /dev/null -w '%{http_code}' 'https://s3.de.int.wahlberger.dev/sstate/<K>'` prints `200` after K is uploaded there
 
-Scenario GS-AC-11 [V] [Amended 0.5]: Garage ports unreachable from outside the container network (GS-FR-13, GS-FR-23, GS-FR-108, GS-FR-109, GS-FR-111)
+Scenario GS-AC-11 [V] [Amended 1.6]: Garage ports unreachable from outside the container network (GS-FR-13, GS-FR-23, GS-FR-108, GS-FR-109, GS-FR-111, GS-FR-145)
 - Given `garage.service` is active
 - When a host on the VM's network runs `nc -z -w 3 <VM IP> <port>` for 3900, 3901, 3902 and 3903
 - Then each exits non-zero
 - And on the VM, `ss -ltnH '( sport >= :3900 and sport <= :3903 )'` in the host namespace prints nothing
-- And from a container on `caddy.network`, `nc -z -w 3 garage 3900` and `nc -z -w 3 garage 3902` exit 0, while `garage 3901` and `garage 3903` exit non-zero
+- And from a container on `garage.network`, `nc -z -w 3 garage 3900` and `nc -z -w 3 garage 3902` exit 0, while `garage 3901` and `garage 3903` exit non-zero
+- And from a container on `caddy.network` none of the four connects (GS-AC-77)
 
 Scenario GS-AC-12 [V]: Idempotent (all FRs)
 - Given a completed apply
@@ -708,7 +737,7 @@ Scenario GS-AC-37 [V]: Unit wiring (GS-FR-17, GS-FR-81, GS-FR-82)
 Scenario GS-AC-38 [S] [Amended 0.9]: Render-check asserts (GS-FR-136, GS-FR-07, GS-FR-08, GS-FR-11, GS-FR-13, GS-FR-19, GS-FR-22, GS-FR-23, GS-FR-38, GS-FR-62, GS-FR-65, GS-FR-73, GS-FR-108, GS-FR-109, GS-FR-111, GS-FR-121, GS-FR-122)
 - When `tests/render-check.sh` runs `40-garage.yml`
 - Then `garage.container` matches:
-  - `^ContainerName=garage$`, `^Network=caddy\.network$` (exactly one `Network=` line);
+  - `^ContainerName=garage$`, `^Network=garage\.network$` (exactly one `Network=` line);
   - `^User=<fixture uid>$`, `^HealthCmd=\["/garage","status"\]$`, `^HealthOnFailure=kill$`; no `HealthCmd=` line in shell form;
   - `^OnFailure=notify-failure@%n\.service$`, `^Restart=always$`;
   - `Volume=` lines for `/mnt/data/garage/data` and `/mnt/containers/garage/meta` ending in `:Z`, and for `garage.toml` and `<garage_secrets_dir>` containing `ro`;
@@ -729,7 +758,7 @@ Scenario GS-AC-38 [S] [Amended 0.9]: Render-check asserts (GS-FR-136, GS-FR-07, 
 Scenario GS-AC-39 [S]: Role order and gate (GS-FR-60, GS-BR-10)
 - When `tests/static-checks.sh` runs its role-order check
 - Then `garage` has tag `garage` and `when: garage_enabled | bool`
-- And it comes after `caddy` and before `btrbk`
+- And it comes before `caddy` and before `btrbk` [Amended 1.6]
 
 Scenario GS-AC-40 [V] [Amended 0.5]: Disabled flag is a no-op (GS-FR-61, GS-FR-126, GS-FR-128, GS-FR-129)
 - Given `garage_enabled: false`
@@ -752,20 +781,22 @@ Scenario GS-AC-43 [V]: Backup gate (GS-FR-67, GS-E-20)
 - When the role runs
 - Then it fails before any change, naming both flags
 
-Scenario GS-AC-44 [S] [Amended 1.1]: Image pinned and Renovate-detectable (GS-FR-10, GS-FR-18)
+Scenario GS-AC-44 [S] [Amended 1.6]: Image pinned by tag and digest, Renovate-detectable (GS-FR-10, GS-FR-18)
 - When the `garage_image` line is matched against the custom-manager regex in `renovate.json`
-- Then it matches with depName `docker.io/dxflrs/garage` and currentValue `v2.4.1`
+- Then it matches with depName `docker.io/dxflrs/garage`, currentValue `v2.4.1` and currentDigest `sha256:9c96caa2612d3411acc5b0e6701fb238dbfba33e533a6d7d3d811a4b12d0d020`
+- And [V] `podman inspect garage` shows the image pulled by that digest
 
 Scenario GS-AC-45 [S] [V] [Amended 0.3]: Backup freshness (GS-FR-74, GS-NFR-06)
 - Given `garage_enabled: true`
 - Then production `backup_disk_freshness_checks` contains `{path: /mnt/backup/btrbk/garage, max_age_hours: 26}` and `{path: /mnt/backup/btrbk/garage-meta, max_age_hours: 26}`
 - And [V] after a btrbk run, `backup-disk-health.service` completes with exit 0
 
-Scenario GS-AC-46 [V]: Check mode on a fresh host (GS-FR-85, GS-E-21)
+Scenario GS-AC-46 [V] [Amended 1.5]: Check mode on a fresh host (GS-FR-85, GS-FR-142, GS-E-21)
 - Given `garage_enabled: true` and no `garage.service` on the VM
 - When `ansible-playbook -i inventories/vm site.yml --check --tags garage` runs
 - Then it exits 0 and the readiness wait is reported as skipped
-- Note [1.3]: fails in VM run V1 because the shared `roles/container` restart handler errors on a fresh host (`Could not find the requested service garage.service`); open in GS-Q-17
+- And no restart handler fails (GS-FR-142)
+- Note [1.5]: failed in VM run V1 on the unguarded shared handler; passes on a fresh VM host (`--check`, exit 0) since commit 21090f9 (GS-Q-17 closed)
 
 Scenario GS-AC-47 [H] [Amended 1.2]: Size gate on `/mnt/data` (GS-NFR-02, GS-FR-120)
 - Given `df -B1 --output=size,used /mnt/data` gives S and U
@@ -773,10 +804,10 @@ Scenario GS-AC-47 [H] [Amended 1.2]: Size gate on `/mnt/data` (GS-NFR-02, GS-FR-
 - Then U <= 0.85 × S
 - And no bucket quota enters the check
 
-Scenario GS-AC-48 [S] [Amended 0.5]: Caddy site for Garage (GS-FR-32, GS-FR-51, GS-FR-93, GS-FR-94, GS-FR-95, GS-FR-112, GS-FR-113)
+Scenario GS-AC-48 [S] [Amended 1.6]: Caddy site for Garage (GS-FR-32, GS-FR-51, GS-FR-93, GS-FR-94, GS-FR-95, GS-FR-112, GS-FR-113, GS-FR-146)
 - When `Caddyfile.j2` is rendered with the production `caddy_sites` and `garage_enabled: true`
 - Then exactly one site address equals `s3.de.int.wahlberger.dev`, and no site address ends in `.s3.de.int.wahlberger.dev`
-- And that site block equals the O-6 fragment (whitespace aside)
+- And that site block equals the O-6 fragment (whitespace aside), including the two `header` lines of the web route (`X-Content-Type-Options nosniff`, `Content-Security-Policy "sandbox"`)
 - And it contains no `request_body`
 
 Scenario GS-AC-49 [S]: Firewall variables unchanged (GS-FR-41)
@@ -842,9 +873,10 @@ Scenario GS-AC-54 [S] [New 0.3]: btrbk configuration with the Garage sources (GS
 - And the `garage-meta` section comes before the `garage` section
 - And the `data` and `containers` sections still pass the existing `20-btrbk.yml` asserts (`snapshot_dir .btrbk`)
 
-Scenario GS-AC-55 [V] [Amended 0.7]: Restore from one run's snapshot pair (GS-FR-77, GS-BR-11, GS-BR-14, GS-A-27, GS-R-03)
+Scenario GS-AC-55 [V] [Amended 1.4]: Restore from one run's snapshot pair (GS-FR-77, GS-BR-11, GS-BR-14, GS-A-27, GS-R-03)
 - Given object `selftest/up` with sha256 S was stored before a completed `btrbk run` with snapshots `garage.<ts>` and `garage-meta.<ts>`, the run took place while a client uploaded objects to `sstate` without pause (live LMDB, GS-A-27), `selftest/up` was deleted afterwards, and `garage_secrets_dir` was emptied to simulate a lost host
-- When the README restore steps run with that `<ts>`, including the secret re-render from Vault
+- When the README restore steps run with that `<ts>`: `btrfs send | btrfs receive` of both snapshots into the staging directories, writable `btrfs subvolume snapshot` of the received snapshots in place of the store, and the secret re-render from Vault
+- Then no step uses `btrfs subvolume snapshot` with a source on `/mnt/backup/btrbk` (that fails with "Invalid cross-device link")
 - Then the secret files are present again with the modes of GS-AC-22
 - And `garage status` exits 0 within 60 s of the start
 - And `selftest/up` reads back with sha256 S
@@ -902,11 +934,11 @@ Scenario GS-AC-66 [S] [New 0.5]: Cross-feature update merged before enabling (GS
 - And `reqs/index.md` lists the new version of that file
 - And that update was merged before the change
 
-Scenario GS-AC-67 [V] [New 0.5]: Secrets are in no snapshot (GS-FR-134, GS-BR-14, GS-NFR-09)
+Scenario GS-AC-67 [V] [Amended 1.4]: Secrets are in no snapshot (GS-FR-134, GS-BR-14, GS-NFR-09)
 - Given the role has run and `garage_secrets_dir` holds `rpc_secret` and `admin_token`
 - When `btrbk run` completes and `snapper -c <config> create` runs for every config listed by `snapper list-configs`
 - Then `findmnt -no FSROOT -T /var/lib/garage/secrets` prints `/@/var` (GS-F-22)
-- And `btrfs inspect-internal rootid /var/lib/garage/secrets` differs from the root ID of every `btrbk_sources` path and of every snapper config subvolume
+- And the pair (filesystem UUID from `findmnt -no UUID -T`, root ID from `btrfs inspect-internal rootid`) of `/var/lib/garage/secrets` differs from the pair of every `btrbk_sources` path and of every snapper config subvolume (a root ID alone can repeat across filesystems)
 - And `find` over every snapper `.snapshots` directory, every btrbk snapshot directory and `/mnt/backup/btrbk` finds no file named `rpc_secret` or `admin_token`
 
 Scenario Outline GS-AC-68 [V] [New 0.5]: Secrets directory inside a snapshotted subvolume refused (GS-FR-134, GS-E-32)
@@ -945,12 +977,12 @@ Scenario GS-AC-72 [V] [New 0.7]: Readiness wait times out (GS-FR-29, GS-E-05)
 - Then it fails at the readiness wait within 10 s plus one poll interval, with a message naming `garage_ready_timeout_sec`
 - And the readiness wait is the failed task
 
-Scenario GS-AC-73 [V] [New 1.1]: The role leaves user-owned state unchanged (GS-BR-15, GS-FR-138)
+Scenario GS-AC-73 [V] [Amended 1.4]: The role leaves user-owned state unchanged (GS-BR-15, GS-FR-138)
 - Given the test setup has run, and the user has also set a 10 MiB quota on `private-test` and a lifecycle rule on `sstate`
 - And the outputs of `garage layout show`, `garage bucket info sstate`, `garage bucket info private-test` and `garage key info test-rw` are saved
 - When `ansible-playbook -i inventories/vm site.yml --tags garage` runs
 - Then the recap shows `changed=0`
-- And the four outputs are identical to the saved ones, and `GetBucketLifecycleConfiguration` on `sstate` returns the user's rule
+- And each of the four outputs has the same content as the saved one, compared as a set of lines in any row order (Garage lists buckets and keys in varying order), and `GetBucketLifecycleConfiguration` on `sstate` returns the user's rule
 
 Scenario GS-AC-74 [S] [New 1.1]: No state-changing Garage command in the role (GS-FR-138)
 - When `roles/garage/tasks/` and `roles/garage/templates/` are searched
@@ -969,6 +1001,21 @@ Scenario GS-AC-76 [V] [New 1.2]: A failing btrfs command stops the role (GS-E-03
 - Then it fails at the `btrfs subvolume create` task, and its output shows the command's stderr (`Read-only file system`)
 - And `/etc/containers/systemd/garage.container` does not exist and `garage.service` is not active
 - And after `mount -o remount,rw /mnt/data` the next role run succeeds
+
+Scenario GS-AC-77 [V] [New 1.6]: Garage is isolated on `garage.network` (GS-FR-22, GS-FR-143, GS-FR-144, GS-FR-145)
+- Given `garage.service` and `caddy.service` are active
+- Then `podman inspect garage` lists only the network `systemd-garage`, and `podman inspect caddy` lists `systemd-caddy` and `systemd-garage`
+- And from a container on `garage.network`, `curl` to `http://garage:3900/` answers 403 and to `http://garage:3902/<missing>` answers 404 (Garage reachable)
+- And from a container on `caddy.network`, the name `garage` does not resolve
+- And from that container, a direct connection to Garage's `garage.network` address on ports 3900 and 3902 does not connect within 5 s
+- Evidence: VM run 2026-10-19, `tests/vm/results/garage-decided-items.md`
+
+Scenario GS-AC-78 [V] [New 1.6]: Web-route security headers (GS-FR-146)
+- Given the route test Caddy with the production O-6 body
+- When unsigned `GET /sstate/selftest/up` and `GET /sstate/x` (missing) are sent
+- Then both responses carry `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox`
+- And an API-route response (signed `GET /sstate?list-type=2`) is not required to carry them
+- Evidence: VM run 2026-10-19, `tests/vm/results/garage-decided-items.md`
 
 ### Non-Functional Requirements
 
@@ -997,6 +1044,8 @@ Scenario GS-AC-76 [V] [New 1.2]: A failing btrfs command stops the role (GS-E-03
 | GS-FR-10, GS-FR-18 | inspection [S] | GS-AC-44 |
 | GS-FR-12, GS-FR-20, GS-FR-133 | test [S] [V] | GS-AC-24, GS-AC-22 |
 | GS-FR-134, GS-BR-14, GS-NFR-09, GS-E-32 | test [V] | GS-AC-67, GS-AC-68, GS-AC-04 |
+| GS-FR-143, GS-FR-144, GS-FR-145 | test [V], inspection [S] | GS-AC-77, GS-AC-38, GS-AC-59 |
+| GS-FR-146 | test [V], inspection [S] | GS-AC-78, GS-AC-48 |
 | GS-FR-13, GS-FR-22, GS-FR-23, GS-FR-108, GS-FR-109, GS-FR-111 | test [S] [V] | GS-AC-38, GS-AC-11 |
 | GS-FR-16, GS-FR-80 | test [S] [V] | GS-AC-36, GS-AC-38, GS-AC-71 |
 | GS-FR-17, GS-FR-81, GS-FR-82 | test [V] | GS-AC-37, GS-AC-71 |
@@ -1034,7 +1083,7 @@ Scenario GS-AC-76 [V] [New 1.2]: A failing btrfs command stops the role (GS-E-03
 | GS-FR-74, GS-NFR-06 | inspection [S], test [V] | GS-AC-45, GS-AC-59 |
 | GS-FR-76, GS-BR-04 | test [V] | GS-AC-21 |
 | GS-FR-92 | test [V] | GS-AC-53 |
-| GS-FR-85 | test [V] | GS-AC-46 |
+| GS-FR-85, GS-FR-142 | test [V] | GS-AC-46, GS-AC-12 |
 | GS-FR-95, GS-FR-96, GS-FR-130 | inspection [S] | GS-AC-57, GS-AC-48 |
 | GS-FR-97 | test [V] | GS-AC-58 |
 | GS-BR-08 | inspection (Erik, before netcup configuration) | GS-P-01 record in `zerotier-flow-rules.md` |
@@ -1074,9 +1123,7 @@ Scenario GS-AC-76 [V] [New 1.2]: A failing btrfs command stops the role (GS-E-03
 
 ### Open Questions
 
-| ID | Question | Proposed default | Who answers | Blocks |
-|---|---|---|---|---|
-| GS-Q-17 [New 1.3] | On a fresh host, the shared `roles/container` handler "Restart the container service" (`ansible.builtin.systemd: state: restarted`) fails with `Could not find the requested service garage.service`, because the unit does not exist yet (in check mode the Quadlet is never written, so the generator never creates the unit). GS-AC-46 fails (VM run V1). The handler is shared by every containerized service, so this is Erik's decision. (a) Guard the shared handler: skip the restart when the unit is not loaded yet (for example `systemctl show -p LoadState <unit>` reports `not-found`) or when the Quadlet change was only reported in check mode. (b) Leave the shared handler unchanged and make the `garage` role start the unit itself only after the first deploy. | (a): one fix in one place covers every service that uses `roles/container` and the next new service; it matches what check mode and a first deploy mean (nothing to restart yet); and the `garage` role stays a plain user of the shared role. (b) fixes only `garage` and keeps a garage-specific start path next to the shared one | Erik | yes: GS-AC-46 (GS-FR-85); a `roles/container` change outside this feature's files |
+None. All questions are resolved; see the table below.
 
 #### Resolved questions (kept for traceability, not open)
 
@@ -1097,6 +1144,7 @@ Scenario GS-AC-76 [V] [New 1.2]: A failing btrfs command stops the role (GS-E-03
 | GS-Q-13 [Closed 0.4] | Approve the `caddy` role change (`caddy_sites[].body`) | Approved (GS-FR-95 to GS-FR-97, GS-CC-25) |
 | GS-Q-14 [Closed 0.4] | Snapshot skew between `garage-meta` and `garage` | Accepted as risk GS-R-01: metadata snapshot first, VM drill GS-AC-55 and GS-AC-56 kept |
 | GS-Q-15 [Closed 0.5] | The Garage secret files under `/mnt/containers/garage` are in the `containers` btrbk and snapper snapshots. Accept, or move them out? | Option 2: move them to `/etc/garage/secrets/` (`root:garage`, files per GS-FR-20), a path that no btrbk or snapper source covers, with a run-time guard and an AC (GS-FR-132 to GS-FR-134, GS-AC-67). Secrets exist only in Vault and on the host; a restore re-renders them from Vault (GS-BR-14, GS-R-02). The path was then changed by GS-Q-16 |
+| GS-Q-17 [New 1.3] [Closed 1.5] | Shared `roles/container` restart handler fails on a fresh host (`Could not find the requested service garage.service`), GS-AC-46 | Option (a), Erik 2026-10-18: guard the shared handler (and the `garage` role's "Restart garage" handler): nothing in check mode, restart only if service facts list the unit. Implemented and verified in commit 21090f9; GS-AC-46 passes on a fresh VM host (GS-FR-142) |
 | GS-Q-16 [New 0.5] [Closed 0.6] | Location of `garage_secrets_dir`: `/etc/garage/secrets` lies in the root subvolume, which the installer's snapper config `root` snapshots (`roles/snapper/defaults/main.yml`: `snapper_preexisting_configs: [root]`) | `/var/lib/garage/secrets` (option 2). Erik checked on the NAS: `/var/lib` is in the separate subvolume `/@/var`, not covered by the `root` config (GS-F-22). The run-time guard GS-FR-134 and GS-AC-67/68 stay |
 
 ### Assumptions
@@ -1108,13 +1156,13 @@ Scenario GS-AC-76 [V] [New 1.2]: A failing btrfs command stops the role (GS-E-03
 - GS-A-05: btrfs snapshots do not include nested subvolumes (verified, GS-F-03).
 - GS-A-06: `metadata_fsync` and `data_fsync` keep Garage's defaults (`false`); the data can be rebuilt from source.
 - GS-A-07 [Deleted 1.1]: The role imports no key (GS-CC-40).
-- GS-A-08: Every container on `caddy.network` can reach `garage:3900` (signature required) and `garage:3902` (the same anonymous read as any LAN client). Accepted.
+- GS-A-08 [Amended 1.6]: Only containers on `garage.network` (Caddy, and test containers on [V]) can reach `garage:3900` (signature required) and `garage:3902` (the same anonymous read as any LAN client). Accepted.
 - GS-A-09: Layout capacity is a placement weight between nodes, not a storage limit; bucket quotas are the limit. To verify.
 - GS-A-10 [Amended 1.2]: `rpc_bind_addr` and `rpc_public_addr` of `127.0.0.1:3901` are enough for one node and for the CLI through `podman exec`, following the pattern of the Garage quick-start (single node, local RPC address). Verified in spike T-02 (`tests/spikes/garage-v2.4.1-cli-config.md`, "GS-A-10 RPC on loopback"); GS-AC-07 keeps checking it.
 - GS-A-11: BitBake builds a task from source when the sstate mirror is unreachable or returns an error (standard `SSTATE_MIRRORS` behaviour).
 - GS-A-12: sstate object keys contain the task hash, so concurrent uploads of the same key carry identical content.
 - GS-A-13: Playbook runs against the NAS do not overlap (manual runs and Semaphore runs are not concurrent).
-- GS-A-14: netavark DNS on `caddy.network` resolves `garage` for Caddy, as it does for `tandoor` and `forgejo`.
+- GS-A-14 [Amended 1.6]: netavark DNS on `garage.network` resolves `garage` for Caddy (verified on the VM, `tests/vm/results/garage-decided-items.md`).
 - GS-A-15 [Amended 0.8]: Garage v2.4.1's s3_web endpoint serves bucket `<b>` for a request whose `Host` header equals `<b>`, a global bucket alias. Verified by spike T-03 (`tests/spikes/garage-caddy-routing.md`): with `root_domain = "s3.de.int.wahlberger.dev"` a bare `Host: sstate` maps to bucket `sstate`, because the host does not end in the root domain and resolves as a global alias; the mapping is verified only with `root_domain` set (GS-FR-38). GS-AC-10 [V] keeps checking it.
 - GS-A-16 [New 0.3]: The O-6 fragment behaves as follows in Caddy 2 (`localhost/caddy-cloudflare:2`), to verify with the route test Caddy (GS-AC-52, GS-AC-31): (a) `handle @web` is evaluated before the matcher-less `handle`, and only one of them runs; (b) inside `handle @web`, `rewrite` runs before `reverse_proxy`; (c) `header !Authorization` matches only requests without that header; (d) `query X-Amz-Signature=*` matches any value of that parameter; (e) `{re.bucket.1}` and `{re.bucket.2}` keep the `@web` captures after the `rewrite`; (f) for `GET /<bucket>` (empty second capture) the response is non-2xx.
 - GS-A-17 [New 0.3]: btrbk creates the snapshots of one run in the order of the `volume` sections in `btrbk.conf`, and all snapshots of one run carry the same `<ts>` suffix (`timestamp_format long`). To verify with `btrbk dryrun` and GS-AC-20. If either does not hold, GS-FR-77, GS-FR-79 and GS-BR-11 are amended before implementation.
@@ -1134,6 +1182,9 @@ Scenario GS-AC-76 [V] [New 1.2]: A failing btrfs command stops the role (GS-E-03
 
 ### Change log
 
+- 1.6 (2026-10-19): spec aligned with the merged security fixes (GS-CC-45; commits d0cce7a, e37840b, dade0f9): dedicated `garage.network` (GS-FR-143 to GS-FR-145, GS-AC-77; `garage` now runs before `caddy`, GS-FR-60), web-route headers (GS-FR-146, O-6, GS-AC-48, GS-AC-78), image index digest (GS-FR-10, GS-AC-44). Status stays `ready`.
+- 1.5 (2026-10-18): GS-Q-17 closed as decided, option (a), implemented in commit 21090f9 (GS-CC-44, GS-FR-142, GS-AC-46 passes on a fresh VM host); Open Questions empty; status `ready`. The restore steps added in 1.4 are kept.
+- 1.4 (2026-10-18): VM runs V2 and V3 wording fixes (GS-CC-43): (filesystem UUID, root ID) pairs in GS-FR-134 and GS-AC-67; order-insensitive comparison in GS-AC-73; send/receive restore sequence in GS-FR-77 and GS-AC-55. GS-Q-17 still open; status `draft`.
 - 1.3 (2026-10-18): VM run V1 corrections (GS-CC-42): exec-form `HealthCmd`, fixture domain `s3.de.int.wahlberger.dev`; new open question GS-Q-17 (shared container restart handler, recommendation (a)); status `draft` until GS-Q-17 is answered.
 - 1.2 (2026-10-18): cleanup after the re-audit of 1.1 (READY with gaps), GS-CC-41: superseded and historical tags on stale contract entries (G1), GS-FR-141 for input formats (G4), GS-A-10 and the quota Out of Scope entry repointed (G5), GS-AC-76 for GS-E-03 and GS-AC-50 for GS-FR-139 (G6), `block list-errors` pinned from spike T-02 (G7), ambiguous terms replaced. Erik's decisions applied: GS-NFR-04 observe-only (no 1 TiB gate) and GS-FR-120/GS-NFR-02/GS-AC-47 without a quota figure. Quality metadata refreshed with the requirements engineer's self-score (Atomic 3: compound FRs such as GS-FR-02, GS-FR-09 and GS-FR-92 remain).
 - 1.1 (2026-10-18): Erik's scope change and clarification (GS-CC-40): Ansible sets up only the Garage service; everything the Garage or S3 CLI can do (node layout, buckets, keys, grants, quotas, website access, lifecycle) is user-owned and documented in the README (GS-FR-139, GS-FR-140). Removed IDs are marked [Deleted 1.1]; GS-Q-08 retired; GS-A-20 to GS-A-22 and GS-A-28 moved to Out of Scope; new GS-FR-137 to GS-FR-140, GS-BR-15, GS-BR-16, GS-E-33, GS-AC-73 to GS-AC-75; [V] test setup replaces the role-managed fixture (GS-FR-68, GS-AC-70); Verification table rebuilt. Consequence recorded: Garage runs without a layout until the user runs the README steps (GS-BR-16). Status kept `ready`; the quality scores date from 0.7.
