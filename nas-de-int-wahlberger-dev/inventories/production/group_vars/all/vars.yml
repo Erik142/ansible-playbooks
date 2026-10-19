@@ -160,6 +160,8 @@ garage_s3_caddy_body: "\
   \tpath_regexp bucket ^/([^/]+)(/.*)?$\n\
   }\n\
   handle @web {\n\
+  \theader X-Content-Type-Options nosniff\n\
+  \theader Content-Security-Policy \"sandbox\"\n\
   \trewrite * {re.bucket.2}\n\
   \treverse_proxy garage:3902 {\n\
   \t\theader_up Host {re.bucket.1}\n\

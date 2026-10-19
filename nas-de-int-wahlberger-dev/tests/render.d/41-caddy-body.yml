@@ -20,6 +20,8 @@ render_items:
             	path_regexp bucket ^/([^/]+)(/.*)?$
             }
             handle @web {
+            	header X-Content-Type-Options nosniff
+            	header Content-Security-Policy "sandbox"
             	rewrite * {re.bucket.2}
             	reverse_proxy garage:3902 {
             		header_up Host {re.bucket.1}
@@ -32,5 +34,7 @@ render_items:
       - '^a\.example\.test \{$'
       - '(?s)\A(?!.*^    reverse_proxy)'
       - '^    handle @web \{$'
+      - '^    \theader X-Content-Type-Options nosniff$'
+      - '^    \theader Content-Security-Policy "sandbox"$'
       - '^    handle \{\n    \treverse_proxy garage:3900\n    \}\n\}$'
       - '(?s)\A(?:(?!reverse_proxy).)*reverse_proxy garage:3902(?:(?!reverse_proxy).)*reverse_proxy garage:3900(?:(?!reverse_proxy).)*\Z'
