@@ -1,7 +1,7 @@
 ---
 # Default variables for the `semaphore` role (ops VM copy, T-09).
 
-semaphore_image: docker.io/semaphoreui/semaphore:v2.19.16
+semaphore_image: docker.io/semaphoreui/semaphore:v2.19.17
 
 # Derived from podman_data_dir, not hardcoded, so it always lands on the same
 # disk as every other service's data.
