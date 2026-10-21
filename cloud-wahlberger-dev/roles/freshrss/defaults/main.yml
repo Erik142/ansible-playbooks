@@ -2,7 +2,7 @@
 # Default variables for the `freshrss` role.
 
 # FreshRSS image, pinned to a specific release for reproducibility.
-freshrss_image: docker.io/freshrss/freshrss:1.30.2
+freshrss_image: docker.io/freshrss/freshrss:1.30.4
 
 # Named Podman volume for persistent data — holds the SQLite DB and config.php
 # (/var/www/FreshRSS/data). Back this up. Podman creates it automatically.
