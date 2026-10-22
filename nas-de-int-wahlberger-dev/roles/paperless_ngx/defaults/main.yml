@@ -2,7 +2,7 @@
 # Default variables for the `paperless_ngx` role.
 
 # v3.x: upgraded from 2.20.15 (required first step). See the v3 migration guide.
-paperless_ngx_image: ghcr.io/paperless-ngx/paperless-ngx:3.3.3
+paperless_ngx_image: ghcr.io/paperless-ngx/paperless-ngx:3.3.4
 paperless_ngx_redis_image: docker.io/library/redis:8
 paperless_ngx_db_image: docker.io/library/postgres:18
 
