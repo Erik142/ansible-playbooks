@@ -35,7 +35,7 @@ Risks and decisions
 
 ### Definition of Done (all tasks)
 - Code formatted and linted: from the NAS dir `yamllint .` and `ansible-lint` (production profile) exit 0; `ansible-playbook site.yml --syntax-check` exits 0; `tests/render-check.sh` stays green; `tests/static-checks.sh` passes. Unwired or partial roles are checked with `tests/syntax-check-role.sh <role>`.
-- Task acceptance criteria verified by qa-verifier at the `Where:` level stated; unit tests for new logic to the test-quality tier; no skipped or weakened tests; no new warnings; no `noqa`, `skip_list`, `warn_list`; docs/config updated; no secrets committed; no production vault value anywhere in `inventories/vm/`.
+- Task acceptance criteria verified by qa-verifier at the `Where:` level stated; unit tests for new logic to the test-quality tier; no skipped or weakened tests; no new warnings; no rule suppressions of any kind; docs/config updated; no secrets committed; no production vault value anywhere in `inventories/vm/`.
 - Role conventions: FQCN, ansible-core 2.16 module names, idempotent built-ins, role-prefixed variables, `meta/argument_specs.yml` declares every input, README, no `meta/main.yml` dependencies, `no_log: true` on every secret-bearing task except the approved assert-only exception of GS-FR-21 / GS-CC-39.
 - A scenario is reported verified only at the level actually run (LOCAL, VM or NAS).
 

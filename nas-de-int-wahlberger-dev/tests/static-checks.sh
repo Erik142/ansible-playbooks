@@ -203,7 +203,7 @@ for a, b in [("notify_failure", "smartd"), ("smartd", "backup_disk"), ("storage"
              ("paperless_ngx", "db_dump"), ("immich", "db_dump"), ("tandoor", "db_dump"), ("forgejo", "db_dump"),
              ("paperless_ngx", "btrbk"), ("immich", "btrbk"), ("tandoor", "btrbk"), ("forgejo", "btrbk"),
              ("db_dump", "btrbk"), ("backup_disk", "btrbk"),
-             ("caddy", "garage"), ("garage", "btrbk")]:
+             ("garage", "caddy"), ("garage", "btrbk")]:
     before(a, b)
 for role in ("smartd", "backup_disk", "restic_server", "db_dump", "btrbk", "restic_backup_decommission", "garage"):
     if role not in list_tasks("--tags", role):
@@ -342,7 +342,13 @@ if v.get("restic_server_maintenance_repos") != [
         {"repo": "cloud", "password": "{{ vault_restic_server_cloud_repo_password | default('') }}"},
         {"repo": "ops", "password": "{{ vault_restic_server_ops_repo_password | default('') }}"}]:
     errors.append("restic_server_maintenance_repos differs from SH-CC-01 (cloud, ops)")
-if {"path": "/mnt/data/restic-repos/ops/snapshots", "max_age_hours": 26} not in (v.get("backup_disk_freshness_checks") or []):
+fc = v.get("backup_disk_freshness_checks") or []
+if isinstance(fc, str):
+    # Jinja expression (Garage entries are appended behind garage_enabled).
+    ops_ok = re.search(r"/mnt/data/restic-repos/ops/snapshots['\"]\s*,\s*['\"]max_age_hours['\"]\s*:\s*26\b", fc) is not None
+else:
+    ops_ok = {"path": "/mnt/data/restic-repos/ops/snapshots", "max_age_hours": 26} in fc
+if not ops_ok:
     errors.append("backup_disk_freshness_checks lacks the ops path (SH-FR-87)")
 if v.get("restic_server_allowed_sources") != ["10.10.0.0/16", "10.243.0.0/16"]:
     errors.append("restic_server_allowed_sources must be [10.10.0.0/16, 10.243.0.0/16]")
