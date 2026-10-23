@@ -1,0 +1,44 @@
+---
+# String-level checks of the optional per-source keys. No command runs and
+# nothing on the host is read, so this also runs under pytest on localhost
+# (tests/unit/test_btrbk_sources.py). Imported first by main.yml.
+# `snapshot_dir`: GS-FR-92, GS-E-22. `mount_path`: GS-FR-75, GS-FR-76.
+- name: Validate the per-source snapshot_dir
+  ansible.builtin.assert:
+    that:
+      - btrbk_sd is match('^/')
+      - btrbk_sd is match('^/[A-Za-z0-9._/-]+$')
+      - "'..' not in btrbk_sd.split('/')"
+      - not (btrbk_sd == btrbk_samba or btrbk_sd is match('^' ~ (btrbk_samba | regex_escape) ~ '/'))
+      - not (btrbk_sd == btrbk_path or btrbk_sd is match('^' ~ (btrbk_path | regex_escape) ~ '/'))
+    fail_msg: >-
+      btrbk_sources entry '{{ item.name }}': snapshot_dir '{{ item.snapshot_dir }}'
+      must be absolute, only letters, digits, '.', '_', '-' and '/', without '..', and not at or below samba_data_dir
+      ({{ btrbk_samba }}) or the source path ({{ btrbk_path }}) (GS-FR-92).
+    quiet: true
+  vars:
+    btrbk_sd: "{{ item.snapshot_dir | regex_replace('(.)/+$', '\\1') }}"
+    btrbk_path: "{{ item.path | regex_replace('(.)/+$', '\\1') }}"
+    btrbk_samba: "{{ samba_data_dir | default('/mnt/data/samba') | regex_replace('(.)/+$', '\\1') }}"
+  loop: "{{ btrbk_sources | selectattr('snapshot_dir', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [btrbk]
+
+- name: Validate that every source path lies below its mount_path
+  ansible.builtin.assert:
+    that:
+      - btrbk_mp is match('^/')
+      - btrbk_path is match('^' ~ (btrbk_mp | regex_escape) ~ '/.')
+      - "'..' not in btrbk_path.split('/')"
+    fail_msg: >-
+      btrbk_sources entry '{{ item.name }}': path '{{ item.path }}' must be
+      absolute and strictly below its mount_path '{{ item.mount_path }}' (GS-FR-76).
+    quiet: true
+  vars:
+    btrbk_mp: "{{ item.mount_path | regex_replace('(.)/+$', '\\1') }}"
+    btrbk_path: "{{ item.path | regex_replace('(.)/+$', '\\1') }}"
+  loop: "{{ btrbk_sources | selectattr('mount_path', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [btrbk]

@@ -26,3 +26,8 @@ caddy_acme_email: ""
 #   extra:    (optional) raw Caddy directives inserted into the site block
 # Set the real list in inventory group_vars.
 caddy_sites: []
+
+# Extra Quadlet networks the Caddy container joins besides caddy.network, as
+# Quadlet unit names (e.g. garage.network). The network units are deployed by
+# the role that owns the backend, which must run before this role.
+caddy_extra_networks: []

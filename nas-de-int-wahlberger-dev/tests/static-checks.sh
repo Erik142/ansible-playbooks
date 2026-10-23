@@ -125,10 +125,15 @@ ac04() {
     #     chattr is tolerated outside init only when it does not set +C.
     pat_a='community\.general\.(parted|filesystem|btrfs_subvolume)|mkfs|wipefs|sgdisk|sfdisk|\bparted\b|\bdd\b|blkdiscard|shred|cryptsetup|btrfs (device (add|delete|remove)|replace)|subvolume (create|delete)'
     # shellcheck disable=SC2086
-    a=$(grep -nE "$pat_a" $files | grep -vE '^roles/backup_disk/tasks/init[^:]*\.yml:')
+    # A0 carve-out (garage, GS-FR-02): roles/garage/tasks/storage.yml alone may
+    # contain `btrfs subvolume create`; nothing else, in no other file.
+    a=$(grep -nE "$pat_a" $files | grep -vE '^roles/backup_disk/tasks/init[^:]*\.yml:' \
+        | grep -vE '^roles/garage/tasks/storage\.yml:[0-9]+:.*btrfs subvolume create')
     [ -z "$a" ] || { echo "(a) destructive pattern outside roles/backup_disk/tasks/init*.yml:"; echo "$a"; rc=1; }
     # shellcheck disable=SC2086
-    a2=$(grep -nE 'chattr.*\+[a-zA-Z]*C' $files | grep -vE '^roles/backup_disk/tasks/init[^:]*\.yml:')
+    # A0 carve-out (garage, GS-FR-06): roles/garage/tasks/storage.yml alone may set +C.
+    a2=$(grep -nE 'chattr.*\+[a-zA-Z]*C' $files | grep -vE '^roles/backup_disk/tasks/init[^:]*\.yml:' \
+        | grep -vE '^roles/garage/tasks/storage\.yml:')
     [ -z "$a2" ] || { echo "(a) chattr +C outside init*.yml:"; echo "$a2"; rc=1; }
     # (b) static include/import names; none templated, none naming an init file.
     # shellcheck disable=SC2086
@@ -155,6 +160,17 @@ if not (isinstance(plays, list) and len(plays) == 1 and plays[0].get("hosts") ==
     sys.exit("backup_disk_init.yml must contain exactly one play with hosts: nas")
 PY
     return $rc
+}
+
+# --- GS-AC-74: the garage role runs no state-changing Garage command (GS-FR-138)
+ac_garage_no_state() {
+    cd "$nas_dir" || return 1
+    g=$(grep -rnE 'layout (assign|apply)|bucket (create|allow|deny|website)|set-quotas|key (create|import)|put-bucket-lifecycle|lifecycle' \
+        roles/garage/tasks roles/garage/templates 2>/dev/null)
+    [ -z "$g" ] || { echo "garage role runs a layout/bucket/key/grant/quota/website/lifecycle command:"; echo "$g"; return 1; }
+    # The only /garage subcommand in the tasks is `status`.
+    g2=$(grep -rnoE '/garage +[a-z][a-z-]*' roles/garage/tasks | grep -vE '/garage +status$')
+    [ -z "$g2" ] || { echo "garage tasks use a /garage subcommand other than status:"; echo "$g2"; return 1; }
 }
 
 # --- BD-AC-05: role order and tags -------------------------------------------
@@ -186,11 +202,20 @@ for a, b in [("notify_failure", "smartd"), ("smartd", "backup_disk"), ("storage"
              ("firewall", "restic_server"), ("podman", "restic_server"), ("storage", "restic_server"),
              ("paperless_ngx", "db_dump"), ("immich", "db_dump"), ("tandoor", "db_dump"), ("forgejo", "db_dump"),
              ("paperless_ngx", "btrbk"), ("immich", "btrbk"), ("tandoor", "btrbk"), ("forgejo", "btrbk"),
-             ("db_dump", "btrbk"), ("backup_disk", "btrbk")]:
+             ("db_dump", "btrbk"), ("backup_disk", "btrbk"),
+             ("garage", "caddy"), ("garage", "btrbk")]:
     before(a, b)
-for role in ("smartd", "backup_disk", "restic_server", "db_dump", "btrbk", "restic_backup_decommission"):
+for role in ("smartd", "backup_disk", "restic_server", "db_dump", "btrbk", "restic_backup_decommission", "garage"):
     if role not in list_tasks("--tags", role):
         errors.append(f"--tags {role} --list-tasks lists no {role} task")
+# GS-AC-39: garage is gated and tagged.
+import yaml
+entries = [e for p in yaml.safe_load(open("site.yml")) for e in p.get("roles", [])
+           if isinstance(e, dict) and e.get("role") == "garage"]
+if len(entries) != 1:
+    errors.append("site.yml must contain exactly one `role: garage` entry")
+elif entries[0].get("tags") != ["garage"] or entries[0].get("when") != "garage_enabled | bool":
+    errors.append("site.yml garage entry needs `tags: [garage]` and `when: garage_enabled | bool`")
 if errors:
     sys.exit("\n".join(errors))
 PY
@@ -317,7 +342,13 @@ if v.get("restic_server_maintenance_repos") != [
         {"repo": "cloud", "password": "{{ vault_restic_server_cloud_repo_password | default('') }}"},
         {"repo": "ops", "password": "{{ vault_restic_server_ops_repo_password | default('') }}"}]:
     errors.append("restic_server_maintenance_repos differs from SH-CC-01 (cloud, ops)")
-if {"path": "/mnt/data/restic-repos/ops/snapshots", "max_age_hours": 26} not in (v.get("backup_disk_freshness_checks") or []):
+fc = v.get("backup_disk_freshness_checks") or []
+if isinstance(fc, str):
+    # Jinja expression (Garage entries are appended behind garage_enabled).
+    ops_ok = re.search(r"/mnt/data/restic-repos/ops/snapshots['\"]\s*,\s*['\"]max_age_hours['\"]\s*:\s*26\b", fc) is not None
+else:
+    ops_ok = {"path": "/mnt/data/restic-repos/ops/snapshots", "max_age_hours": 26} in fc
+if not ops_ok:
     errors.append("backup_disk_freshness_checks lacks the ops path (SH-FR-87)")
 if v.get("restic_server_allowed_sources") != ["10.10.0.0/16", "10.243.0.0/16"]:
     errors.append("restic_server_allowed_sources must be [10.10.0.0/16, 10.243.0.0/16]")
@@ -506,6 +537,7 @@ echo "static checks, diff base: $(git -C "$repo" rev-parse --short "$base")"
 check AC-01 "yamllint, ansible-lint, syntax-check (nas + cloud)" ac01
 check AC-02 "no noqa/skip_list/warn_list added" ac02
 check AC-04 "destructive operations unreachable from site.yml" ac04
+check GS-AC-74 "garage role runs no layout/bucket/key/lifecycle command" ac_garage_no_state
 check AC-05 "role order and tags (list-tasks)" ac05
 check AC-06 "defaults vs argument_specs" ac06
 check AC-07 "render check (default and spindown 120)" ac07

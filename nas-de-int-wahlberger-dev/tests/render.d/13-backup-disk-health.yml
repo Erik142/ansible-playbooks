@@ -29,4 +29,4 @@ render_items:
       - 'btrfs", "device", "stats", "--check"'
       - '"max_age_hours\\": 26'
       # Read-only: no write, chattr, dd or wipefs in the script.
-      - '(?s)\A(?!.*(chattr|wipefs|\bdd\b|open\([^)]*[''"][wa]|write_text|mkdir|unlink|btrfs", "subvolume))'
+      - '(?s)\A(?!.*(chattr|wipefs|\bdd\b|open\([^)]*[''"][wa]|write_text|mkdir|unlink|btrfs", "subvolume", "(create|delete|snapshot|set-default)))'

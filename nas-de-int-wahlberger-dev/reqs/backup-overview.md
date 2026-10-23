@@ -232,7 +232,7 @@ Cross-cutting requirements. Area requirements are in the four area files.
 | Ansible-time check in role | Unit with `RequiresMountsFor=` | Paths |
 |---|---|---|
 | `backup_disk` (after its mount task) | none | every `backup_disk_mounts` path |
-| `btrbk` | `btrbk.service` | `btrbk_target_dir`, every `btrbk_sources` path |
+| `btrbk` | `btrbk.service` | `btrbk_target_dir`, every `btrbk_sources` path; for an entry with `mount_path`, `mount_path` instead of `path` (`path` is then a btrfs subvolume below it, checked with `btrfs subvolume show`; see the `btrbk_sources` Inputs row of [backup-btrbk-and-db-dump.md](backup-btrbk-and-db-dump.md#inputs), GS-FR-75, GS-FR-76) |
 | `db_dump` | `db-dump.service` | the `storage_mounts` path that contains `db_dump_dir` (`/mnt/containers`) |
 | `restic_server` | `restic-server.service`, `restic-server-maintenance.service` | the `storage_mounts` path that contains `restic_server_data_dir` (`/mnt/data`) |
 

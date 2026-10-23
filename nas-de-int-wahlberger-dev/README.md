@@ -141,6 +141,7 @@ See [`roles/security/README.md`](roles/security/README.md) for the
 | Paperless-ngx | Podman Quadlets (app + Redis + PostgreSQL), behind Caddy | Pocket ID OIDC login; inbox lives inside the Samba share. |
 | Forgejo | Podman Quadlet (rootless, SQLite), behind Caddy | Git forge + built-in container registry at `git.de.int.wahlberger.dev`, Pocket ID OIDC login, git over SSH on port 2222, LAN/VPN only. Registry login uses personal access tokens. See [`roles/forgejo/README.md`](roles/forgejo/README.md). |
 | Homepage | Podman Quadlet, behind Caddy | Dashboard linking this NAS's and cloud-wahlberger-dev's services. `rpi-karlsruhe` excluded (legacy). See [`roles/homepage/README.md`](roles/homepage/README.md). |
+| Garage | Podman Quadlet, behind Caddy (opt-in, `garage_enabled`) | S3 object store (service only; layout, buckets and keys are user CLI steps). Endpoint `https://s3.de.int.wahlberger.dev`. See [`roles/garage/README.md`](roles/garage/README.md). |
 
 **Before the first run:** point `recipes.de.int.wahlberger.dev`,
 `docs.de.int.wahlberger.dev`, `git.de.int.wahlberger.dev`, and `www.de.int.wahlberger.dev` at wherever

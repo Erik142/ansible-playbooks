@@ -63,6 +63,13 @@
     # Ensure this host's public DNS records exist before Caddy needs them.
     - role: cloudflare_dns
       tags: [cloudflare_dns]
+    # Garage S3 store (sstate). Before caddy: it creates garage.network, which
+    # the Caddy container joins (caddy_extra_networks), and before btrbk: both
+    # subvolumes must exist before btrbk checks or snapshots them.
+    # Off until the enable preconditions hold (garage_enabled in vars.yml).
+    - role: garage
+      tags: [garage]
+      when: garage_enabled | bool
     # Reverse proxy (creates the shared network) for tandoor/paperless-ngx/immich/forgejo.
     - role: caddy
       tags: [caddy]

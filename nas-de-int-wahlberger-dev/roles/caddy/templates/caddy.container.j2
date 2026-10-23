@@ -1,8 +1,10 @@
 [Unit]
 Description=Caddy reverse proxy
-After=network-online.target caddy-network.service
+After=network-online.target caddy-network.service{% for n in caddy_extra_networks %} {{ n | regex_replace('\\.network$', '') }}-network.service{% endfor %}
+
 Wants=network-online.target
-Requires=caddy-network.service
+Requires=caddy-network.service{% for n in caddy_extra_networks %} {{ n | regex_replace('\\.network$', '') }}-network.service{% endfor %}
+
 # Emails ewahlberger@gmail.com via Resend after 5 consecutive failures —
 # see the notify_failure role.
 OnFailure=notify-failure@%n.service
@@ -11,6 +13,9 @@ OnFailure=notify-failure@%n.service
 ContainerName=caddy
 Image={{ caddy_image }}
 Network=caddy.network
+{% for n in caddy_extra_networks %}
+Network={{ n }}
+{% endfor %}
 PublishPort={{ caddy_http_port }}:80
 PublishPort={{ caddy_https_port }}:443
 # Cloudflare DNS API token for the DNS-01 challenge, rendered to a root-only

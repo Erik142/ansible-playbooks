@@ -1,0 +1,66 @@
+---
+# garage role (T-01): the Quadlets (container and network) (kind text: systemd-analyze cannot verify
+# .container files). garage_uid/garage_gid are runtime facts (getent), so the
+# item supplies fixture values.
+render_items:
+  - role: garage
+    src: garage.container.j2
+    dest: garage.container
+    kind: text
+    vars:
+      garage_uid: "991"
+      garage_gid: "990"
+    asserts:
+      - '^ContainerName=garage$'
+      - '^Network=garage\.network$'
+      - '(?s)\A(?!.*^Network=.*^Network=)'
+      - '(?s)\A(?!.*^Network=caddy\.network)'
+      - '^User=991$'
+      - '^Group=990$'
+      - '^HealthCmd=\["/garage","status"\]$'
+      - '^HealthOnFailure=kill$'
+      - '^OnFailure=notify-failure@%n\.service$'
+      - '^Restart=always$'
+      - '^WantedBy=default\.target$'
+      - '^RequiresMountsFor=/mnt/data /mnt/containers/garage$'
+      - '^Environment=GARAGE_CONFIG_FILE=/mnt/containers/garage/garage\.toml$'
+      - '^Image=docker\.io/dxflrs/garage:v2\.4\.1@sha256:[0-9a-f]{64}$'
+      - '^Volume=/mnt/data/garage/data:/mnt/data/garage/data:Z$'
+      - '^Volume=/mnt/containers/garage/meta:/mnt/containers/garage/meta:Z$'
+      - '^Volume=/mnt/containers/garage/garage\.toml:\S*garage\.toml:ro$'
+      - '^Volume=/var/lib/garage/secrets:/var/lib/garage/secrets:ro$'
+      - '(?s)\A(?!(?:.*?^Volume=){5})'
+      - '(?s)\A(?!.*^PublishPort=)'
+      - '(?s)\A(?!.*SecurityLabelDisable)'
+      - '(?s)\A(?!.*^Volume=/mnt/data/garage:)'
+      - '(?s)\A(?!.*^Volume=/mnt/containers/garage:)'
+      - '(?s)\A(?!.*^Volume=[^\n]*\.btrbk)'
+  - role: garage
+    src: garage.network.j2
+    dest: garage.network
+    kind: text
+    asserts:
+      - '^\[Network\]$'
+      - '^Driver=bridge$'
+      - '(?s)\A(?!.*^Internal=)'
+  - role: garage
+    src: garage.toml.j2
+    dest: garage.toml
+    kind: text
+    asserts:
+      - '^replication_factor = 1$'
+      - '^metadata_dir = "/mnt/containers/garage/meta"$'
+      - '^data_dir = "/mnt/data/garage/data"$'
+      - '^rpc_bind_addr = "127\.0\.0\.1:3901"$'
+      - '^rpc_public_addr = "127\.0\.0\.1:3901"$'
+      - '^rpc_secret_file = "/var/lib/garage/secrets/rpc_secret"$'
+      - '^admin_token_file = "/var/lib/garage/secrets/admin_token"$'
+      - '(?s)\[s3_api\]\napi_bind_addr = "0\.0\.0\.0:3900"\ns3_region = "garage"\n\n\[s3_web\]'
+      - '(?s)\[s3_web\]\nbind_addr = "0\.0\.0\.0:3902"\n[^\n]*\nroot_domain = "s3\.de\.int\.wahlberger\.dev"\n\n\[admin\]\napi_bind_addr = "127\.0\.0\.1:3903"'
+      - '(?s)\A(?!.*^root_domain[^\n]*\n.*^root_domain)'
+      - '(?s)\A(?!.*\[s3_api\][^\[]*root_domain)'
+      - '(?s)\A(?!.*^\s*(rpc_secret|admin_token)\s*=)'
+      - '(?s)\A(?!.*metadata_snapshots_dir)'
+      - '(?s)\A(?!.*metadata_auto_snapshot_interval)'
+      - '(?s)\A(?!.*k2v_api)'
+      - '(?s)\A(?!.*fixture-garage-not-a-secret)'

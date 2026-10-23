@@ -1,0 +1,62 @@
+---
+# Stage 4: garage.toml, the Quadlet and the liveness check (GS-FR-11, GS-FR-17,
+# GS-FR-29, GS-FR-85). The only Garage CLI call of the role is `status`
+# (GS-FR-138).
+
+- name: Render garage.toml
+  ansible.builtin.template:
+    src: garage.toml.j2
+    dest: "{{ garage_config_dir }}/garage.toml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart garage
+
+# The dedicated network of Garage and Caddy. It must exist before the
+# container starts. The Quadlet is read at daemon-reload, which the restart
+# handler (and the container role's flushed handler) performs.
+- name: Deploy the Garage network Quadlet
+  ansible.builtin.template:
+    src: garage.network.j2
+    dest: /etc/containers/systemd/garage.network
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart garage
+
+# The container role renders the Quadlet and flushes handlers, so a changed
+# garage.toml or secret restarts the service once the Quadlet exists.
+- name: Deploy the Garage container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: garage
+    container_quadlet_src: garage.container.j2
+
+- name: Read the state of garage.service
+  ansible.builtin.systemd:
+    name: garage.service
+  register: garage_unit
+  check_mode: false
+
+# Fails when the unit is not active yet: poll 2 s up to garage_ready_timeout_sec.
+# Skipped in check mode when the service is not running (nothing was started).
+- name: Readiness wait
+  when: not (ansible_check_mode and garage_unit.status.ActiveState | default('') != 'active')
+  block:
+    - name: Wait until garage status exits 0
+      ansible.builtin.command:
+        cmd: podman exec garage /garage status
+      register: garage_ready
+      until: garage_ready.rc == 0
+      retries: "{{ ((garage_ready_timeout_sec | int) / 2) | round(0, 'ceil') | int }}"
+      delay: 2
+      changed_when: false
+      check_mode: false
+  rescue:
+    - name: Readiness wait failed, Garage did not answer in time
+      ansible.builtin.fail:
+        msg: >-
+          Garage did not answer `garage status` within garage_ready_timeout_sec
+          ({{ garage_ready_timeout_sec }} s). Check `journalctl -u garage.service`
+          for a pull, config or secret-file-mode error (GS-E-05).

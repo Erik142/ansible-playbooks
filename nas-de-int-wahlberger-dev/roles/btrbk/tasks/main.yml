@@ -1,5 +1,9 @@
 ---
 # All checks come first: nothing below changes the host until they pass.
+- name: Validate the optional per-source keys (snapshot_dir, mount_path)
+  ansible.builtin.import_tasks: validate.yml
+  tags: [btrbk]
+
 - name: Validate the snapshot directory name and sources
   ansible.builtin.assert:
     that:
@@ -18,11 +22,16 @@
     quiet: true
   tags: [btrbk]
 
-# BD-BR-04 paths: the target and every source. Computed once for the guard,
+# BD-BR-04 paths: the target and every source (for an entry with `mount_path`,
+# that mount point instead of the nested subvolume path). Computed once for the guard,
 # the unit's RequiresMountsFor= and the directories below.
 - name: Collect the paths that must be mounted
   ansible.builtin.set_fact:
-    btrbk_mount_paths: "{{ ([btrbk_target_dir] + (btrbk_sources | map(attribute='path') | list)) | map('regex_replace', '(.)/+$', '\\1') | list }}"
+    btrbk_mount_paths: >-
+      {{ ([btrbk_target_dir]
+          + (btrbk_sources | selectattr('mount_path', 'undefined') | map(attribute='path') | list)
+          + (btrbk_sources | selectattr('mount_path', 'defined') | map(attribute='mount_path') | list))
+         | map('regex_replace', '(.)/+$', '\1') | unique | list }}
   tags: [btrbk]
 
 # Reads the live mount table (BD-FR-25), not facts gathered at play start.
@@ -69,6 +78,82 @@
   loop: "{{ btrbk_findmnt.results }}"
   loop_control:
     label: "{{ item.item }}"
+  tags: [btrbk]
+
+# Entries with `mount_path` (GS-FR-75, GS-FR-76): the source path is a nested
+# subvolume, not a mount point. `btrfs subvolume show` fails when it is absent
+# or a plain directory; nothing is created.
+- name: Check that every source below a mount_path is an existing btrfs subvolume
+  ansible.builtin.command:
+    argv:
+      - btrfs
+      - subvolume
+      - show
+      - "{{ item.path }}"
+  loop: "{{ btrbk_sources | selectattr('mount_path', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: btrbk_subvol
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags: [btrbk]
+
+- name: Fail before any change when a source path is not a btrfs subvolume
+  ansible.builtin.assert:
+    that: item.rc == 0
+    fail_msg: >-
+      btrbk_sources entry '{{ item.item.name }}': path '{{ item.item.path }}'
+      does not exist or is not a btrfs subvolume ({{ item.stderr | default('') | trim }}).
+      The role never creates it (GS-FR-76, GS-BR-04).
+    quiet: true
+  loop: "{{ btrbk_subvol.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  tags: [btrbk]
+
+# GS-FR-92: the snapshot directory must be on the same filesystem mount as the
+# source, else btrbk cannot make a snapshot there.
+- name: Read the mount target of each source path that has a snapshot_dir
+  ansible.builtin.command:
+    argv: [findmnt, --noheadings, --output, TARGET, --target, "{{ item.path }}"]
+  loop: "{{ btrbk_sources | selectattr('snapshot_dir', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: btrbk_src_target
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags: [btrbk]
+
+- name: Read the mount target of the parent of each snapshot_dir
+  ansible.builtin.command:
+    argv: [findmnt, --noheadings, --output, TARGET, --target, "{{ item.snapshot_dir | regex_replace('(.)/+$', '\\1') | dirname }}"]
+  loop: "{{ btrbk_sources | selectattr('snapshot_dir', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: btrbk_sd_target
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags: [btrbk]
+
+- name: Fail before any change when a snapshot_dir is on another mount than its source
+  ansible.builtin.assert:
+    that:
+      - item.0.rc == 0
+      - item.1.rc == 0
+      - item.0.stdout | trim | length > 0
+      - item.0.stdout | trim == item.1.stdout | trim
+    fail_msg: >-
+      btrbk_sources entry '{{ item.0.item.name }}': snapshot_dir
+      '{{ item.0.item.snapshot_dir }}' must be on the same mount as path
+      '{{ item.0.item.path }}' (findmnt: source on '{{ item.0.stdout | trim }}',
+      snapshot_dir parent on '{{ item.1.stdout | trim }}') (GS-FR-92).
+    quiet: true
+  loop: "{{ btrbk_src_target.results | zip(btrbk_sd_target.results) | list }}"
+  loop_control:
+    label: "{{ item.0.item.name }}"
   tags: [btrbk]
 
 - name: Install btrbk from the pinned repository

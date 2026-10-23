@@ -6,7 +6,9 @@ ZeroTier/LAN, not a public VM like cloud-wahlberger-dev), so Let's Encrypt
 can't reach it on port 80 to validate a certificate. DNS-01 only needs
 outbound access to Cloudflare's API and Let's Encrypt, which the host already
 has. It also creates the shared `caddy.network` Podman network that backend
-services (`tandoor`, `paperless_ngx`) attach to.
+services (`tandoor`, `paperless_ngx`) attach to. `caddy_extra_networks` (default
+`[]`) lists further Quadlet networks the container joins, for example
+`garage.network`; the role that owns that network must run before this one.
 
 ## Why a custom-built image
 
@@ -27,7 +29,7 @@ before deploying the container — no external/third-party image required.
 | `caddy_http_port` | `80` | Host port → container 80. |
 | `caddy_https_port` | `443` | Host port → container 443. |
 | `caddy_acme_email` | `""` | Let's Encrypt account email (optional). |
-| `caddy_sites` | `[]` | List of `{ host, upstream, extra? }` to serve. |
+| `caddy_sites` | `[]` | List of `{ host, upstream, extra? }` or `{ host, body }` to serve. |
 
 Cloudflare API token: set `vault_cloudflare_dns_api_token` in Ansible Vault,
 surfaced as `cloudflare_dns_api_token` in `vars.yml` — a scoped token with
@@ -49,3 +51,21 @@ Each `host` needs a DNS **A/AAAA record** pointing at wherever clients
 actually reach this host (its LAN or ZeroTier IP) — DNS-01 doesn't require it
 to resolve to a public IP, unlike HTTP-01. Certificates persist in
 `/mnt/containers/caddy/data` — back that up.
+
+## Sites with a custom body
+
+Set `body` instead of `upstream` when a site needs its own routing. The block
+renders as `<host> { <body> }` with no generated `reverse_proxy`:
+
+```yaml
+caddy_sites:
+  - host: s3.example.test
+    body: |
+      handle {
+        reverse_proxy garage:3900
+      }
+```
+
+`body` excludes `upstream` and `extra`, and an entry needs either `body` or
+`upstream`. Any other combination fails before the role changes anything,
+naming the entry's `host`. Entries without `body` render exactly as before.

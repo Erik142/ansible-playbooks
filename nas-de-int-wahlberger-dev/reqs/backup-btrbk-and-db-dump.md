@@ -1,7 +1,7 @@
 ## Feature: Local backup disk, btrbk, and NAS-hosted restic REST server (btrbk replication and database dumps)
 status:            ready
 priority:          must
-version:           3.0
+version:           3.1
 quality:           feature-level scores in [backup-overview.md](backup-overview.md)
 
 ### Problem Statement
@@ -23,7 +23,7 @@ See [backup-overview.md](backup-overview.md#actors). Main actors here: btrbk, th
 - BD-FR-48 [Must]: The repository of BD-FR-47 shall have GPG signature checking enabled.
 - BD-FR-49 [Must]: If the repository signing key's fingerprint is not `btrbk_zypper_repo_gpg_fingerprint`, then the `btrbk` role shall fail before adding the repository or its key.
 - BD-FR-50 [Must]: After a run of the `btrbk` role, `btrbk` shall be the only installed package whose repository is the repository of BD-FR-47.
-- BD-FR-51 [Must]: When a btrbk run executes, btrbk shall create one read-only snapshot of each `btrbk_sources` entry in `<source path>/<btrbk_snapshot_dirname>` (BD-A-07).
+- BD-FR-51 [Must]: When a btrbk run executes, btrbk shall create one read-only snapshot of each `btrbk_sources` entry in `<source path>/<btrbk_snapshot_dirname>`, or in the entry's `snapshot_dir` where set (BD-A-07; per-source `snapshot_dir`: GS-FR-90 to GS-FR-92).
 - BD-FR-52 [Must]: The btrbk snapshot directory shall not be a `.snapshots` directory or below one.
 - BD-FR-53 [Must]: The btrbk snapshot directory shall not be at or below `samba_data_dir` (`/mnt/data/samba`, the Samba share's parent).
 - BD-FR-54 [Must]: When a btrbk run executes, btrbk shall transfer each new source snapshot with btrfs send/receive into `<btrbk_target_dir>/<source name>/`.
@@ -71,7 +71,7 @@ See [backup-overview.md](backup-overview.md#actors). Main actors here: btrbk, th
 
 | Name | Type | Required | Constraints |
 |---|---|---|---|
-| `btrbk_sources` | list of `{name, path}` | no | Default `data` → `/mnt/data` and `containers` → `/mnt/containers`. Each path is a `storage_mounts` path |
+| `btrbk_sources` | list of `{name, path, mount_path?, snapshot_dir?}` | no | Default `data` → `/mnt/data` and `containers` → `/mnt/containers`. Each path of an entry without `mount_path` is a `storage_mounts` path. Optional `mount_path`: a `storage_mounts` path; `path` is then a btrfs subvolume below `mount_path`, checked with `btrfs subvolume show`, and the mount guard (BD-FR-25, BD-BR-04) checks `mount_path` instead of `path`; if `path` does not exist, is not a btrfs subvolume or is not below `mount_path`, the role fails before any change and does not create `path` (GS-FR-75, GS-FR-76). Optional `snapshot_dir`: absolute path that holds this entry's source snapshots instead of `<path>/<btrbk_snapshot_dirname>`, created `root:root 0700`; the role fails before any change if it is relative, at or below `samba_data_dir`, at or below `path`, or on another mount than `path` (GS-FR-90 to GS-FR-92) |
 | `btrbk_target_dir` | path | no | Default `/mnt/backup/btrbk` |
 | `btrbk_snapshot_dirname` | str | no | Default `.btrbk`; not `.snapshots` |
 | `btrbk_snapshot_preserve_min` / `btrbk_snapshot_preserve` | str | no | Defaults `2d` / `no` |
@@ -92,7 +92,7 @@ See [backup-overview.md](backup-overview.md#actors). Main actors here: btrbk, th
 | Name | Type | Constraints |
 |---|---|---|
 | btrbk configuration; `btrbk.service`, `btrbk.timer`, `db-dump.service` | Config + systemd units | BD-FR-57, BD-FR-58, BD-BR-05 |
-| Source snapshots `<source>/.btrbk/<name>.<timestamp>` | Read-only subvolumes | BD-FR-51 to BD-FR-53 |
+| Source snapshots `<source>/.btrbk/<name>.<timestamp>`, or `<snapshot_dir>/<name>.<timestamp>` for an entry with a per-source `snapshot_dir` | Read-only subvolumes | BD-FR-51 to BD-FR-53; GS-FR-90 to GS-FR-92 |
 | Received snapshots `/mnt/backup/btrbk/<name>/<name>.<timestamp>` | Read-only subvolumes with `Received UUID` | BD-FR-54 to BD-FR-57, BD-FR-161 |
 | `/mnt/containers/db-dumps/{paperless,immich,tandoor}.sql`, `forgejo.db` | Files | `0600 root:root` |
 | zypper repository `filesystems` | Repository definition | BD-FR-47 to BD-FR-50 |

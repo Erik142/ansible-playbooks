@@ -1,0 +1,71 @@
+---
+argument_specs:
+  main:
+    short_description: Garage S3 store as a Podman Quadlet on dedicated btrfs subvolumes.
+    options:
+      garage_enabled:
+        type: bool
+        required: false
+        description: site.yml gate; the role fails when true while backup_disk_enabled is false.
+      garage_image:
+        type: str
+        required: false
+        description: Pinned, fully qualified Garage image; the tag is never latest.
+      garage_mount_path:
+        type: path
+        required: false
+        description: Mount point of the data filesystem (a storage_mounts path, btrfs).
+      garage_store_path:
+        type: path
+        required: false
+        description: Data subvolume, a direct child of garage_mount_path.
+      garage_meta_mount_path:
+        type: path
+        required: false
+        description: Mount point of the metadata filesystem (a storage_mounts path, btrfs).
+      garage_config_dir:
+        type: path
+        required: false
+        description: Directory below garage_meta_mount_path holding garage.toml and the metadata subvolume; holds no secret file.
+      garage_meta_path:
+        type: path
+        required: false
+        description: Metadata subvolume, a direct child of garage_config_dir.
+      garage_secrets_dir:
+        type: path
+        required: false
+        description: Directory (root:garage_user 0750) with the rpc_secret and admin_token files; covered by no btrbk source and no snapper config.
+      garage_user:
+        type: str
+        required: false
+        description: System account (UID below 1000, nologin) the container runs as.
+      garage_uid:
+        type: int
+        required: false
+        description: Runtime fact read with getent in tasks/storage.yml; not an input. Must not be 0.
+      garage_gid:
+        type: int
+        required: false
+        description: Runtime fact read with getent in tasks/storage.yml; not an input. Must not be 0.
+      garage_s3_domain:
+        type: str
+        required: false
+        description: FQDN of the S3 host; ends in .<cloudflare_dns_zone>.
+      garage_s3_region:
+        type: str
+        required: false
+        description: S3 region name; non-empty.
+      garage_rpc_secret:
+        type: str
+        required: false
+        no_log: true
+        description: RPC secret, 64 hex characters; from vault_garage_rpc_secret.
+      garage_admin_token:
+        type: str
+        required: false
+        no_log: true
+        description: Admin token of at least 32 characters; from vault_garage_admin_token.
+      garage_ready_timeout_sec:
+        type: int
+        required: false
+        description: Seconds to wait for garage status after a start or restart (10 to 600).

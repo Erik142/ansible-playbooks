@@ -1,0 +1,23 @@
+---
+# Notified by tasks/deploy.yml (garage.toml) and by tasks/secrets.yml (the two
+# secret files): Garage reads both only at start.
+# Guarded for check mode (GS-AC-46): nothing runs in check mode; a real apply
+# reloads systemd, then restarts only if the unit is installed.
+- name: Restart garage
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: not ansible_check_mode
+
+- name: Gather service facts for the garage unit check
+  ansible.builtin.service_facts:
+  when: not ansible_check_mode
+  listen: Restart garage
+
+- name: Restart garage unit if installed
+  ansible.builtin.systemd:
+    name: garage.service
+    state: restarted
+  when:
+    - not ansible_check_mode
+    - "'garage.service' in ansible_facts.services"
+  listen: Restart garage

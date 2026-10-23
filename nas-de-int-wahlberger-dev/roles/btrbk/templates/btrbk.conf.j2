@@ -13,7 +13,7 @@ target_preserve           {{ btrbk_target_preserve }}
 
 # {{ source.name }}: the whole mounted subvolume, restic repositories included (BD-FR-161).
 volume {{ source.path }}
-  snapshot_dir {{ btrbk_snapshot_dirname }}
+  snapshot_dir {{ (source.snapshot_dir | regex_replace('(.)/+$', '\1')) if source.snapshot_dir | default('') | length > 0 else btrbk_snapshot_dirname }}
   subvolume .
     snapshot_name {{ source.name }}
     target {{ btrbk_target_dir | regex_replace('/+$', '') }}/{{ source.name }}
