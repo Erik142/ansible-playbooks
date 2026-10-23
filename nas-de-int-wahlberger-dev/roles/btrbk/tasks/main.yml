@@ -80,6 +80,26 @@
     label: "{{ item.item }}"
   tags: [btrbk]
 
+# Check mode on a fresh host: a source the garage role has not created yet (it
+# creates it only in a real run) cannot be checked. Such a source is skipped by
+# the subvolume and snapshot_dir mount checks below. A real run never skips.
+- name: Look up which source paths exist
+  ansible.builtin.stat:
+    path: "{{ item.path }}"
+  loop: "{{ btrbk_sources }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: btrbk_src_stat
+  check_mode: false
+  tags: [btrbk]
+
+- name: Collect the sources not created yet (check mode only)
+  ansible.builtin.set_fact:
+    btrbk_sources_pending: >-
+      {{ btrbk_src_stat.results | rejectattr('stat.exists') | map(attribute='item.name') | list
+         if ansible_check_mode else [] }}
+  tags: [btrbk]
+
 # Entries with `mount_path` (GS-FR-75, GS-FR-76): the source path is a nested
 # subvolume, not a mount point. `btrfs subvolume show` fails when it is absent
 # or a plain directory; nothing is created.
@@ -93,6 +113,7 @@
   loop: "{{ btrbk_sources | selectattr('mount_path', 'defined') | list }}"
   loop_control:
     label: "{{ item.name }}"
+  when: item.name not in btrbk_sources_pending
   register: btrbk_subvol
   changed_when: false
   failed_when: false
@@ -110,6 +131,7 @@
   loop: "{{ btrbk_subvol.results }}"
   loop_control:
     label: "{{ item.item.name }}"
+  when: not (item.skipped | default(false))
   tags: [btrbk]
 
 # GS-FR-92: the snapshot directory must be on the same filesystem mount as the
@@ -120,6 +142,7 @@
   loop: "{{ btrbk_sources | selectattr('snapshot_dir', 'defined') | list }}"
   loop_control:
     label: "{{ item.name }}"
+  when: item.name not in btrbk_sources_pending
   register: btrbk_src_target
   changed_when: false
   failed_when: false
@@ -154,6 +177,7 @@
   loop: "{{ btrbk_src_target.results | zip(btrbk_sd_target.results) | list }}"
   loop_control:
     label: "{{ item.0.item.name }}"
+  when: not (item.0.skipped | default(false))
   tags: [btrbk]
 
 - name: Install btrbk from the pinned repository
