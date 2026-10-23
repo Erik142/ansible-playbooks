@@ -27,9 +27,9 @@ forgejo_runner_cpu_quota: "200%"
 # actions run under it. Pinned by digest; Renovate tracks the digests through
 # the netcup entry in renovate.json. The podman image is built on the host from
 # forgejo_runner_podman_base_image (see the Containerfile template).
-forgejo_runner_ubuntu_image: "docker.io/library/node:24-bookworm@sha256:14078204b6bb268c107ceff6d3c43f45a888105e5c2b18b14c32b3409d93a1b0"
+forgejo_runner_ubuntu_image: "docker.io/library/node:24-bookworm@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a"
 forgejo_runner_python_image: "docker.io/nikolaik/python-nodejs:python3.12-nodejs22@sha256:4f8fd127aa51e7f9fe80742a1dd7ce2191286abe2a341102418615eca8ff62b3"
-forgejo_runner_node_image: "docker.io/library/node:24-bookworm@sha256:14078204b6bb268c107ceff6d3c43f45a888105e5c2b18b14c32b3409d93a1b0"
+forgejo_runner_node_image: "docker.io/library/node:24-bookworm@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a"
 forgejo_runner_podman_base_image: "quay.io/podman/stable@sha256:2fb39ca923dd9e0ee33f9e319c3a107a2bfde022a6a31560cbd56a862821e7d3"
 forgejo_runner_podman_image: "localhost/ci-podman-node:1"
 
