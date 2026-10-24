@@ -19,13 +19,15 @@ Network=garage.network
 # Numeric ids of {{ garage_user }}: never root. Set at run time (getent).
 User={{ garage_uid }}
 Group={{ garage_gid }}
-# Container paths equal host paths. `:Z` relabels only these two directories;
+# Container paths equal host paths. `:Z` relabels only these four directories
+# (the config file and secrets directory are read-only but still need the
+# container_file_t label, or SELinux denies the read);
 # no Volume= for the subvolume root, the config directory as a whole or a
 # snapshot directory, so a read-only btrbk snapshot is never relabelled.
 Volume={{ garage_store_path }}/data:{{ garage_store_path }}/data:Z
 Volume={{ garage_meta_path }}:{{ garage_meta_path }}:Z
-Volume={{ garage_config_dir }}/garage.toml:{{ garage_config_dir }}/garage.toml:ro
-Volume={{ garage_secrets_dir }}:{{ garage_secrets_dir }}:ro
+Volume={{ garage_config_dir }}/garage.toml:{{ garage_config_dir }}/garage.toml:ro,Z
+Volume={{ garage_secrets_dir }}:{{ garage_secrets_dir }}:ro,Z
 # Config file location: to verify against v2.4.1 in spike T-02 / task T-10.
 Environment=GARAGE_CONFIG_FILE={{ garage_config_dir }}/garage.toml
 # Hardening (security review finding 2).
