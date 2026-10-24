@@ -147,7 +147,7 @@ caddy_sites: >-
 # entry. Set to true only after the enable checklist (GS-FR-115 to GS-FR-118,
 # GS-FR-120). Buckets, keys and the node layout are user-owned (GS-CC-40) and
 # are deliberately not declared here.
-garage_enabled: false
+garage_enabled: true
 garage_s3_domain: s3.de.int.wahlberger.dev
 # Caddy site body of the S3 host (O-6): anonymous GET/HEAD without a signature
 # go to the web endpoint with the bucket taken from the path; the rest goes to

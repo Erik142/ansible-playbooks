@@ -76,7 +76,7 @@ sys.exit(1)
 """
 
 
-def run_role(tmp_path: Path, sources: list[dict], subvols=(), extra_mounts=()):
+def run_role(tmp_path: Path, sources: list[dict], subvols=(), extra_mounts=(), check=False):
     bindir = tmp_path / "bin"
     bindir.mkdir()
     for name, body in (("findmnt", FAKE_FINDMNT), ("btrfs", FAKE_BTRFS)):
@@ -107,7 +107,7 @@ def run_role(tmp_path: Path, sources: list[dict], subvols=(), extra_mounts=()):
         "FAKE_SUBVOLS": json.dumps(list(subvols)),
     }
     proc = subprocess.run(
-        [ANSIBLE, "-i", "localhost,", "-e", f"@{tmp_path / 'vars.json'}", str(tmp_path / "play.yml")],
+        [ANSIBLE, *(["--check"] if check else []), "-i", "localhost,", "-e", f"@{tmp_path / 'vars.json'}", str(tmp_path / "play.yml")],
         env=env,
         capture_output=True,
         text=True,
@@ -172,3 +172,19 @@ def test_mount_path_equal_to_path_is_refused(tmp_path):
     bad = {k: v for k, v in GARAGE.items() if k != "snapshot_dir"} | {"path": "/mnt/data"}
     proc, out = run_role(tmp_path, [*DEFAULTS, bad], subvols=["/mnt/data"])
     assert proc.returncode != 0 and "strictly below" in out
+
+
+@pytest.mark.parametrize("check", [False, True], ids=["real-run", "check-mode"])
+def test_missing_source_real_run_fails_check_mode_skips(tmp_path, check):
+    """Real run: a missing source fails naming its path (GS-FR-76, GS-BR-04).
+    Check mode on a fresh host: the not-yet-created source is skipped, the guard passes."""
+    src = entry(GARAGE, path=str(tmp_path / "missing"), mount_path=str(tmp_path))
+    src["snapshot_dir"] = str(tmp_path / ".snap")
+    proc, out = run_role(tmp_path, [*DEFAULTS, src], subvols=[], extra_mounts=[str(tmp_path)], check=check)
+    if not check:
+        assert proc.returncode != 0
+        assert src["path"] in out and "never creates" in out
+    else:
+        for guard in ("does not exist or is not", "never creates", "must be on the same mount"):
+            assert guard not in out
+        assert "skipping" in out
