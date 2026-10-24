@@ -52,7 +52,7 @@ BD-FR-25, BD-FR-27, BD-FR-28 and BD-FR-33 (mount guards and unit properties) are
 - BD-FR-32 [Must]: `btrfs-scrub.timer` shall be enabled, with a period no longer than one calendar month.
 - BD-FR-34 [Must]: If a `backup_disk_mounts` path is not mounted when the health check runs, then the health check shall fail.
 - BD-FR-35 [Must]: If `btrfs device stats --check` reports a non-zero error counter for the backup filesystem, then the health check shall fail.
-- BD-FR-36 [Must]: If no direct child of a `backup_disk_freshness_checks` path has a birth time (`stat -c %W`) within that entry's `max_age_hours`, then the health check shall fail, with a journal line naming that path.
+- BD-FR-36 [Must]: If no direct child of a `backup_disk_freshness_checks` path was made within that entry's `max_age_hours`, then the health check shall fail, with a journal line naming that path. A child that is a btrfs subvolume is dated by its `Receive time` (else `Creation time`) from `btrfs subvolume show`, because `btrfs receive` does not set the birth time that `stat -c %W` reports; any other child is dated by `stat -c %W`.
 - BD-FR-37 [Must]: (The hook, packages and `smartd.service` of BD-FR-37 to BD-FR-42 come from the shared `smartd` role, see [smartd-main-disk.md](smartd-main-disk.md); `backup_disk` adds only its own device line.) smartd shall monitor the backup disk, addressed by its `/dev/disk/by-id/` path, with the `-a` directive.
 - BD-FR-38 [Must]: smartd shall schedule self-tests of the backup disk with `-s <backup_disk_smartd_schedule>`.
 - BD-FR-39 [Must]: When smartd logs a warning for the backup disk, an email shall reach `notify_failure_to_address` within 5 min, sent with the `notify_failure` Resend credentials.

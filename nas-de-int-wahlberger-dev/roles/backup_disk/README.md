@@ -194,8 +194,10 @@ journal lines start with `FAIL:` and name the path. It fails when
 - a `backup_disk_mounts` path is not mounted, or is mounted from another
   filesystem UUID or subvolume than `backup_disk_uuid` and the entry's `subvol`;
 - `btrfs device stats --check` exits non-zero (any error counter above 0);
-- no direct child of a `backup_disk_freshness_checks` path was born (`stat -c
-  %W`) within that entry's `max_age_hours`. A path that does not exist logs
+- no direct child of a `backup_disk_freshness_checks` path was made within that
+  entry's `max_age_hours`. A btrfs subvolume child (a btrbk snapshot or
+  replica) is dated by its `Receive time` from `btrfs subvolume show`, else its
+  `Creation time`; other children by birth time (`stat -c %W`). A path that does not exist logs
   `<path>: absent, skipped` and does not fail (for example the cloud repository
   before runbook step 6).
 

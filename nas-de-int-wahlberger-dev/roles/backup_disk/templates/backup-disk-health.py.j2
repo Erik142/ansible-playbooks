@@ -5,8 +5,10 @@
 Fails (exit 1, every finding on stdout for the journal) when
   * a backup mount is not mounted from the expected filesystem UUID and subvolume,
   * ``btrfs device stats --check`` exits non-zero for a backup mount,
-  * no direct child of a freshness path was born within that entry's
-    ``max_age_hours`` (a freshness path that does not exist is skipped).
+  * no direct child of a freshness path was made within that entry's
+    ``max_age_hours`` (a freshness path that does not exist is skipped). A btrfs
+    subvolume child is dated by its receive time, else creation time; other
+    children by birth time (``stat -c %W``).
 The unit has OnFailure=notify-failure-immediate@%n.service, so a failure alerts.
 
 Read-only by design (BD-FR-28): it lists directories and runs findmnt, btrfs
@@ -19,10 +21,12 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
 from collections.abc import Callable, Sequence
+from datetime import datetime
 from typing import TextIO
 
 {% set config = {"uuid": backup_disk_uuid, "mounts": backup_disk_mounts, "freshness": backup_disk_freshness_checks} %}
@@ -70,15 +74,46 @@ def check_device_stats(path: str, run: Runner) -> "list[str]":
     return []
 
 
+SUBVOLUME_TIME = re.compile(r"^\s*(Receive|Creation) time:\s*(\S+ \S+ \S+)\s*$", re.M)
+TIME_FORMAT = "%Y-%m-%d %H:%M:%S %z"
+
+
+def subvolume_time(path: str, run: Runner) -> "int | None":
+    """Receive time, else creation time (epoch s), of a btrfs subvolume; None if path is not one.
+
+    btrbk replicates by `btrfs receive`, which does not set the birth time that
+    `stat -c %W` reports: a received snapshot keeps the birth time of an older
+    one, so the receive time is the one that says when the copy was made.
+    """
+    code, out = run(["btrfs", "subvolume", "show", path])
+    if code != 0:
+        return None
+    times = dict(SUBVOLUME_TIME.findall(out))
+    for kind in ("Receive", "Creation"):
+        try:
+            return int(datetime.strptime(times[kind], TIME_FORMAT).timestamp())
+        except (KeyError, ValueError):
+            continue
+    return None
+
+
+def child_birth(child: str, run: Runner) -> "int | None":
+    """Epoch s the child was made (subvolume time, else stat birth time); None if unknown."""
+    born = subvolume_time(child, run)
+    if born is not None:
+        return born
+    code, out = run(["stat", "-c", "%W", "--", child])
+    if code != 0 or not out.strip().isdigit():
+        return None
+    return int(out.strip())
+
+
 def newest_birth(path: str, run: Runner, listdir: Callable[[str], "list[str]"]) -> "int | None":
     """Newest birth time (epoch s) among the direct children, None if none known."""
     newest = None
     for name in listdir(path):
-        code, out = run(["stat", "-c", "%W", "--", os.path.join(path, name)])
-        if code != 0 or not out.strip().isdigit():
-            continue
-        born = int(out.strip())
-        if born > 0 and (newest is None or born > newest):  # 0 = birth time unknown (BD-A-20)
+        born = child_birth(os.path.join(path, name), run)
+        if born is not None and born > 0 and (newest is None or born > newest):  # 0 = unknown (BD-A-20)
             newest = born
     return newest
 
