@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+Hetzner Cloud variant of the openSUSE Tumbleweed Minimal-VM image description.
+
+Derived from openSUSE:Factory/kiwi-templates-Minimal (Minimal.kiwi), see README.md for the
+exact upstream revision. Strategy: ONE profile that takes
+  - the filesystem/disk attributes (btrfs, snapper, subvolumes, BIOS+EFI hybrid) from the
+    upstream profile "kvm-and-xen", and
+  - the cloud pieces (cloud-init, cloud-init-config-suse, release-appliance-openstack,
+    grub timeout 1) from the upstream profile "Cloud".
+Every deviation from upstream is marked with a "HETZNER:" comment so it can be found by grep.
+All upstream profiles we do not build (VMware, HyperV, RPi, s390x, ppc64le, sdboot, BLS,
+KubeVirt, aarch64) are removed.
+-->
+
+<image schemaversion="7.4" name="openSUSE-Tumbleweed-Hetzner" displayname="openSUSE Tumbleweed Hetzner">
+    <description type="system">
+        <author>Erik Wahlberger</author>
+        <contact>ewahlberger@gmail.com</contact>
+        <specification>openSUSE Tumbleweed Minimal (btrfs, snapper, cloud-init) for Hetzner Cloud</specification>
+    </description>
+    <profiles>
+        <profile name="Hetzner" description="Minimal btrfs+snapper+cloud-init image for Hetzner Cloud (x86_64, BIOS+UEFI)" arch="x86_64"/>
+    </profiles>
+    <preferences profiles="Hetzner" arch="x86_64">
+        <!-- HETZNER: build.sh rewrites this with the image-version option -->
+        <version>1.0.0</version>
+        <packagemanager>zypper</packagemanager>
+        <bootloader-theme>openSUSE</bootloader-theme>
+        <rpm-excludedocs>true</rpm-excludedocs>
+        <locale>en_US</locale>
+        <!--
+          Attributes are those of upstream "kvm-and-xen" (x86_64) except:
+          - no format="qcow2": HETZNER wants a RAW disk (hcloud-upload-image / dd). build.sh compresses it.
+          - bootloader timeout="1" as in upstream "Cloud".
+          firmware="uefi" is kiwi's hybrid mode on x86_64: GPT with a BIOS boot partition (grub2
+          i386-pc, what Hetzner's legacy/CSM boot uses) AND an ESP (grub2 x86_64-efi).
+          Root growth on first boot: oem-resize is on by default for image="oem", implemented
+          by dracut-kiwi-oem-repart (systemd-repart + growfs, works on btrfs).
+        -->
+        <type
+            image="oem"
+            filesystem="btrfs"
+            firmware="uefi"
+            efipartsize="512"
+            bootpartition="false"
+            bootkernel="custom"
+            devicepersistency="by-uuid"
+            btrfs_quota_groups="true"
+            btrfs_root_is_snapshot="true"
+        >
+            <bootloader name="grub2" timeout="1"/>
+            <systemdisk>
+                <volume name="home"/>
+                <volume name="root"/>
+                <volume name="opt"/>
+                <volume name="srv"/>
+                <volume name="boot/grub2/i386-pc"/>
+                <volume name="boot/grub2/x86_64-efi" mountpoint="boot/grub2/x86_64-efi"/>
+                <volume name="usr/local"/>
+                <volume name="var" copy_on_write="false"/>
+            </systemdisk>
+            <!-- HETZNER: 6 GB instead of upstream 24 GB (smaller upload; grown to the 40 GB disk at first boot) -->
+            <size unit="G">6</size>
+        </type>
+    </preferences>
+
+    <!-- HETZNER: upstream uses obsrepositories:/ (OBS build service only); plain Tumbleweed repos here -->
+    <repository type="rpm-md" alias="repo-oss" priority="99" imageinclude="false">
+        <source path="https://download.opensuse.org/tumbleweed/repo/oss/"/>
+    </repository>
+
+    <!-- Common set: identical to upstream, except the lines marked HETZNER -->
+    <packages type="image">
+        <package name="patterns-base-base"/>
+        <package name="patterns-base-selinux"/>
+        <package name="audit"/> <!-- On SLE it's only recommended by the apparmor pattern -->
+        <package name="aaa_base-extras"/> <!-- wouldn't be SUSE without that ;-) -->
+        <package name="acl"/>
+        <package name="chrony"/>
+        <package name="curl"/> <!-- needed for openQA, maybe delete -->
+        <package name="dracut"/>
+        <package name="fipscheck"/>
+        <package name="group(mail)"/> <!-- needed by useradd bsc#1061838-->
+        <!-- Previously pam_cracklib was part of pam, but the replacement is only recommended -->
+        <package name="pam_pwquality"/>
+        <package name="cracklib-dict-small"/> <!-- Avoid the big 10MiB one -->
+        <package name="iputils"/>
+        <package name="vim-small"/>
+        <package name="haveged"/>
+        <package name="less"/>
+        <package name="tar"/>
+        <package name="parted"/>
+        <package name="timezone"/>
+        <package name="iproute2"/>
+        <package name="openssh"/>
+        <package name="rsync"/>
+        <package name="dosfstools"/> <!-- For fscking /boot/efi -->
+        <package name="procps"/> <!-- For free/ps and other basic utilities -->
+        <package name="lsof"/> <!-- For zypper ps (bsc#1167553) -->
+        <package name="live-add-yast-repos"/>
+        <package name="systemd-logger"/> <!-- for openSUSE -->
+        <package name="zypper-needs-restarting"/> <!-- Some deployment script use this (bsc#1173548) -->
+        <package name="nftables"/>
+        <package name="iptables"/>
+        <!-- Configure zypper for no-recommends and excludedocs -->
+        <package name="zypp-excludedocs"/>
+        <package name="zypp-no-recommends"/>
+        <package name="combustion &gt;= 1.2"/> <!-- 1.2+ has improved firstboot detection -->
+        <package name="NetworkManager"/>
+        <package name="dracut-kiwi-oem-repart"/> <!-- first-boot root growth (also btrfs) -->
+        <package name="update-bootloader"/>
+    </packages>
+
+    <!-- From upstream "kvm-and-xen": GRUB (BIOS + EFI) -->
+    <packages type="image">
+        <package name="grub2"/> <!-- on x86_64 this also provides the i386-pc (BIOS) modules -->
+        <package name="grub2-branding-openSUSE"/>
+        <package name="grub2-x86_64-efi"/>
+        <package name="shim"/>
+    </packages>
+
+    <!-- From upstream "kvm-and-xen": btrfs + snapper. -->
+    <packages type="image">
+        <package name="btrfsprogs"/>
+        <package name="btrfsmaintenance"/>
+        <package name="snapper-zypp-plugin"/>   <!-- this is key snapper/zypp integration, as requested in the PRD -->
+        <package name="snapper"/>
+        <package name="grub2-snapper-plugin"/>  <!-- snapper - grub2 - integration, "small" -->
+        <!-- HETZNER: NOT installed vs upstream kvm-and-xen: jeos-firstboot (interactive wizard) and firewalld -->
+    </packages>
+
+    <!-- From upstream "Cloud" -->
+    <packages type="image">
+        <package name="cloud-init"/>
+        <package name="cloud-init-config-suse"/>
+        <package name="kernel-default-base"/>
+        <package name="qemu-guest-agent"/>
+        <!-- HETZNER: not in upstream Cloud (it uses XFS): nothing needed for XFS here -->
+        <!-- HETZNER: addition. Hetzner user-data creates a user with "sudo: ALL=(ALL) NOPASSWD:ALL",
+             which needs sudo to exist. Upstream Minimal images do not ship it. -->
+        <package name="sudo"/>
+        <!-- HETZNER: not installed vs upstream kvm-and-xen: xen-tools-domU, xen-libs (KVM guest only) -->
+    </packages>
+
+    <packages type="bootstrap">
+        <package name="filesystem"/>
+        <package name="glibc-locale-base"/>
+        <package name="ca-certificates-mozilla"/>
+        <package name="openSUSE-release"/>
+
+        <!-- Avoid that zypper picks the busybox-foo variant for those, that would fail later -->
+        <package name="awk"/>
+        <package name="coreutils"/>
+        <package name="gzip"/>
+        <!-- HETZNER: upstream Cloud flavour -->
+        <package name="openSUSE-release-appliance-openstack"/>
+    </packages>
+</image>

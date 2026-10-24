@@ -55,7 +55,7 @@ Critical path: T-09 -> T-10 -> T-16 -> T-17 -> T-18 -> T-19 -> T-21 -> T-23 -> T
 
 ### Tasks
 
-#### T-01 — Walking skeleton: `garage` role scaffold, Quadlet, `site.yml` wiring, role-order check          [~] done, v1.1 trim open
+#### T-01 — Walking skeleton: `garage` role scaffold, Quadlet, `site.yml` wiring, role-order check          [x] done 2026-10-18; v1.1 trim done 2026-10-19 (1053084, trimmed skeleton)
 - Type: skeleton
 - Requirements: GS-FR-10, GS-FR-13, GS-FR-16, GS-FR-17, GS-FR-18, GS-FR-19, GS-FR-22, GS-FR-60, GS-FR-62 (container part), GS-FR-63, GS-FR-64, GS-FR-67, GS-FR-73, GS-FR-80, GS-FR-81, GS-FR-82, GS-FR-121, GS-FR-122, GS-FR-136 (Quadlet line), GS-FR-138 (static guard), GS-BR-10, GS-E-20, GS-CC-36, GS-CC-38
 - Agent: ansible-doctor    Priority: P0    Size: M    Parallel group: G0 (done), trim in G1
@@ -131,7 +131,7 @@ Critical path: T-09 -> T-10 -> T-16 -> T-17 -> T-18 -> T-19 -> T-21 -> T-23 -> T
 - Verification: `tests/render-check.sh && pytest tests/unit/test_caddy_body.py -q && ansible-lint roles/caddy`
 - Where: LOCAL; VM confirmation in T-17. Gate: host    Risk/notes: nothing applied to the NAS.
 
-#### T-07 — `garage` role: input validation before any change          [~] done, v1.1 trim open
+#### T-07 — `garage` role: input validation before any change          [x] done 2026-10-18; v1.1 trim done 2026-10-19 (preflight limited to GS-FR-135 checks)
 - Type: slice
 - Requirements: GS-FR-135, GS-FR-12 (non-empty/format checks), GS-FR-21 (assert exception, GS-CC-39), GS-E-04, GS-FR-67 (shared with T-01)
 - Agent: ansible-doctor    Priority: P1    Size: S    Parallel group: G0 (done), trim in G1
@@ -158,7 +158,7 @@ Critical path: T-09 -> T-10 -> T-16 -> T-17 -> T-18 -> T-19 -> T-21 -> T-23 -> T
 - Verification: LOCAL `ansible-lint roles/garage && tests/syntax-check-role.sh garage && tests/static-checks.sh`; VM scenarios in T-16.
 - Where: LOCAL for lint/static; VM for the scenarios. Gate: simulator    Risk/notes: authored, not claimed verified until T-16.
 
-#### T-09 — `garage` role: secret files outside every snapshot, run-time guard          [ ] todo
+#### T-09 — `garage` role: secret files outside every snapshot, run-time guard          [x] done 2026-10-19: secrets stage and guard (64d1772)
 - Type: slice
 - Requirements: GS-FR-20, GS-FR-21 (secret files), GS-FR-132, GS-FR-133, GS-FR-134, GS-BR-14, GS-NFR-09, GS-E-32, GS-CC-31, GS-CC-33
 - Agent: ansible-doctor    Priority: P0    Size: M    Parallel group: G1
@@ -173,7 +173,7 @@ Critical path: T-09 -> T-10 -> T-16 -> T-17 -> T-18 -> T-19 -> T-21 -> T-23 -> T
 - Verification: LOCAL `ansible-lint roles/garage && tests/static-checks.sh`; scenarios on the VM in T-16.
 - Where: LOCAL for lint/inspection; VM for the scenarios. Gate: simulator    Risk/notes: reviewed by `security-auditor` in T-20. NAS not touched.
 
-#### T-10 — `garage` role: `garage.toml`, container deployment, readiness wait          [ ] todo
+#### T-10 — `garage` role: `garage.toml`, container deployment, readiness wait          [x] done 2026-10-19: garage.toml, container, readiness wait (cb0cdff); restart fix (170982d)
 - Type: slice
 - Requirements: GS-FR-07, GS-FR-08, GS-FR-11, GS-FR-17, GS-FR-23, GS-FR-29, GS-FR-38, GS-FR-62 (full), GS-FR-85, GS-FR-108, GS-FR-109, GS-FR-111, GS-FR-136, GS-FR-138, GS-NFR-05, GS-E-05, GS-E-19, GS-CC-04, GS-CC-05, GS-CC-35, GS-CC-36
 - Agent: ansible-doctor    Priority: P1    Size: M    Parallel group: G1
@@ -197,7 +197,7 @@ Critical path: T-09 -> T-10 -> T-16 -> T-17 -> T-18 -> T-19 -> T-21 -> T-23 -> T
 - Reason: GS-CC-40 removes GS-FR-100 to GS-FR-105, 123 to 125, 131, GS-BR-12, GS-BR-13, GS-NFR-01, GS-NFR-07, GS-NFR-08, GS-E-28 to GS-E-31 and GS-AC-60 to GS-AC-64. Retention is user-owned; the lifecycle commands become README text (T-21, GS-FR-140). `garage_s3_client_image`, the `bucket-admin` key and the lifecycle one-shot container do not exist any more.
 - Files owned: none.
 
-#### T-13 — VM fixture inputs for Garage, `vault.yml.example`, and the test-setup step          [ ] todo
+#### T-13 — VM fixture inputs for Garage, `vault.yml.example`, and the test-setup step          [x] done 2026-10-19: VM fixture inputs and test-setup step (82f873c)
 - Type: enabling
 - Requirements: GS-FR-65, GS-FR-66, GS-FR-68, GS-AC-70 (static part), GS-AC-24 (fixture values)
 - Agent: ansible-doctor    Priority: P1    Size: S    Parallel group: G1
@@ -213,7 +213,7 @@ Critical path: T-09 -> T-10 -> T-16 -> T-17 -> T-18 -> T-19 -> T-21 -> T-23 -> T
 - Verification: the `ansible -i inventories/vm ...` commands above; `yamllint .`; `bash -n tests/vm/scenarios/garage-test-setup.sh`.
 - Where: LOCAL (authoring); the script runs on the VM in T-16/T-17. Gate: host    Risk/notes: NAS not touched.
 
-#### T-14 — Production `vars.yml`: Garage wiring behind `garage_enabled: false`          [ ] todo
+#### T-14 — Production `vars.yml`: Garage wiring behind `garage_enabled: false`          [x] done 2026-10-19: production wiring behind garage_enabled (8f94c4c); enabled in PR #56 (merged)
 - Type: slice
 - Requirements: GS-FR-12 (indirections), GS-FR-32, GS-FR-35, GS-FR-41, GS-FR-45, GS-FR-50, GS-FR-51, GS-FR-61 (default false), GS-FR-70, GS-FR-74, GS-FR-78, GS-FR-79, GS-FR-93, GS-FR-94, GS-FR-112, GS-FR-113, GS-FR-114, GS-FR-126, GS-FR-127, GS-FR-128, GS-FR-129, GS-NFR-03, GS-CC-30
 - Agent: ansible-doctor    Priority: P1    Size: M    Parallel group: G1
@@ -230,7 +230,7 @@ Critical path: T-09 -> T-10 -> T-16 -> T-17 -> T-18 -> T-19 -> T-21 -> T-23 -> T
 - Verification: `pytest tests/unit/test_garage_production_vars.py -q && tests/render-check.sh && ansible-playbook site.yml --syntax-check && git diff master -- roles/btrbk/defaults/main.yml`
 - Where: LOCAL. Gate: host    Risk/notes: production file but `garage_enabled: false`; nothing is applied. Do not run `ansible-playbook` against the NAS.
 
-#### T-15 — Add the two `vault_garage_*` values to the encrypted production vault          [ ] todo
+#### T-15 — Add the two `vault_garage_*` values to the encrypted production vault          [x] done 2026-10-22: two production vault values (df6774d)
 - Type: enabling
 - Requirements: GS-P-03, GS-FR-12, GS-AC-69 (vault bullet), GS-E-04 (formats)
 - Agent: ansible-doctor    Priority: P1    Size: S    Parallel group: G1
@@ -288,7 +288,7 @@ Critical path: T-09 -> T-10 -> T-16 -> T-17 -> T-18 -> T-19 -> T-21 -> T-23 -> T
 - Verification: `tests/vm/scenarios/garage-v4-*.sh` exits 0; results file all PASS.
 - Where: VM. Gate: simulator    Risk/notes: none beyond T-16..T-18 prerequisites.
 
-#### T-20 — Security review of the Garage feature          [ ] todo
+#### T-20 — Security review of the Garage feature          [x] done 2026-10-22: security review (no critical/high/medium); fixes in 9814a32
 - Type: security
 - Requirements: GS-FR-12, GS-FR-13, GS-FR-20, GS-FR-21 (incl. the assert exception, GS-CC-39), GS-FR-132, GS-FR-133, GS-FR-134, GS-FR-138, GS-BR-05, GS-BR-09, GS-BR-14, GS-BR-15, GS-NFR-09, GS-A-08
 - Agent: security-auditor    Priority: P1    Size: S    Parallel group: G2
@@ -301,7 +301,7 @@ Critical path: T-09 -> T-10 -> T-16 -> T-17 -> T-18 -> T-19 -> T-21 -> T-23 -> T
 - Verification: reviewer checks the finding list against `grep -rn 'no_log' roles/garage` and the VM results of T-16, T-17, T-19.
 - Where: LOCAL (inspection of repo and VM results). Gate: host    Risk/notes: NAS not touched.
 
-#### T-21 — Documentation: role README (layout, user steps, restore), CLAUDE.md, repo README          [ ] todo
+#### T-21 — Documentation: role README (layout, user steps, restore), CLAUDE.md, repo README          [x] done 2026-10-22: role README, user steps and restore (1a797c6)
 - Type: docs
 - Requirements: GS-FR-34, GS-FR-77, GS-FR-84, GS-FR-139, GS-FR-140, GS-FR-63 (CLAUDE.md note), GS-AC-41, GS-AC-50, O-9
 - Agent: docs-writer    Priority: P1    Size: M    Parallel group: G2
@@ -315,7 +315,7 @@ Critical path: T-09 -> T-10 -> T-16 -> T-17 -> T-18 -> T-19 -> T-21 -> T-23 -> T
 - Verification: `grep -n 'SSTATE_MIRRORS\|layout assign\|layout apply\|same .<ts>\|re-render' roles/garage/README.md && grep -n garage CLAUDE.md molecule/default/converge.yml && yamllint .`
 - Where: LOCAL. Gate: host    Risk/notes: NAS not touched.
 
-#### T-22 — Prepare the enable change (`garage_enabled: true`) with the checklist          [ ] todo
+#### T-22 — Prepare the enable change (`garage_enabled: true`) with the checklist          [x] done 2026-10-23: enable change merged as PR #56 (garage_enabled: true)
 - Type: enabling
 - Requirements: GS-FR-61, GS-FR-115, GS-FR-116, GS-FR-117, GS-FR-118, GS-FR-120, GS-AC-66, GS-AC-69
 - Agent: git-release-manager    Priority: P1    Size: S    Parallel group: -
@@ -329,7 +329,7 @@ Critical path: T-09 -> T-10 -> T-16 -> T-17 -> T-18 -> T-19 -> T-21 -> T-23 -> T
 - Verification: `git diff --stat`; `pytest tests/unit/test_garage_production_vars.py -q`.
 - Where: LOCAL. Gate: host    Risk/notes: Erik reviews and merges; commit/push/merge only on Erik's request. Do not run any playbook.
 
-#### T-23 — Capacity analysis (GS-AC-47) from the README quota recommendation          [ ] todo
+#### T-23 — Capacity analysis (GS-AC-47) from the README quota recommendation          [x] done 2026-10-23: capacity read-only check: /mnt/data 5.9 TB free, /mnt/containers 2.0 TB free
 - Type: hardware-validation
 - Requirements: GS-NFR-02, GS-FR-120, GS-AC-47
 - Agent: ansible-doctor    Priority: P1    Size: S    Parallel group: -
@@ -342,7 +342,7 @@ Critical path: T-09 -> T-10 -> T-16 -> T-17 -> T-18 -> T-19 -> T-21 -> T-23 -> T
 - Verification: recorded values and the arithmetic in the PR description.
 - Where: NAS (read-only). Gate: hardware    Risk/notes: **A2** required; not executed by the planner.
 
-#### T-24 — Production apply (`--check --diff`, then apply)          [ ] todo
+#### T-24 — Production apply (`--check --diff`, then apply)          [x] done 2026-10-24: production check and apply (garage, btrbk, caddy, backup_disk); SELinux fix in PR #58, health fix in PR #59
 - Type: hardware-validation
 - Requirements: enabled-state requirements on the NAS: GS-FR-01..09, 20, 29, 32, 35, 70, 74, 78, 79, GS-BR-10, GS-BR-16
 - Agent: ansible-doctor    Priority: P1    Size: S    Parallel group: -
@@ -356,7 +356,7 @@ Critical path: T-09 -> T-10 -> T-16 -> T-17 -> T-18 -> T-19 -> T-21 -> T-23 -> T
 - Verification: recorded recap lines and the commands above, pasted to Erik.
 - Where: NAS. Gate: hardware    Risk/notes: **A3**. Changes the live NAS (Caddy reload affects all sites briefly; btrbk config changes). Not executed by the planner.
 
-#### T-25 — Production setup by Erik (README steps), then validation          [ ] todo
+#### T-25 — Production setup by Erik (README steps), then validation          [~] 2026-10-24: layout and user buckets/keys done by Erik; garage status healthy; S3 host live after cloudflare_dns; upload round trip verified with ci-upload key (temporary credentials removed)
 - Type: hardware-validation
 - Requirements: GS-FR-30, 31, 35, 44, 45, 50, 51, 137, 139, 140; GS-BR-05; GS-E-12; GS-AC-05, 10 (H bullet), 20 (first real run), 32, 33, 34, 45
 - Agent: ansible-doctor    Priority: P1    Size: S    Parallel group: -
