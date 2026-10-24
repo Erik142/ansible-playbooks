@@ -1,6 +1,23 @@
-## Plan: Move Semaphore from the Pi to a Hetzner VM (UI over ZeroTier only, key-only public SSH) and retire the Pi          spec: semaphore-migration/reqs/semaphore-to-hetzner.md (v1.2)   planned: 2026-10-10   status: planned
+## Plan: Move Semaphore from the Pi to a Hetzner VM (UI over ZeroTier only, key-only public SSH) and retire the Pi          spec: semaphore-migration/reqs/semaphore-to-hetzner.md (v1.2)   planned: 2026-10-10   status: in progress (PRs A–D merged to master, 2026-10-11 to 2026-10-17; PR E and Pi retirement open)
 
 Branch: `feature/semaphore-to-hetzner`. IDs: `T-nn` agent tasks (repo, offline-verifiable), `OP-nn` operator checklist items (Erik only, live systems). Spec IDs carry the prefix `SH-`; in this file `FR-nn`, `AC-nn`, `BR-nn`, `CC-nn`, `DOC-nn`, `NFR-nn`, `D-nn`, `A-nn`, `E-nn` all mean `SH-...`.
+
+### Reality check (2026-10-19, verified against `master` and live DNS)
+
+Checked against the repository on `master` (not against this document's checkboxes, which lagged behind) and public DNS via `dig @1.1.1.1`.
+
+| Item | Actual state | Evidence |
+|---|---|---|
+| Semaphore DNS | `semaphore.de.int.wahlberger.dev` is a CNAME to `ops.de.int.wahlberger.dev`, which resolves to `10.243.25.185` (= `vm_zt_ip`). `pi.de.int.wahlberger.dev` still has an A record (`10.10.0.101`), used by nothing in the CNAME chain. | `dig`; PR D `1c40eaa`: `semaphore_dns_cutover_enabled: true` in `ops-de-wahlberger-dev/inventories/production/group_vars/all/vars.yml:121` |
+| Semaphore cut-over (OP-08 code side) | Merged: PR #40 (`ad198c9`, 2026-10-17). Live steps (Pi stop, schedule activation, Uptime Kuma TCP monitor) are not verifiable from the repo. | `git log master`, `1c40eaa` message |
+| Pi still in repo | `pi-de-int-wahlberger-dev/` present with its own `site.yml` (incl. `semaphore`, `restic_server`, `caddy`). Renovate freeze rule for `pi-de-int-wahlberger-dev/**` still in `renovate.json:89`. Root `README.md` Pi row still says "runs all the playbooks… Retires at PR E". | `git ls-tree master pi-de-int-wahlberger-dev/`; `renovate.json`; `README.md:16` |
+| Pi as backup target | No longer. Cloud client defaults to `nas.de.int.wahlberger.dev`; NAS `restic_backup_decommission_enabled: true`; NAS runs `restic_server` (gated by `backup_disk_enabled: true`). | `cloud-wahlberger-dev/roles/restic_backup/defaults/main.yml:28`; `nas-de-int-wahlberger-dev/inventories/production/group_vars/all/vars.yml:55,72` |
+| SSH automation key | Replaced on ops, nas and cloud by PR C (`cd9e322`, `3e9fa02`). Old Pi key still needs revoking in PR E. | PR C commit |
+| Pi retirement (OP-09, PR E, T-26/T-27) | Not started. PR E has not been merged; `pi-de-int-wahlberger-dev/` still exists. | `git log master`; directory listing |
+
+Merged PRs (from `master` history): #26 plan; #27 podman socket check mode; #28 PR A2 (ZeroTier values); #29 PR A3 (step-3 decision); #30 PR A4 (pin Semaphore image); #31 beszel check mode; #32 vault copy keys tool; #33 and #36 NAS restic `ops` client and Vault keys (PR B); #37 NAS restic maintenance (PR B2); #38 maintenance log fix; #39 PR C (new automation key with `from=`); #40 PR D (cut-over).
+
+Open: PR E (T-26, T-27); OP-W stabilisation window (≥14 days from cut-over); OP-09 Pi retirement, including the point-of-no-return steps and the USB drive (which holds the frozen `nas` and `cloud` restic repos, per the runbook). Not yet confirmed from the repo: whether OP-04 to OP-08 live steps were executed as written, and whether any Pi-side schedule was reactivated or left stopped.
 
 ### Scope split (read first)
 
@@ -356,7 +373,7 @@ Walking skeleton: T-02 (after the tiny contract task T-01).
 - Verification: commands above plus `gh pr view --json files`
 - Gate: host    Risk/notes: Merge is deploy for nas/cloud (Pi Semaphore applies master): operator confirms the AC-44 no-op property from the Molecule output before merging.
 
-#### T-20 — PR B: NAS rest-server client `ops` (+ Vault keys, examples, docs)          [ ] todo
+#### T-20 — PR B: NAS rest-server client `ops` (+ Vault keys, examples, docs)          [x] done (merged #33, #36; 2026-10-16/17)
 - Type: slice
 - Requirements: SH-FR-84, SH-CC-02, SH-BR-09 (NAS half), SH-BR-16 (row B), SH-DOC-07 (part), SH-R-03
 - Agent: ansible-doctor    Priority: P1    Size: S    Parallel group: L1
@@ -370,7 +387,7 @@ Walking skeleton: T-02 (after the tiny contract task T-01).
 - Verification: commands above in `nas-de-int-wahlberger-dev`; `ops-de-wahlberger-dev/tests/tools/vault-hash-compare.sh`
 - Gate: host    Risk/notes: Needs Erik's unlock. NAS Vault must not contain `access_key_encryption` (BR-11).
 
-#### T-21 — PR B2: NAS maintenance for both repositories (CC-01) and freshness path (CC-03)          [ ] todo
+#### T-21 — PR B2: NAS maintenance for both repositories (CC-01) and freshness path (CC-03)          [x] done (merged #37, #38; 2026-10-17)
 - Type: slice
 - Requirements: SH-FR-85, SH-FR-86, SH-FR-87, SH-FR-153, SH-FR-154, SH-FR-155, SH-CC-01, SH-CC-03, SH-E-18/20, SH-BR-16 (row B2), SH-AC-32 (render/test half), SH-DOC-07
 - Agent: ansible-doctor    Priority: P1    Size: M    Parallel group: -
@@ -385,7 +402,7 @@ Walking skeleton: T-02 (after the tiny contract task T-01).
 - Verification: in `nas-de-int-wahlberger-dev`: `pytest tests/unit -q`, `tests/static-checks.sh`, `tests/render-check.sh`, ansible-lint/yamllint/syntax-check
 - Gate: host (fixture `t29`/`t31` scenarios optional, simulator)    Risk/notes: Existing NAS fixture scenarios cover rest-server; updating them is allowed here.
 
-#### T-22 — PR A2 (step 3 values) and PR A3 (step 3 observations, selector, UID)          [ ] todo
+#### T-22 — PR A2 (step 3 values) and PR A3 (step 3 observations, selector, UID)          [x] done (merged #28, #29; 2026-10-11)
 - Type: slice (runtime repo task; two sittings, inputs from Erik)
 - Requirements: SH-FR-34, SH-FR-192, SH-FR-29 (value), SH-FR-185 (name), SH-DOC-06 (in force), SH-AC-63, SH-BR-16 (rows A2, A3), PA-1, SH-AC-05/08/61 (README notes)
 - Agent: ansible-doctor    Priority: P0    Size: S    Parallel group: -
@@ -399,7 +416,7 @@ Walking skeleton: T-02 (after the tiny contract task T-01).
 - Verification: `tests/static-checks.sh && tests/pr-boundaries.sh A2` (resp. `A3`)
 - Gate: host    Risk/notes: Values come from Erik; the agent never reads Central or the Pi.
 
-#### T-23 — PR C: new key with `from=` in nas, cloud, `<vm-dir>` (+ contingent C2 and C-R branches)          [ ] todo
+#### T-23 — PR C: new key with `from=` in nas, cloud, `<vm-dir>` (+ contingent C2 and C-R branches)          [x] done (merged #39; 2026-10-17)
 - Type: slice (runtime repo task, inputs from Erik)
 - Requirements: SH-FR-56 (pubkey use), SH-FR-62, SH-FR-126, SH-FR-191 (C2), SH-CC-05, SH-BR-10, SH-BR-16 (rows C, C2, C-R), SH-AC-23, PA-3, PA-9
 - Agent: ansible-doctor    Priority: P0    Size: S    Parallel group: -
@@ -414,7 +431,7 @@ Walking skeleton: T-02 (after the tiny contract task T-01).
 - Verification: `tests/static-checks.sh && tests/pr-boundaries.sh C`; Molecule in nas/cloud (idempotence with the new key) if time allows
 - Gate: host    Risk/notes: Merge is deploy: Pi Semaphore may apply C to nas/cloud at any time; the key is usable only from the VM's addresses.
 
-#### T-24 — PR D code: NAS homepage label (CC-10), `semaphore_dns_cutover_enabled: true`, Renovate rule removal          [ ] todo
+#### T-24 — PR D code: NAS homepage label (CC-10), `semaphore_dns_cutover_enabled: true`, Renovate rule removal          [x] done (merged #40, commit `1c40eaa`; 2026-10-17)
 - Type: slice
 - Requirements: SH-CC-10, SH-FR-38, SH-FR-161 (removal), SH-CC-16, SH-BR-16 (row D), SH-DOC-08, SH-AC-38 (static half)
 - Agent: ansible-doctor    Priority: P1    Size: S    Parallel group: L1
@@ -428,7 +445,7 @@ Walking skeleton: T-02 (after the tiny contract task T-01).
 - Verification: commands above in `nas-de-int-wahlberger-dev` and `ops-de-wahlberger-dev`
 - Gate: host    Risk/notes: Cosmetic NAS change; safe if the Pi still applies it before it is stopped.
 
-#### T-25 — PR D docs: root README (ops row), architecture update, CI comments          [ ] todo
+#### T-25 — PR D docs: root README (ops row), architecture update, CI comments          [~] partial (ops row added in root README in #40; Pi row still says "Semaphore UI… Retires at PR E" (T-27); architecture update and CI comments not verified)
 - Type: docs
 - Requirements: SH-DOC-01, SH-DOC-12, SH-DOC-14, SH-FR-114, SH-BR-16 (row D docs)
 - Agent: docs-writer    Priority: P1    Size: S    Parallel group: -
@@ -485,9 +502,31 @@ Rule for every apply below: run `--check --diff` first, read it, then apply (wor
 - [ ] OP-05 Step 5 backups: merge PR B (T-20), apply NAS `--tags restic_server`; apply VM `--tags restic_backup`, start one backup (repository created); merge PR B2 (T-21), apply NAS `--tags restic_server,backup_disk`, start one maintenance run, restore test. Store `vault_restic_backup_repo_password` in 1Password (FR-88). Gate: AC-06, 31, 32, 33, 50. Rollback: disable the VM timer, revert B2 and B, delete the `ops` `.htpasswd` line by hand.
 - [ ] OP-06 Step 6: merge PR C (T-23); apply `--tags ssh_authorized_keys` to nas, cloud and the VM from the workstation (`--check --diff` first); add the new key as a second Key Store entry; switch nas and cloud templates; create the `<vm-dir>` project/template with `--skip-tags semaphore,zerotier -e common_upgrade=false`; delete the Pi project, API tokens, integrations and the deletion-list items; run the FR-178 scan; AC-48 plus the PA-3 additions (cloud login with the new key, `<vm-dir>` self-run login); FR-191 address check, then PR C2 if needed; delete the workstation key (FR-58). Gate: AC-23, 24, 25, 48. Rollback per spec with PR C-R (T-23); retry rule PA-9.
 - [ ] OP-07 Step 7 full run (BR-02 slot): nas, cloud, `<vm-dir>` templates. Gate: AC-26, 36, 37 (NFR-08, 10, 11). Then T-26/T-27 may start.
-- [ ] OP-08 Step 8 cut-over within 72 h (BR-15): optional snapshot; BR-13/BR-14 checks; read the Pi's active schedules; merge PR D (T-24, T-25); apply `<vm-dir> --tags cloudflare_dns` (`--check --diff` verifies A-06) and NAS `--tags homepage`; wait 300 s; Pi to stopped standby; activate schedules per FR-101 (list excluded ones in the PR D description); add the Uptime Kuma TCP monitor for `<vm-fqdn>:22` (FR-92). Gate: AC-35, 38 (+34). Rollback per spec.
-- [ ] OP-W Stabilization window (>=14 days): AC-28, AC-29, AC-39; NFR-09 (day 30), NFR-13; 30-day snapshot deadline.
-- [ ] OP-09 Step 9 (order D-20, BR-17): 9.1 evidence for BR-05 a)..j) (AC-40, noted in the PR E description); 9.2 remove the Pi from Beszel and Uptime Kuma; 9.3 first action = point of no return, log every command to the step-9.3 log (shred -n 1 on the FR-173 files, delete `/mnt/data/containers/semaphore`, old-key Key Store entry, shutdown, detach drive, erase and re-image SD, delete the Cloudflare A record `pi.de.int...`), gate AC-41; 9.4 merge PR E (T-26, T-27), apply `--tags ssh_authorized_keys` to nas, cloud, VM (`--check --diff` first), gate AC-42, AC-43; 9.5 archive the Pi's 1Password item, delete all VM snapshots, gate AC-57. Rollback: step-8 rollback until the first 9.3 action; none afterwards (NFR-07 recovery).
+- [~] OP-08 Step 8 cut-over within 72 h (BR-15) — repo side merged (PR D, #40, 2026-10-17); live status: DNS cut-over done (CNAME → ops); Pi was NOT put in stopped standby until 2026-10-19 (its Semaphore had run since 2026-10-19 03:00 with no schedules and no tasks since 2026-10-01); Pi stopped/disabled 2026-10-19; Uptime Kuma TCP monitor for `ops` and the Pi-monitor removal: not verified (see status below). Original text: optional snapshot; BR-13/BR-14 checks; read the Pi's active schedules; merge PR D (T-24, T-25); apply `<vm-dir> --tags cloudflare_dns` (`--check --diff` verifies A-06) and NAS `--tags homepage`; wait 300 s; Pi to stopped standby; activate schedules per FR-101 (list excluded ones in the PR D description); add the Uptime Kuma TCP monitor for `<vm-fqdn>:22` (FR-92). Gate: AC-35, 38 (+34). Rollback per spec.
+- [ ] OP-W Stabilization window (>=14 days; NOT waited — Pi retirement started 2026-10-19, about 9 days after the 2026-10-10 plan and 2 days after PR D; the VM's clean-backup and 14-day preconditions of BR-05 are unverified): AC-28, AC-29, AC-39; NFR-09 (day 30), NFR-13; 30-day snapshot deadline.
+- [~] OP-09 Step 9 (order D-20, BR-17) — partially done 2026-10-19 outside the runbook order, see "Pi retirement status" below. Original text: 9.1 evidence for BR-05 a)..j) (AC-40, noted in the PR E description); 9.2 remove the Pi from Beszel and Uptime Kuma; 9.3 first action = point of no return, log every command to the step-9.3 log (shred -n 1 on the FR-173 files, delete `/mnt/data/containers/semaphore`, old-key Key Store entry, shutdown, detach drive, erase and re-image SD, delete the Cloudflare A record `pi.de.int...`), gate AC-41; 9.4 merge PR E (T-26, T-27), apply `--tags ssh_authorized_keys` to nas, cloud, VM (`--check --diff` first), gate AC-42, AC-43; 9.5 archive the Pi's 1Password item, delete all VM snapshots, gate AC-57. Rollback: step-8 rollback until the first 9.3 action; none afterwards (NFR-07 recovery).
+
+### Pi retirement status (2026-10-19, performed on the live Pi and verified by read-only checks)
+
+Done:
+- Pre-check (read-only): Pi reachable; `semaphore`, `caddy`, `restic-server`, `beszel-agent` active; Semaphore DB had no schedules and no tasks since 2026-10-01 (table `task`, latest `created` 2026-10-01).
+- Stopped and disabled: `semaphore.service`, `caddy.service`, `restic-server.service`, `beszel-agent.service` (`systemctl disable --now`).
+- Quadlet units removed from `/etc/containers/systemd/`: `semaphore.container`, `caddy.container`, `caddy.network`, `restic-server.container`; `daemon-reload` run; `semaphore.service` failed state cleared. No containers remain (`podman ps -a` empty).
+- Secrets shredded (`shred -n 1 -u`): `containers/semaphore/data/database.sqlite{,-wal,-shm}`, `containers/semaphore/config.json`, `containers/semaphore/semaphore.env`, `containers/caddy/caddy.env` (Cloudflare token copy).
+- Service data removed: `/mnt/data/containers/semaphore` and `/mnt/data/containers/caddy` (incl. the Caddy ACME account key and certificate private keys). Not shredded individually (plain `rm -rf`); the drive's other contents were kept.
+- Retired key removed from the Pi's `~/.ssh/authorized_keys`: `semaphore-automation@pi.de.int.wahlberger.dev` (SHA256 `jgza9UYt…`). Remaining keys: `erikwahlberger@personal`, `erik@LTGEMEA-18858`.
+- Firewall (ufw): removed `80/tcp`, `443/tcp`, `45876/tcp`, `8000/tcp` (from 10.10.0.0/16). Remaining: `22/tcp` (v4+v6) and the Podman DNS rules on `podman+`.
+- The Pi's own repo state is unchanged (`pi-de-int-wahlberger-dev/` still exists, `site.yml` still defines the old services; do not apply it).
+
+Not done (still open, each needed for full runbook compliance):
+- 9.1 preconditions (BR-05 a–j), including the 14-day wait and the 7 nightly VM backups; not verified.
+- 9.2 remove the Pi from the Beszel hub (on cloud) and remove its Uptime Kuma monitors. Not done; the hub still lists the Pi as a system (not verified from the repo).
+- 9.3 remaining items: detach the USB drive and store it offline (drive still attached to the Pi); erase and re-image the SD card (not done; OS kept on purpose for embedded use); shut down (not done); delete Cloudflare A record `pi.de.int.wahlberger.dev` (not done, harmless to keep).
+- Old key still authorized on nas and cloud until PR E (T-26) revokes it. The key's private half is destroyed on the Pi, so it is no longer usable from there.
+- PR E (T-26, T-27) not started; `pi-de-int-wahlberger-dev/` removal, Renovate rule `renovate.json:89`, root `README.md` Pi row still present.
+- `ops`'s Uptime Kuma TCP monitor (FR-92, OP-08) not verified.
+
+Deviations from the runbook: the Pi kept running Semaphore after the cut-over until 2026-10-19 (it was not put in stopped standby at step 8); the 14-day stabilization (OP-W) and 9.1 preconditions were skipped; the caddy data directory (ACME account and certificate keys) was removed in addition to the runbook's 9.3 list; the firewall and SSH-key cleanup was not part of the runbook.
 
 ### Traceability
 
@@ -579,6 +618,8 @@ Scenario map (all 63): AC-01 T-02/T-14; AC-02 OP-01; AC-03 OP-04; AC-04 OP-03; A
 
 ### Task status log   (orchestrator updates checkboxes; never delete history)
 - 2026-10-10: plan created (27 tasks, 13 operator items OP-00a..OP-09). No task started.
+- 2026-10-19: Pi retirement performed (see "Pi retirement status"): services stopped and disabled, Quadlets removed, Semaphore/Caddy secrets and service data deleted, retired SSH key and ports removed. Pi is usable for other work. OP-09 partially done; PR E and the Beszel/Uptime Kuma/drive/SD steps remain.
+- 2026-10-19: status reconciled against `master` and live DNS (see "Reality check" above). T-20, T-21, T-22, T-23, T-24 marked done (merged). T-25 partial. T-11 CC-06: cloud `restic_backup_rest_server_host` now `nas.de.int.wahlberger.dev` on master (the earlier permission-denied edit is resolved). PR D cut-over merged 2026-10-17; `semaphore.de.int` CNAME resolves to ops. T-26, T-27 (PR E) not started. Operator items OP-00c to OP-08: repo side merged, live execution not verifiable from the repo, Erik to confirm.
 
 ### Carry-over notes (orchestrator, from implementer reports)
 - T-02: `podman` role asserts `podman_data_dir` is a mountpoint; on the VM `/opt/podman` is not -> needs a fix (owner: T-09 or T-12; unassigned). `semaphore_network_subnet` placeholder 172.29.30.0/24 and `cloud_zt_ip` var name need confirming in T-12. CI jobs (validate, molecule, vault-encrypted) not yet run (needs a push).
