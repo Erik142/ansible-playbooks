@@ -10,6 +10,7 @@ from __future__ import annotations
 import io
 import re
 import types
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -43,6 +44,7 @@ class Fakes:
         self.mounted = {MOUNT["path"]: UUID + " /@btrbk"}
         self.stats_code = 0
         self.tree: dict[str, dict[str, int | str]] = {}  # dir -> {child: birth epoch, or raw stat output}
+        self.subvolumes: dict[str, str] = {}  # child path -> `btrfs subvolume show` output (absent: not a subvolume)
         self.calls: list[list[str]] = []
 
     def run(self, argv):
@@ -52,6 +54,10 @@ class Fakes:
             assert argv[1:-1] == ["--noheadings", "--raw", "--output", "UUID,FSROOT", "--mountpoint"], argv
             line = self.mounted.get(argv[-1])
             return (0, line + "\n") if line else (1, "")
+        if argv[:3] == ["btrfs", "subvolume", "show"]:
+            assert len(argv) == 4, argv
+            text = self.subvolumes.get(argv[3])
+            return (0, text) if text is not None else (1, "ERROR: not a subvolume: " + argv[3])
         if argv[0] == "btrfs":
             assert argv[:4] == ["btrfs", "device", "stats", "--check"] and len(argv) == 5, argv
             return self.stats_code, ""
@@ -230,7 +236,7 @@ def test_wrong_uuid_and_stale_entry_are_both_reported_without_stats_for_the_bad_
     code, out = fakes.check(health, [entry(DATA)])
     assert code == 1
     assert out.count("FAIL:") == 2
-    assert not [c for c in fakes.calls if c[0] == "btrfs"]
+    assert not [c for c in fakes.calls if c[:3] == ["btrfs", "device", "stats"]]
 
 
 def test_second_mount_failing_does_not_hide_the_first_mounts_stats(health, fakes):
@@ -254,4 +260,53 @@ def test_check_only_reads(health, fakes):
     fakes.tree = {DATA: {"a": NOW - HOUR}}
     fakes.check(health, [entry(DATA)])
     assert {c[0] for c in fakes.calls} <= {"findmnt", "btrfs", "stat"}
-    assert all(c[:3] == ["btrfs", "device", "stats"] for c in fakes.calls if c[0] == "btrfs")
+    assert all(c[:3] in (["btrfs", "device", "stats"], ["btrfs", "subvolume", "show"])
+               for c in fakes.calls if c[0] == "btrfs")
+
+
+def btrfs_time(epoch, label="Receive"):
+    """Format an epoch the way `btrfs subvolume show` prints its times (UTC here)."""
+    stamp = datetime.fromtimestamp(epoch, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S +0000")
+    return f"\tName:\t\t\tdata.x\n\t{label} time:\t\t{stamp}\n"
+
+
+def test_received_snapshot_is_judged_by_receive_time_not_stat_birth(health, fakes):
+    # The incident: stat %W kept the first send's birth time (100 h old); the copy was made 1 h ago.
+    child = DATA + "/data.new"
+    fakes.tree = {DATA: {"data.new": NOW - 100 * HOUR}}
+    fakes.subvolumes[child] = btrfs_time(NOW - HOUR)
+    code, out = fakes.check(health, [entry(DATA)])
+    assert code == 0
+    assert f"{DATA}: fresh" in out
+
+
+def test_receive_time_older_than_stat_birth_makes_the_entry_stale(health, fakes):
+    child = DATA + "/data.new"
+    fakes.tree = {DATA: {"data.new": NOW - HOUR}}
+    fakes.subvolumes[child] = btrfs_time(NOW - 30 * HOUR)
+    code, out = fakes.check(health, [entry(DATA)])
+    assert code == 1
+    assert f"FAIL: {DATA}: stale, newest child is 30 h old, limit 26 h" in out
+
+
+def test_source_snapshot_without_receive_time_uses_creation_time(health, fakes):
+    child = DATA + "/data.src"
+    fakes.tree = {DATA: {"data.src": NOW - 100 * HOUR}}
+    fakes.subvolumes[child] = "\tReceive time:\t\t-\n" + btrfs_time(NOW - 2 * HOUR, label="Creation")
+    code, out = fakes.check(health, [entry(DATA)])
+    assert code == 0
+    assert f"{DATA}: fresh" in out
+
+
+def test_unparseable_subvolume_time_falls_back_to_stat_birth(health, fakes):
+    child = DATA + "/data.odd"
+    fakes.tree = {DATA: {"data.odd": NOW - HOUR}}
+    fakes.subvolumes[child] = "\tReceive time:\t\tsoon\n"
+    assert fakes.check(health, [entry(DATA)])[0] == 0
+
+
+def test_plain_directory_child_uses_stat_birth(health, fakes):
+    fakes.tree = {DATA: {"restic-repo-dir": NOW - 2 * HOUR}}
+    code, out = fakes.check(health, [entry(DATA)])
+    assert code == 0
+    assert ["btrfs", "subvolume", "show", DATA + "/restic-repo-dir"] in fakes.calls
