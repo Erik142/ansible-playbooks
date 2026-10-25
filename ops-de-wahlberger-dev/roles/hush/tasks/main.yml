@@ -34,6 +34,44 @@
     quiet: true
   tags: [hush, hush_guard]
 
+# A hush restart makes the Kuma "Hush" monitor report down, which hush would
+# alert on. An ad-hoc maintenance window for this apply holds those alerts. It
+# is scoped to the ops host, which the Kuma monitor's URL host is an alias of
+# (topology). It expires on its own; a failed call does not block the deploy.
+- name: Set the maintenance window id for this apply
+  ansible.builtin.set_fact:
+    hush_maintenance_window_id: "ansible-hush-{{ lookup('pipe', 'date +%s') }}"
+  tags: [hush]
+
+- name: Open a hush maintenance window for this apply
+  ansible.builtin.uri:
+    url: "https://{{ hush_public_host }}/maintenance/windows"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ hush_secrets.hush_maintenance_ansible }}"
+    body_format: json
+    body:
+      scope:
+        - host: ops.de.wahlberger.dev
+      duration_seconds: 900
+      reason: "ansible apply of the hush role"
+      id: "{{ hush_maintenance_window_id }}"
+    status_code: [200, 201]
+    timeout: 15
+  no_log: true
+  register: hush_window_open
+  failed_when: false
+  when: not ansible_check_mode
+  tags: [hush]
+
+- name: Report that the maintenance window could not be opened
+  ansible.builtin.debug:
+    msg: "hush maintenance window not opened (status {{ hush_window_open.status | default('none') }}); hush alerts during the restart are not held"
+  when:
+    - not ansible_check_mode
+    - hush_window_open.status | default(0) not in [200, 201]
+  tags: [hush]
+
 - name: Create the Hush data directory
   ansible.builtin.file:
     path: "{{ hush_data_path }}"
@@ -103,4 +141,24 @@
   vars:
     container_name: hush
     container_quadlet_src: hush.container.j2
+  tags: [hush]
+
+# Run the restart handlers now, so the restart happens inside the window.
+- name: Restart Hush now if its config, secrets or unit changed
+  ansible.builtin.meta: flush_handlers
+  tags: [hush]
+
+- name: Close the hush maintenance window
+  ansible.builtin.uri:
+    url: "https://{{ hush_public_host }}/maintenance/windows/{{ hush_maintenance_window_id }}"
+    method: DELETE
+    headers:
+      Authorization: "Bearer {{ hush_secrets.hush_maintenance_ansible }}"
+    status_code: [200, 404]
+    timeout: 15
+  no_log: true
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - hush_window_open.status | default(0) in [200, 201]
   tags: [hush]

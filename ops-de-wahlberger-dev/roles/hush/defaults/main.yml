@@ -104,7 +104,8 @@ hush_config:
   topology:
     hosts:
       - id: ops.de.wahlberger.dev
-        aliases: [ops]
+        # Kuma's Hush monitor reports under this host name (its URL host).
+        aliases: [ops, hush.de.int.wahlberger.dev]
         host_check: {source: kuma, check: ops ping}
         services:
           - {id: hush}
