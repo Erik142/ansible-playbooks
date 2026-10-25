@@ -12,6 +12,12 @@ notify_failure_from_address: "Homelab Alerts <alerts@no-reply.wahlberger.dev>"
 
 notify_failure_to_address: "ewahlberger@gmail.com"
 
+# hush (the failure path). Token = the source's bearer secret, set in group_vars
+# from Vault. Source id = the hush source for this host.
+notify_failure_hush_url: "https://hush.de.int.wahlberger.dev"
+notify_failure_hush_source: hooks-nas
+notify_failure_hush_token: ""
+
 # Tail length of the journalctl excerpt embedded in the email, scoped to
 # just the failed unit's own invocation (see notify-failure.sh.j2).
 notify_failure_log_lines: 50

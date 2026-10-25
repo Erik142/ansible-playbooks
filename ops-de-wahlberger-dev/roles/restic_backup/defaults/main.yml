@@ -67,6 +67,12 @@ restic_backup_check_read_data_subset: "10%"
 # Daily 05:00, system time zone (the common role sets Europe/Berlin).
 restic_backup_on_calendar: "*-*-* 05:00:00"
 
+# Success is posted to hush as an "ok" event, signed with this HMAC secret
+# (hush backup source). Vault value is set in group_vars.
+restic_backup_hush_source: backup-ops
+restic_backup_hush_secret_file: /etc/restic-backup/hush-backup.secret
+restic_backup_hush_hmac_secret: ""
+
 # Email a summary via Resend after each successful run. Reuses notify_failure's
 # credentials, so notify_failure must run first (it does in site.yml).
 restic_backup_notify_on_success: true

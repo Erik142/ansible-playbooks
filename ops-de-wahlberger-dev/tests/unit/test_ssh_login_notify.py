@@ -3,9 +3,7 @@ login email must escape everything the login controls, substitute in one pass,
 and keep the Resend payload shape. The script is a standalone file, so it is
 imported by path. Stdlib + pytest only; no network."""
 import importlib.util
-import io
 import re
-import urllib.request
 from pathlib import Path
 
 import pytest
@@ -112,22 +110,27 @@ def test_long_value_is_capped(mod, template):
     assert "u" * 101 not in p["html"] and "u" * 101 not in p["text"]
 
 
-def test_send_posts_json_with_bearer(mod, monkeypatch):
+def test_send_posts_a_hush_event_through_hush_post(mod, monkeypatch):
+    import json
     seen = {}
 
-    def fake_urlopen(request, timeout):
-        seen.update(url=request.full_url, method=request.get_method(), headers=dict(request.header_items()),
-                    body=request.data, timeout=timeout)
-        return io.BytesIO(b"{}")
+    def fake_run(argv, env, check, timeout):
+        seen.update(argv=argv, env=env, check=check, timeout=timeout,
+                    event=json.load(open(argv[3], encoding="utf-8")))
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
     payload = {"from": "f", "to": ["t"], "subject": "s", "text": "x", "html": "<p>x</p>"}
-    mod.send(payload, ENV)
-    import json
-    assert seen["url"] == mod.DEFAULT_URL and seen["method"] == "POST"
-    assert seen["headers"]["Authorization"] == "Bearer k-secret"
-    assert seen["headers"]["Content-type"] == "application/json"
-    assert json.loads(seen["body"]) == payload
+    mod.send(payload, {"HUSH_TOKEN": "t-secret"})
+    assert seen["argv"][:3] == [mod.HUSH_POST, mod.HUSH_SOURCE_DEFAULT, "bearer"]
+    assert seen["env"]["HUSH_TOKEN"] == "t-secret" and seen["check"] is True
+    assert seen["event"]["schema"] == "hush.event.v1"
+    assert seen["event"]["status"] == "problem" and seen["event"]["check"] == "ssh-login"
+    assert seen["event"]["message"] == "s" and seen["event"]["log_excerpt"] == "x"
+
+
+def test_send_refuses_an_empty_token(mod):
+    with pytest.raises(RuntimeError):
+        mod.send({"subject": "s", "text": "x"}, {"HUSH_TOKEN": ""})
 
 
 def test_process_sends_html_and_text(mod, template, tmp_path, monkeypatch):

@@ -3,10 +3,12 @@
   ansible.builtin.assert:
     that:
       - notify_failure_resend_api_key | length > 0
+      - notify_failure_hush_token | length > 0
     fail_msg: >-
-      notify_failure_resend_api_key is empty. Set
-      vault_notify_failure_resend_api_key in Ansible Vault. See README.md.
+      notify_failure_resend_api_key or notify_failure_hush_token is empty. Set
+      vault_notify_failure_resend_api_key and the host's vault_hush_source_hooks_* in Ansible Vault.
     quiet: true
+  no_log: true
 
 - name: Install jq
   community.general.zypper:
@@ -41,6 +43,14 @@
   ansible.builtin.template:
     src: notify-failure.sh.j2
     dest: /usr/local/bin/notify-failure.sh
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Deploy the hush-post helper
+  ansible.builtin.template:
+    src: hush-post.sh.j2
+    dest: /usr/local/bin/hush-post
     owner: root
     group: root
     mode: "0700"

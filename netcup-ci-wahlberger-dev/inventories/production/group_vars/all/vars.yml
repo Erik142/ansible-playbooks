@@ -64,6 +64,8 @@ disk_space_threshold_percent: 85
 
 # --- Failure notifications ------------------------------------------------------------
 notify_failure_resend_api_key: "{{ vault_notify_failure_resend_api_key | default('') }}"
+notify_failure_hush_token: "{{ vault_hush_source_hooks_netcup | default('') }}"
+notify_failure_hush_source: hooks-netcup
 notify_failure_crash_threshold: 5
 
 # --- Firewall ---------------------------------------------------------------------

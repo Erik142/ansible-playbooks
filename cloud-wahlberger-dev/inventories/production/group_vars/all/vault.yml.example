@@ -56,3 +56,7 @@ vault_restic_backup_repo_password: "REPLACE-with-a-40-char-alnum-password"
 # value as pi-de-int-wahlberger-dev's vault_restic_server_cloud_htpasswd_password.
 #     LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo
 vault_restic_backup_rest_server_password: "REPLACE-with-a-32-char-alnum-password"
+
+# --- Hush (notify_failure failure path, restic success HMAC) -------------------
+vault_hush_source_hooks_cloud: ""
+vault_hush_source_backup_cloud: ""

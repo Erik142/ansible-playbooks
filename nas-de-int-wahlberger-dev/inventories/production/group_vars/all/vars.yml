@@ -317,6 +317,8 @@ restic_server_maintenance_repos:
 # Resend API key for failure notification emails (notify_failure role). Same
 # account/key as cloud-wahlberger-dev and pi-de-int-wahlberger-dev.
 notify_failure_resend_api_key: "{{ vault_notify_failure_resend_api_key | default('') }}"
+notify_failure_hush_token: "{{ vault_hush_source_hooks_nas | default('') }}"
+notify_failure_hush_source: hooks-nas
 
 # Garage's cluster RPC secret and admin API token (formats in
 # roles/garage/README.md); the role fails before any change while one is empty.

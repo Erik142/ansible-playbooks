@@ -72,6 +72,17 @@
     group: root
     mode: "0644"
 
+- name: Write the hush HMAC secret for the backup source
+  ansible.builtin.copy:
+    content: "{{ restic_backup_hush_hmac_secret }}"
+    dest: "{{ restic_backup_hush_secret_file }}"
+    owner: root
+    group: root
+    mode: "0400"
+  no_log: true
+  diff: false
+  when: restic_backup_notify_on_success
+
 - name: Deploy the backup script
   ansible.builtin.template:
     src: restic-backup.sh.j2

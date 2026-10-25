@@ -115,3 +115,6 @@ vault_garage_rpc_secret: "REPLACE-with-64-hex-characters"
 # Garage admin API token (bearer token, written to a root-owned secrets file).
 #     openssl rand -base64 32
 vault_garage_admin_token: "REPLACE-with-a-generated-token"
+
+# --- Hush (notify_failure failure path) ----------------------------------------
+vault_hush_source_hooks_nas: ""

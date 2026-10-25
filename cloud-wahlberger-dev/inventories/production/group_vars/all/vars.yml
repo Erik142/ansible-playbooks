@@ -150,6 +150,9 @@ cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token | default('') }}"
 # Resend API key for failure notification emails (notify_failure role). Same
 # account/key as nas-de-int-wahlberger-dev and pi-de-int-wahlberger-dev.
 notify_failure_resend_api_key: "{{ vault_notify_failure_resend_api_key | default('') }}"
+notify_failure_hush_token: "{{ vault_hush_source_hooks_cloud | default('') }}"
+notify_failure_hush_source: hooks-cloud
+restic_backup_hush_hmac_secret: "{{ vault_hush_source_backup_cloud | default('') }}"
 
 # Uptime Kuma's OIDC client secret (from Pocket ID) and oauth2-proxy's
 # session cookie encryption key.

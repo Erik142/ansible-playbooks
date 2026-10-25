@@ -60,6 +60,12 @@ restic_backup_check_read_data_subset: "10%"
 # the NAS maintenance run at 06:00.
 restic_backup_on_calendar: "*-*-* 04:30:00"
 
+# Success is posted to hush as an "ok" event, signed with this HMAC secret
+# (hush backup source backup-cloud). Vault value is set in group_vars.
+restic_backup_hush_source: backup-cloud
+restic_backup_hush_secret_file: /etc/restic-backup/hush-backup.secret
+restic_backup_hush_hmac_secret: ""
+
 # Emails a backup summary via Resend on every successful run, not just
 # failures (notify_failure already covers those) — reuses notify_failure's
 # Resend credentials, so it must have already run (see site.yml). Set to
