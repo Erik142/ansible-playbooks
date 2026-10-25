@@ -10,7 +10,7 @@ set -eu
 SOURCE="${1:?usage: hush-post <source-id> bearer|hmac <json-file> [secret-file]}"
 MODE="${2:?bearer or hmac}"
 FILE="${3:?json file}"
-URL="{{ notify_failure_hush_url }}/ingest/$SOURCE"
+URL="${HUSH_URL:-{{ notify_failure_hush_url }}}/ingest/$SOURCE"
 
 case "$MODE" in
   bearer)

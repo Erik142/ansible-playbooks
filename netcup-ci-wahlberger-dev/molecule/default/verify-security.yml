@@ -493,11 +493,11 @@
   vars:
     verify_mail_dir: /tmp/t05-mail
     verify_mail_env:
-      RESEND_API_KEY: t05-test-key
+      HUSH_TOKEN: t05-test-key
+      HUSH_URL: http://127.0.0.1:18025
       NOTIFY_FROM: "Homelab Alerts <alerts@example.test>"
       NOTIFY_TO: owner@example.test
       SSH_LOGIN_NOTIFY_IGNORE: "127.0.0.0/8,10.10.0.0/16,10.243.0.0/16,198.51.100.0/24,not-a-network"
-      SSH_LOGIN_NOTIFY_URL: http://127.0.0.1:18025/emails
     # sshd's real log format (checked in this container):
     verify_log_lines: |
       Server listening on 0.0.0.0 port 22.
@@ -577,20 +577,20 @@
           ansible.builtin.assert:
             that:
               - verify_mails | length == 2
-              - verify_mails | map(attribute='path') | unique | list == ['/emails']
+              - verify_mails | map(attribute='path') | unique | list == ['/ingest/hooks-ops']
               - verify_mails | map(attribute='auth') | unique | list == ['Bearer t05-test-key']
-              - verify_mails[0].body.from == 'Homelab Alerts <alerts@example.test>'
-              - verify_mails[0].body.to == ['owner@example.test']
-              - "'203.0.113.9' in verify_mails[0].body.subject"
-              - "'erikwahlberger' in verify_mails[0].body.subject"
-              - "'User: erikwahlberger' in verify_mails[0].body.text"
-              - "'Source: 203.0.113.9 (port 51234)' in verify_mails[0].body.text"
-              - "'ED25519 SHA256:abcDEF123+/xyz' in verify_mails[0].body.text"
-              - "'erikwahlberger' in verify_mails[0].body.html"
-              - "'@@' not in verify_mails[0].body.html"
-              - "'2001:db8::7' in verify_mails[1].body.subject"
-              - "'SHA256:v6public' in verify_mails[1].body.text"
-            fail_msg: "mails: {{ verify_mails | map(attribute='body') | map(attribute='subject') | list }}"
+              - verify_mails[0].body.schema == 'hush.event.v1'
+              - verify_mails[0].body.check == 'ssh-login'
+              - verify_mails[0].body.status == 'problem'
+              - "'203.0.113.9' in verify_mails[0].body.message"
+              - "'erikwahlberger' in verify_mails[0].body.message"
+              - "'User: erikwahlberger' in verify_mails[0].body.log_excerpt"
+              - "'Source: 203.0.113.9 (port 51234)' in verify_mails[0].body.log_excerpt"
+              - "'ED25519 SHA256:abcDEF123+/xyz' in verify_mails[0].body.log_excerpt"
+              - "'@@' not in verify_mails[0].body.log_excerpt"
+              - "'2001:db8::7' in verify_mails[1].body.message"
+              - "'SHA256:v6public' in verify_mails[1].body.log_excerpt"
+            fail_msg: "mails: {{ verify_mails | map(attribute='body') | map(attribute='message') | list }}"
             quiet: true
 
         - name: Assert the secret never reaches the log, and the bad ignore entry was reported
@@ -608,7 +608,7 @@
             stdin: |
               Accepted publickey for erikwahlberger from 203.0.113.9 port 1 ssh2: ED25519 SHA256:one
               Accepted publickey for erikwahlberger from 203.0.113.10 port 2 ssh2: ED25519 SHA256:two
-          environment: "{{ verify_mail_env | combine({'SSH_LOGIN_NOTIFY_URL': 'http://127.0.0.1:1/emails'}) }}"
+          environment: "{{ verify_mail_env | combine({'HUSH_URL': 'http://127.0.0.1:1'}) }}"
           register: verify_notify_down
           changed_when: false
 
@@ -625,7 +625,7 @@
           ansible.builtin.command: /usr/local/bin/ssh-login-notify.py --stdin
           args:
             stdin: "Accepted publickey for erikwahlberger from 203.0.113.9 port 1 ssh2: ED25519 SHA256:one\n"
-          environment: "{{ verify_mail_env | combine({'RESEND_API_KEY': ''}) }}"
+          environment: "{{ verify_mail_env | combine({'HUSH_TOKEN': ''}) }}"
           register: verify_notify_nokey
           changed_when: false
 
@@ -633,7 +633,7 @@
           ansible.builtin.assert:
             that:
               - verify_notify_nokey.rc == 0
-              - "'RESEND_API_KEY is empty' in verify_notify_nokey.stderr"
+              - "'HUSH_TOKEN is empty' in verify_notify_nokey.stderr"
             quiet: true
 
         - name: Reject unknown arguments
