@@ -63,7 +63,7 @@ class Refused(PopulateError):
 @dataclass(frozen=True)
 class Entry:
     key: str
-    kind: str  # "copy" or "generate"
+    kind: str  # "copy", "generate" or "manual"
     source: str = ""  # pi | cloud | nas
     source_key: str = ""
     generator: str = ""
@@ -98,12 +98,16 @@ def parse_manifest(text: str) -> list[Entry]:
             if rest not in GENERATORS:
                 raise PopulateError(f"manifest: {key}: unknown generator {rest!r}")
             entries.append(Entry(key, "generate", generator=rest))
+        elif kind == "manual":
+            if rest:
+                raise PopulateError(f"manifest: {key}: manual takes no argument")
+            entries.append(Entry(key, "manual"))
         elif kind in SOURCE_DIRS:
             if not _KEY.match(rest):
                 raise PopulateError(f"manifest: {key}: bad source key {rest!r}")
             entries.append(Entry(key, "copy", source=kind, source_key=rest))
         else:
-            raise PopulateError(f"manifest: {key}: source must be pi|cloud|nas|generate")
+            raise PopulateError(f"manifest: {key}: source must be pi|cloud|nas|generate|manual")
     return entries
 
 
@@ -300,6 +304,16 @@ def populate(opts: Options, out: Callable[[str], None] = print) -> int:
             values[e.key], states[e.key] = keep, "kept"
         else:
             values[e.key], states[e.key] = generate(e.generator), "generated"
+    # manual: a value typed by the operator (e.g. a Forgejo token). It is kept
+    # from the current vault on a rebuild; otherwise it stays empty until entered.
+    for e in entries:
+        if e.kind != "manual":
+            continue
+        keep = existing.get(e.key, "")
+        if keep:
+            values[e.key], states[e.key] = keep, "kept"
+        else:
+            values[e.key], states[e.key] = "", "empty"
     for e in entries:
         out(_line(e, values[e.key], states[e.key], opts.show_hash))
 
@@ -319,7 +333,12 @@ def populate(opts: Options, out: Callable[[str], None] = print) -> int:
 
 
 def _line(e: Entry, value: str, state: str, show_hash: bool) -> str:
-    origin = f" from {e.source}:{e.source_key}" if e.kind == "copy" else f" ({e.generator})"
+    if e.kind == "copy":
+        origin = f" from {e.source}:{e.source_key}"
+    elif e.kind == "manual":
+        origin = " (manual: enter by hand with ansible-vault edit)"
+    else:
+        origin = f" ({e.generator})"
     suffix = f"  sha256:{sha8(value)}" if show_hash else ""
     return f"{e.key}: {state}{origin}{suffix}"
 
@@ -348,10 +367,14 @@ def verify(entries: list[Entry], opts: Options, password: str, out: Callable[[st
             out(f"{e.key}: {verdict}" + (f" ({note})" if note else ""))
             bad += verdict != MATCH
     for e in entries:
-        if e.kind != "generate":
-            continue
-        ok = e.key in new and valid_generated(e.generator, new[e.key])
-        out(f"{e.key}: {'ok' if ok else 'BAD-FORMAT'} ({e.generator})")
-        bad += not ok
+        if e.kind == "generate":
+            ok = e.key in new and valid_generated(e.generator, new[e.key])
+            out(f"{e.key}: {'ok' if ok else 'BAD-FORMAT'} ({e.generator})")
+            bad += not ok
+        elif e.kind == "manual":
+            # Presence is a failure; an empty value is only a reminder to enter it.
+            present = e.key in new
+            out(f"{e.key}: {'set' if new.get(e.key) else 'empty, enter by hand'} (manual)")
+            bad += not present
     out("all verified" if not bad else f"{MISMATCH}: {bad} check(s) failed")
     return 1 if bad else 0

@@ -7,6 +7,15 @@ argument_specs:
         type: str
         required: true
         description: Resend API key used to send failure notification emails.
+      notify_failure_hush_token:
+        type: str
+        required: true
+        no_log: true
+        description: Bearer secret of this host's hush source (hooks-nas), used by the failure path.
+      notify_failure_hush_source:
+        type: str
+        required: false
+        description: hush source id for this host's failure events.
       notify_failure_from_address:
         type: str
         required: false

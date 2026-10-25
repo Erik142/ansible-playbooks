@@ -30,5 +30,6 @@ render_items:
       - '^ENV_FILE=/etc/notify-failure/notify-failure\.env$'
       - 'SMARTD_DEVICE'
       - 'SMARTD_FULLMESSAGE'
-      - 'api\.resend\.com/emails'
-      - 'subject: .*smartd warning for'
+      - '/usr/local/bin/hush-post hooks-nas bearer'
+      - '--arg check "smartd:'
+      - 'status: "problem"'

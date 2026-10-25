@@ -26,6 +26,8 @@ provisioner:
     host_vars:
       cloud-instance:
         notify_failure_resend_api_key: "molecule-fake-key-never-used"
+        notify_failure_hush_token: "molecule-fake-hush-token-never-used"
+        notify_failure_hush_source: hooks-cloud
         # erikwahlberger doesn't exist as a real user on a bare test
         # container (real hosts get it from initial provisioning outside
         # this playbook's scope) — root always exists, so use that instead

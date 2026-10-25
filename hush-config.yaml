@@ -1,0 +1,183 @@
+# Starting point for the wahlberger homelab, derived from the Ansible playbooks in
+# ~/Projekt/infra/Ansible/ansible-playbooks (ops, cloud, nas). Ansible should render this
+# as a Jinja template; keep the structure, render the values.
+#
+# Hosts (from the inventories):
+#   ops.de.wahlberger.dev       Hetzner CX23, public. Caddy, Semaphore, restic. Hush runs here.
+#   cloud.wahlberger.dev        Hetzner VM. Pocket ID (id.wahlberger.dev), Uptime Kuma, FreshRSS.
+#   nas.de.int.wahlberger.dev   Home NAS, LAN 10.10.0.0/16, ZeroTier 10.243.0.0/16. btrbk, Samba.
+#
+# Every line marked ASSUMPTION is a guess. Confirm or correct it before enabling triage.
+# Reference: docs/configuration.md.
+schema_version: 1
+timezone: Europe/Berlin
+
+server:
+  port: 8080
+  # Caddy on ops is the only proxy. Its address on the Podman network is an ASSUMPTION.
+  trusted_proxies: ["127.0.0.1/32", "10.88.0.1/32"]
+
+# One source per producer, each with its own credential, so a leaked token is revocable
+# on its own. Source ids match the hook and webhook configuration in the playbooks.
+sources:
+  # Uptime Kuma on cloud: down and recovery notifications via its webhook
+  - id: kuma
+    adapter: uptime_kuma
+    auth: {mode: bearer, secret_files: [/run/secrets/hush_source_kuma]}
+
+  # Hook scripts (hush-post / hush-run-job / OnFailure units), one credential per host
+  - id: hooks-ops
+    adapter: generic
+    auth: {mode: bearer, secret_files: [/run/secrets/hush_source_hooks_ops]}
+  - id: hooks-nas
+    adapter: generic
+    auth: {mode: bearer, secret_files: [/run/secrets/hush_source_hooks_nas]}
+  - id: hooks-cloud
+    adapter: generic
+    auth: {mode: bearer, secret_files: [/run/secrets/hush_source_hooks_cloud]}
+  - id: hooks-netcup
+    adapter: generic
+    auth: {mode: bearer, secret_files: [/run/secrets/hush_source_hooks_netcup]}
+
+  # Absence detection on the nightly restic-backup.timer (OnCalendar 04:30 nightly, from
+  # restic_backup role). The role has notify_on_success: true, so a success event exists.
+  # The role does NOT post to Hush yet: see the notes at the end of this file.
+  - id: backup-ops
+    adapter: generic
+    dedupe_window_seconds: 900
+    auth: {mode: hmac, secret_files: [/run/secrets/hush_source_backup_ops]}
+    expect:
+      max_age_seconds: 93600      # 26 h: nightly job plus slack
+      grace_seconds: 3600
+  - id: backup-cloud
+    adapter: generic
+    dedupe_window_seconds: 900
+    auth: {mode: hmac, secret_files: [/run/secrets/hush_source_backup_cloud]}
+    expect:
+      max_age_seconds: 93600
+      grace_seconds: 3600
+
+topology:
+  hosts:
+    - id: ops.de.wahlberger.dev
+      aliases: [ops]
+      host_check: {source: kuma, check: ops ping}     # ASSUMPTION: Kuma monitor name
+      services:
+        - {id: hush}
+        - {id: caddy, always_notify: true}
+        - {id: semaphore}
+        - {id: restic-backup}
+
+    - id: cloud.wahlberger.dev
+      aliases: [cloud]
+      host_check: {source: kuma, check: cloud ping}   # ASSUMPTION: Kuma monitor name
+      services:
+        - {id: pocket-id, always_notify: true}        # login is down without it
+        - {id: uptime-kuma}
+        - {id: freshrss}
+        - {id: restic-backup}
+
+    - id: nas.de.int.wahlberger.dev
+      aliases: [nas]
+      # ASSUMPTION: no parent. Hush runs on public ops, so NAS alerts should not be
+      # suppressed by ops. Set parent to ops only if you want that suppression.
+      host_check: {source: kuma, check: nas ping}     # ASSUMPTION: Kuma monitor name
+      grace_seconds: 300                              # NAS reboots take minutes
+      services:
+        - {id: btrfs-scrub, always_notify: true}
+        - {id: samba, aliases: [smb]}
+        - {id: tandoor}
+        - {id: paperless}
+        - {id: immich}
+        - {id: homepage}
+
+# Reboot window is rebootmgr's maintenance window, Sunday 04:00 on the NAS and the VMs
+# (security role). ASSUMPTION: the window is 1 h; check security_autoupdate_reboot_window_duration.
+maintenance_windows:
+  - id: reboot-sunday
+    cron: "0 4 * * 0"
+    duration_seconds: 3600
+    scope:
+      - {host: ops.de.wahlberger.dev}
+      - {host: cloud.wahlberger.dev}
+      - {host: nas.de.int.wahlberger.dev}
+
+rules:
+  dedupe_window_seconds: 900
+  grace_seconds: 300
+  max_hold_seconds: 14400
+  notify_recoveries: true
+
+triage:
+  enabled: true
+  model: claude-haiku-5-5
+  api_key_file: /run/secrets/hush_anthropic_key
+  daily_budget_usd: 1.0
+  context_notes: >-
+    Three hosts: ops and cloud are public Hetzner VMs; nas is on the home LAN (10.10.0.0/16)
+    and reachable over ZeroTier (10.243.0.0/16). Auto-updates run weekly; reboots happen only
+    in the Sunday 04:00 rebootmgr window. restic-backup runs nightly at 04:30.
+
+replay:
+  max_cost_usd: 0.5
+
+notifications:
+  resend:
+    # ASSUMPTION: create a separate Resend key for Hush rather than reusing notify_failure's
+    api_key_file: /run/secrets/hush_resend_key
+    # no-reply.wahlberger.dev is already verified in Resend (notify_failure sends from it)
+    from: "Hush <hush@no-reply.wahlberger.dev>"
+    to: [ewahlberger@gmail.com]
+  dashboard_base_url: https://hush.wahlberger.dev   # ASSUMPTION: hostname (Cloudflare DNS)
+
+digest:
+  time: "07:00"
+escalation:
+  after_seconds: 3600
+  max_repeats: 1
+storm:
+  threshold: 10
+  window_seconds: 300
+
+storage:
+  path: /data/hush.db
+  backup_dir: /data/backups
+  backup_keep: 7
+  backup_time: "03:00"
+  retention_days: {events: 30, decisions: 30, token_usage: 30, audit: 30}
+
+# Redaction runs before anything goes to the Claude API. Public IPs of ops and cloud, LAN
+# and ZeroTier addresses, and e-mail addresses are all sent otherwise.
+redaction:
+  builtin: {ipv4: true, ipv6: true, email: true}
+  patterns: []
+
+heartbeat:
+  url: https://hc-ping.com/REPLACE-WITH-YOUR-UUID   # ASSUMPTION: create a Healthchecks.io check
+  interval_seconds: 60
+
+auth:
+  oidc:
+    issuer: https://id.wahlberger.dev              # Pocket ID on cloud
+    client_id: hush                                # create this client in Pocket ID
+    client_secret_file: /run/secrets/hush_oidc_secret
+    redirect_uri: https://hush.wahlberger.dev/auth/callback
+  authorization:
+    claims: {groups: ["hush_admins"]}   # Pocket ID group that may use the dashboard
+  session: {idle_seconds: 1800, absolute_seconds: 28800}
+  break_glass:
+    enabled: false
+    password_hash_file: /run/secrets/hush_break_glass_hash
+
+shadow_mode: true   # first week: log decisions, suppress nothing
+logging: {level: INFO}
+metrics: {token_file: /run/secrets/hush_metrics_token}
+
+# Notes for the Ansible side (not in this repo):
+#  - The restic_backup role needs a Hush hook after a successful run, posting an hmac-signed
+#    event for backup-ops / backup-cloud. Without it, absence fires every night.
+#  - btrbk on the NAS has no success event yet, so no backup-nas source. Add one with the
+#    same pattern once btrbk reports success.
+#  - Caddy routes hush.wahlberger.dev to the container. Limit /ingest/* to the LAN, ZeroTier
+#    and cloud networks. Dashboard and OIDC callback stay public. The quadlet in deploy/
+#    uses Traefik labels; replace them with Caddy routes.

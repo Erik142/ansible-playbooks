@@ -36,6 +36,8 @@ client: a refused port shows up as a timeout from the ZeroTier side.
 | M-07 | VM | cloud (`cloud_zt_ip`) | 22/tcp | cloud is reached over its public IPv4 (SH-D-05) | drop |
 | M-08 | VM | any other ZeroTier or home-LAN address or port | any | none | drop |
 | M-09 | any other initiator | VM | any other port | none | drop |
+| M-10 | VM | NAS LAN IPv4 (Forgejo registry, `git.de.int.wahlberger.dev`) | 443/tcp | pull the hush image from the Forgejo registry on ops | allow |
+| C-07 | netcup runner (`10.243.73.1`) | VM (`vm_zt_ip`), hush ingest only | 443/tcp | netcup failure, reboot and login events to hush (`hooks-netcup`) | allow (2026-10-25) |
 
 ## Before (Central's rule set in force before the change)
 
@@ -99,9 +101,9 @@ restore the network in the step-3 rollback.
 Saved in step 3 by pull request A2 (SH-FR-34, SH-FR-192), after the rules are
 written and the checks of SH-AC-11, SH-AC-12 and SH-AC-13 pass. Empty until then.
 
-- Date: 2026-10-11
+- Date: 2026-10-25 (C-07 added: runner to hush on the VM, above the runner drop; M-10 and the netcup runner rules were added 2026-10-24; previous set dated 2026-10-11)
 - Source: ZeroTier Central, Flow Rules editor, network `8056c2e21cc5c789`
-- Verified on the real network the same day (partial; the rest runs with the step-3 tests):
+- Verified 2026-10-24 from the VM: `curl https://git.de.int.wahlberger.dev/v2/` returns 401 (M-10). Earlier verification, 2026-10-11 (partial; the rest runs with the step-3 tests):
   - from the owner's Mac (arrives as the MikroTik, `10.243.163.88`): SSH to the VM works, port 80 never reaches the VM, port 443 does (tcpdump on `ztmjfaojmv`);
   - from the VM: `10.10.0.100:22` open, `10.10.0.100:80` and `10.243.203.116:22` blocked.
   - Not yet checked: cloud to the VM on 45876 (the Beszel agent comes in step 5), ICMP echo, HTTPS end to end (Caddy comes in step 3).
@@ -126,6 +128,27 @@ written and the checks of SH-AC-11, SH-AC-12 and SH-AC-13 pass. Empty until then
       not ethertype ipv4
       and not ethertype arp
       and not ethertype ipv6
+  ;
+
+  # C-07: netcup runner -> hush on the VM, 443/tcp (ingest only; added 2026-10-25)
+  accept
+      ipsrc 10.243.73.1/32
+      and ipdest 10.243.25.185/32
+      and ipprotocol tcp
+      and dport 443
+  ;
+
+  # C-07 reply: VM -> runner (source port 443)
+  accept
+      ipsrc 10.243.25.185/32
+      and ipdest 10.243.73.1/32
+      and ipprotocol tcp
+      and sport 443
+  ;
+
+  drop
+      ipsrc 10.243.73.1/32
+      and ipdest 10.243.25.185/32
   ;
 
   # M-07: VM -> cloud 22/tcp (cloud is reached over its public IPv4)
@@ -280,6 +303,22 @@ written and the checks of SH-AC-11, SH-AC-12 and SH-AC-13 pass. Empty until then
       and icmp 0 0
   ;
 
+  # M-10: VM -> NAS 443/tcp (Forgejo registry, pull of the hush image)
+  accept
+      ipsrc 10.243.25.185/32
+      and ipdest 10.10.0.100/32
+      and ipprotocol tcp
+      and dport 443
+  ;
+
+  # Replies NAS -> VM for M-10 (source port 443)
+  accept
+      ipsrc 10.10.0.100/32
+      and ipdest 10.243.25.185/32
+      and ipprotocol tcp
+      and sport 443
+  ;
+
   # M-08: VM -> any other ZeroTier address
   drop
       ipsrc 10.243.25.185/32
@@ -297,7 +336,105 @@ written and the checks of SH-AC-11, SH-AC-12 and SH-AC-13 pass. Empty until then
       ipdest 10.243.25.185/32
   ;
 
-  # Everything not involving the VM keeps Central's accept-all behaviour.
+  # Netcup runner 10.243.73.1 (ztmjfaojmv). Netcup-side rules, kept here because
+  # they live in this network's Central rule set. Their record belongs in the
+  # netcup-ci-wahlberger-dev repo.
+
+  # C-01: runner -> NAS Forgejo, 443/tcp
+  accept
+      ipsrc 10.243.73.1/32
+      and ipdest 10.10.0.100/32
+      and ipprotocol tcp
+      and dport 443
+  ;
+
+  # C-01 reply: NAS Forgejo -> runner (source port 443)
+  accept
+      ipsrc 10.10.0.100/32
+      and ipdest 10.243.73.1/32
+      and ipprotocol tcp
+      and sport 443
+  ;
+
+  # C-02: ZeroTier members -> runner, 22/tcp
+  accept
+      ipsrc 10.243.0.0/16
+      and ipdest 10.243.73.1/32
+      and ipprotocol tcp
+      and dport 22
+  ;
+
+  # C-02 reply: runner -> ZeroTier members (source port 22)
+  accept
+      ipsrc 10.243.73.1/32
+      and ipdest 10.243.0.0/16
+      and ipprotocol tcp
+      and sport 22
+  ;
+
+  # C-03: cloud -> runner, 45876/tcp (Beszel hub)
+  accept
+      ipsrc 10.243.203.116/32
+      and ipdest 10.243.73.1/32
+      and ipprotocol tcp
+      and dport 45876
+  ;
+
+  # C-03 reply: runner -> cloud (source port 45876)
+  accept
+      ipsrc 10.243.73.1/32
+      and ipdest 10.243.203.116/32
+      and ipprotocol tcp
+      and sport 45876
+  ;
+
+  # C-04: echo request, ZeroTier members and home LAN -> runner
+  accept
+      ipsrc 10.243.0.0/16
+      and ipdest 10.243.73.1/32
+      and ipprotocol 1
+      and icmp 8 0
+  ;
+
+  accept
+      ipsrc 10.10.0.0/16
+      and ipdest 10.243.73.1/32
+      and ipprotocol 1
+      and icmp 8 0
+  ;
+
+  # C-04 reply: echo reply, runner -> ZeroTier members and home LAN
+  accept
+      ipsrc 10.243.73.1/32
+      and ipdest 10.243.0.0/16
+      and ipprotocol 1
+      and icmp 0 0
+  ;
+
+  accept
+      ipsrc 10.243.73.1/32
+      and ipdest 10.10.0.0/16
+      and ipprotocol 1
+      and icmp 0 0
+  ;
+
+  # C-05: runner -> any other ZeroTier or home-LAN address
+  drop
+      ipsrc 10.243.73.1/32
+      and ipdest 10.243.0.0/16
+  ;
+
+  drop
+      ipsrc 10.243.73.1/32
+      and ipdest 10.10.0.0/16
+  ;
+
+  # C-06: anything else to the runner
+  drop
+      ipdest 10.243.73.1/32
+  ;
+
+  # Everything not involving the VM or the runner keeps Central's accept-all behaviour.
   accept
   ;
   ```

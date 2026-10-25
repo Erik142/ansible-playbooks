@@ -1,7 +1,7 @@
 #!/bin/sh
 # Managed by Ansible (role smartd). Do NOT edit on the host.
-# smartd mail hook (-M exec): emails the owner through Resend with the
-# credentials of the notify_failure role (SM-FR-3, SM-FR-4). smartd passes
+# smartd mail hook (-M exec): posts the warning to hush, which e-mails the owner.
+# Uses the hush token of the notify_failure role (SM-FR-3, SM-FR-4). smartd passes
 # SMARTD_DEVICE, SMARTD_MESSAGE, SMARTD_FULLMESSAGE and SMARTD_FAILTYPE.
 set -eu
 
@@ -12,28 +12,25 @@ if [ ! -r "$ENV_FILE" ]; then
 fi
 # The file holds plain KEY=value lines, quoted where needed; sourcing is safe.
 # shellcheck source=/dev/null
+set -a  # export HUSH_TOKEN for hush-post
 . "$ENV_FILE"
+set +a
 
 DEVICE="${SMARTD_DEVICE:-unknown device}"
 MESSAGE="${SMARTD_FULLMESSAGE:-${SMARTD_MESSAGE:-no message from smartd}}"
 HOST="$(hostname -f)"
 NOW="$(date '+%Y-%m-%d %H:%M:%S %Z')"
 
-BODY="$(jq -n \
-  --arg from "$NOTIFY_FROM" \
-  --arg to "$NOTIFY_TO" \
-  --arg device "$DEVICE" \
+# A smartd warning goes to hush as a problem event (hush decides on the mail).
+TMP="$(mktemp)"
+trap 'rm -f "$TMP"' EXIT
+jq -n \
   --arg host "$HOST" \
-  --arg time "$NOW" \
-  --arg message "$MESSAGE" \
-  '{
-    from: $from,
-    to: [$to],
-    subject: ("[" + $host + "] smartd warning for " + $device),
-    text: ("smartd reported a problem with " + $device + " on " + $host + ", as of " + $time + ".\n\n" + $message)
-  }')"
+  --arg check "smartd:$DEVICE" \
+  --arg message "smartd reported a problem with $DEVICE on $HOST." \
+  --arg logs "$MESSAGE" \
+  --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  '{schema: "hush.event.v1", host: $host, check: $check, service: "", status: "problem",
+    message: $message, log_excerpt: $logs, occurred_at: $ts}' > "$TMP"
 
-curl -fsS https://api.resend.com/emails \
-  -H "Authorization: Bearer ${RESEND_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d "$BODY"
+/usr/local/bin/hush-post {{ notify_failure_hush_source }} bearer "$TMP"

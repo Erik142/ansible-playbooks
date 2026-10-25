@@ -1,0 +1,216 @@
+---
+# Defaults for the `hush` role (ops VM: intelligent alerting, see
+# ../../hush-config.yaml at the repository root for the reference config).
+#
+# Runs as a rootful Quadlet under /etc/containers/systemd, like Caddy and
+# Semaphore. The container image comes from the Forgejo registry on the NAS.
+
+# --- Image --------------------------------------------------------------------
+hush_image: git.de.int.wahlberger.dev/erikwahlberger/hush:0.4.2
+# Registry login user. The token is the Forgejo token with read:package only,
+# passed in as hush_forgejo_pull_token (vault_hush_forgejo_pull_token).
+hush_registry: git.de.int.wahlberger.dev
+hush_registry_user: erikwahlberger
+
+# --- Host paths ---------------------------------------------------------------
+hush_data_dir: /opt/podman/hush
+hush_data_path: "{{ hush_data_dir }}/data"        # SQLite database and the nightly backups (hush storage.backup_dir): back this up
+hush_config_path: "{{ hush_data_dir }}/config.yaml"
+hush_secrets_dir: "{{ hush_data_dir }}/secrets"   # mounted at /run/secrets, read-only
+
+# The container runs as uid 10001 (Containerfile). Data and secrets must be
+# writable or readable by it.
+hush_container_uid: 10001
+
+# --- Network ------------------------------------------------------------------
+# Loopback only. Caddy (host network) proxies to it; the hook scripts on ops
+# post to it directly. Never publish on a public or ZeroTier address.
+hush_publish_address: 127.0.0.1
+hush_port: 8080
+# Caddy is the only proxy. It runs with host networking and connects to the
+# published port on 127.0.0.1; hush's container sees that traffic from the
+# Podman bridge gateway (10.88.0.1). Both must be trusted, or X-Forwarded-Proto
+# is ignored and login refuses the request as plain HTTP.
+hush_trusted_proxies:
+  - 127.0.0.1/32
+  - 10.88.0.1/32
+
+# Public name of the dashboard and ingest (DNS and Caddy site are in group_vars).
+hush_public_host: hush.de.int.wahlberger.dev
+
+# --- Placeholders that must be replaced before the role runs -------------------
+# The role fails while any of these still contains REPLACE (see tasks/main.yml).
+hush_heartbeat_url: https://hc-ping.com/REPLACE-WITH-YOUR-UUID
+# Pocket ID groups whose members may log in to the dashboard: the `groups` claim
+# (hush 0.3.0 `auth.authorization.claims`). Set in group_vars. Empty is refused by hush at start.
+hush_allowed_groups: []
+
+# --- Secrets ------------------------------------------------------------------
+# Friendly-name dict, filled from Vault in group_vars (vars.yml). Keys are the
+# secret file names that hush-config.yaml refers to under /run/secrets/.
+# Every value must be non-empty; the role refuses to run otherwise.
+hush_secret_names:
+  - hush_source_kuma
+  - hush_source_hooks_ops
+  - hush_source_hooks_nas
+  - hush_source_hooks_cloud
+  - hush_source_hooks_netcup
+  - hush_source_backup_ops
+  - hush_source_backup_cloud
+  - hush_maintenance_ansible
+  - hush_anthropic_key
+  - hush_resend_key
+  - hush_oidc_secret
+  - hush_break_glass_hash
+  - hush_metrics_token
+
+# --- Config (rendered to config.yaml) -----------------------------------------
+hush_timezone: Europe/Berlin
+hush_shadow_mode: true   # keep true for the first week (log only, suppress nothing)
+hush_dashboard_base_url: "https://{{ hush_public_host }}"
+
+hush_config:
+  schema_version: 1
+  timezone: "{{ hush_timezone }}"
+  server:
+    port: "{{ hush_port }}"
+    trusted_proxies: "{{ hush_trusted_proxies }}"
+  sources:
+    - id: kuma
+      adapter: uptime_kuma
+      auth: {mode: bearer, secret_files: [/run/secrets/hush_source_kuma]}
+    - id: hooks-ops
+      adapter: generic
+      auth: {mode: bearer, secret_files: [/run/secrets/hush_source_hooks_ops]}
+    - id: hooks-nas
+      adapter: generic
+      auth: {mode: bearer, secret_files: [/run/secrets/hush_source_hooks_nas]}
+    - id: hooks-cloud
+      adapter: generic
+      auth: {mode: bearer, secret_files: [/run/secrets/hush_source_hooks_cloud]}
+    - id: hooks-netcup
+      adapter: generic
+      auth: {mode: bearer, secret_files: [/run/secrets/hush_source_hooks_netcup]}
+    - id: backup-ops
+      adapter: generic
+      dedupe_window_seconds: 900
+      auth: {mode: hmac, secret_files: [/run/secrets/hush_source_backup_ops]}
+      expect: {max_age_seconds: 93600, grace_seconds: 3600}
+    - id: backup-cloud
+      adapter: generic
+      dedupe_window_seconds: 900
+      auth: {mode: hmac, secret_files: [/run/secrets/hush_source_backup_cloud]}
+      expect: {max_age_seconds: 93600, grace_seconds: 3600}
+  topology:
+    hosts:
+      - id: ops.de.wahlberger.dev
+        # Kuma's Hush monitor reports under this host name (its URL host).
+        aliases: [ops, hush.de.int.wahlberger.dev]
+        host_check: {source: kuma, check: ops ping}
+        services:
+          - {id: hush}
+          - {id: caddy, always_notify: true}
+          - {id: semaphore}
+          - {id: restic-backup}
+      - id: cloud.wahlberger.dev
+        aliases: [cloud]
+        host_check: {source: kuma, check: cloud ping}
+        services:
+          - {id: pocket-id, always_notify: true}
+          - {id: uptime-kuma}
+          - {id: freshrss}
+          - {id: restic-backup}
+      - id: nas.de.int.wahlberger.dev
+        aliases: [nas]
+        host_check: {source: kuma, check: nas ping}
+        grace_seconds: 300
+        services:
+          - {id: btrfs-scrub, always_notify: true}
+          - {id: samba, aliases: [smb]}
+          - {id: tandoor}
+          - {id: paperless}
+          - {id: immich}
+          - {id: homepage}
+  maintenance_windows:
+    - id: reboot-sunday
+      cron: "0 4 * * 0"
+      duration_seconds: 3600
+      scope:
+        - {host: ops.de.wahlberger.dev}
+        - {host: cloud.wahlberger.dev}
+        - {host: nas.de.int.wahlberger.dev}
+  # Ad-hoc windows (hush 0.2.0+): opened by the Ansible controller through the
+  # maintenance API. Its secret is separate from every source secret.
+  maintenance:
+    max_duration_seconds: 7200
+  maintenance_clients:
+    - id: ansible
+      auth: {mode: bearer, secret_files: [/run/secrets/hush_maintenance_ansible]}
+  rules:
+    dedupe_window_seconds: 900
+    grace_seconds: 300
+    max_hold_seconds: 14400
+    notify_recoveries: true
+  triage:
+    enabled: true
+    model: claude-haiku-5-5
+    api_key_file: /run/secrets/hush_anthropic_key
+    daily_budget_usd: 1.0
+    context_notes: >-
+      Three hosts: ops and cloud are public Hetzner VMs; nas is on the home LAN (10.10.0.0/16)
+      and reachable over ZeroTier (10.243.0.0/16). Auto-updates run weekly; reboots happen only
+      in the Sunday 04:00 rebootmgr window. restic-backup runs nightly at 04:30.
+  replay:
+    max_cost_usd: 0.5
+  notifications:
+    resend:
+      api_key_file: /run/secrets/hush_resend_key
+      from: "Hush <hush@no-reply.wahlberger.dev>"
+      to: ["{{ hush_alert_recipient }}"]
+    dashboard_base_url: "{{ hush_dashboard_base_url }}"
+  digest:
+    time: "07:00"
+  escalation:
+    after_seconds: 3600
+    max_repeats: 1
+  storm:
+    threshold: 10
+    window_seconds: 300
+  storage:
+    path: /data/hush.db
+    backup_dir: /data/backups
+    backup_keep: 7
+    backup_time: "03:00"
+    retention_days: {events: 30, decisions: 30, token_usage: 30, audit: 30}
+  redaction:
+    builtin: {ipv4: true, ipv6: true, email: true}
+    patterns: []
+  heartbeat:
+    url: "{{ hush_heartbeat_url }}"
+    interval_seconds: 60
+  auth:
+    oidc:
+      issuer: https://id.wahlberger.dev
+      client_id: "{{ hush_oidc_client_id }}"
+      client_secret_file: /run/secrets/hush_oidc_secret
+      redirect_uri: "https://{{ hush_public_host }}/auth/callback"
+    authorization:
+      # A login is allowed when any listed claim has an accepted value (HUSH-AUTH-041).
+      claims:
+        groups: "{{ hush_allowed_groups }}"
+    session: {idle_seconds: 1800, absolute_seconds: 28800}
+    break_glass:
+      enabled: false
+      password_hash_file: /run/secrets/hush_break_glass_hash
+  shadow_mode: "{{ hush_shadow_mode }}"
+  logging: {level: INFO}
+  metrics: {token_file: /run/secrets/hush_metrics_token}
+
+# Recipient of hush's own e-mail. Set in group_vars (ewahlberger@gmail.com).
+hush_alert_recipient: ""
+
+# Forgejo pull token and secret values: provided by group_vars from Vault.
+hush_forgejo_pull_token: ""
+hush_secrets: {}
+# Pocket ID client id of the hush OIDC client (set in group_vars).
+hush_oidc_client_id: ""

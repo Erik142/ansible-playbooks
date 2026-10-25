@@ -1,0 +1,32 @@
+---
+argument_specs:
+  main:
+    short_description: Deploys the Hush alerting service as a Podman Quadlet on the ops VM.
+    options:
+      hush_image:
+        type: str
+        required: true
+        description: "Pinned image reference in the Forgejo registry. 0.3.0 or later: claims-based dashboard authorization."
+      hush_forgejo_pull_token:
+        type: str
+        required: true
+        no_log: true
+        description: Forgejo token with read:package, from vault_hush_forgejo_pull_token.
+      hush_secrets:
+        type: dict
+        required: true
+        no_log: true
+        description: Secret values keyed by hush_secret_names. Every name must be present and non-empty.
+      hush_alert_recipient:
+        type: str
+        required: true
+        description: E-mail address Hush notifies through Resend.
+      hush_heartbeat_url:
+        type: str
+        required: true
+        description: Healthchecks.io ping URL. The role refuses the REPLACE placeholder.
+      hush_allowed_groups:
+        type: list
+        elements: str
+        required: true
+        description: Pocket ID groups whose members may log in (hush `auth.authorization.claims.groups`). Must not be empty.

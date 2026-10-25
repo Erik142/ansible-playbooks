@@ -1,0 +1,38 @@
+#!/bin/sh
+# Rendered by the notify_failure role to /usr/local/bin/hush-post. Do NOT edit
+# on the host; re-run Ansible.
+#
+# Posts one hush.event.v1 JSON file to a hush source:
+#   hush-post <source-id> bearer <json-file>                 (token in HUSH_TOKEN)
+#   hush-post <source-id> hmac   <json-file> <secret-file>   (HMAC-SHA256, hush 0.4.0)
+set -eu
+
+SOURCE="${1:?usage: hush-post <source-id> bearer|hmac <json-file> [secret-file]}"
+MODE="${2:?bearer or hmac}"
+FILE="${3:?json file}"
+URL="${HUSH_URL:-{{ notify_failure_hush_url }}}/ingest/$SOURCE"
+
+case "$MODE" in
+  bearer)
+    : "${HUSH_TOKEN:?HUSH_TOKEN is not set}"
+    exec curl -fsS -m 15 \
+      -H "Authorization: Bearer $HUSH_TOKEN" \
+      -H "Content-Type: application/json" \
+      --data-binary "@$FILE" "$URL"
+    ;;
+  hmac)
+    SECRET_FILE="${4:?secret file}"
+    TS="$(date +%s)"
+    # Signature over "<timestamp>.<body>", as hush/auth/machine.py verifies it.
+    SIG="$(printf '%s.' "$TS" | cat - "$FILE" | openssl dgst -sha256 -hmac "$(cat "$SECRET_FILE")" | awk '{print $NF}')"
+    exec curl -fsS -m 15 \
+      -H "X-Hush-Timestamp: $TS" \
+      -H "X-Hush-Signature: sha256=$SIG" \
+      -H "Content-Type: application/json" \
+      --data-binary "@$FILE" "$URL"
+    ;;
+  *)
+    echo "unknown mode: $MODE" >&2
+    exit 2
+    ;;
+esac

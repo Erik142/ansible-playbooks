@@ -11,15 +11,16 @@ happened, this only watches the log. A failed send is logged to stderr (the
 journal) and the next line is processed; there is no retry.
 
 Environment:
-  RESEND_API_KEY, NOTIFY_FROM, NOTIFY_TO   from /etc/notify-failure/notify-failure.env
+  HUSH_TOKEN, NOTIFY_FROM, NOTIFY_TO   from /etc/notify-failure/notify-failure.env
   SSH_LOGIN_NOTIFY_IGNORE   comma separated CIDRs/addresses that never trigger a mail
-  SSH_LOGIN_NOTIFY_URL      Resend endpoint (default https://api.resend.com/emails)
+  SSH_LOGIN_NOTIFY_SOURCE   hush source id (default hooks-ops)
   SSH_LOGIN_NOTIFY_TEMPLATE HTML template (default /etc/ssh-login-notify/email-template.html);
                             if unreadable the mail goes out as plain text only
 
 Usage: ssh-login-notify.py            follow the journal (the systemd service)
        ssh-login-notify.py --stdin    read journal lines from stdin (tests)
 """
+import datetime
 import html
 import ipaddress
 import json
@@ -28,11 +29,11 @@ import re
 import socket
 import subprocess
 import sys
+import tempfile
 import time
-import urllib.error
-import urllib.request
 
-DEFAULT_URL = "https://api.resend.com/emails"
+HUSH_POST = "/usr/local/bin/hush-post"
+HUSH_SOURCE_DEFAULT = "hooks-ops"
 DEFAULT_TEMPLATE = "/etc/ssh-login-notify/email-template.html"
 MAX_VALUE_LENGTH = 100
 SEND_TIMEOUT_SECONDS = 15
@@ -135,23 +136,30 @@ def build_payload(login, env, host, now, template=None):
 
 
 def send(payload, env):
-    """POST the mail to Resend. Raises on any failure; the caller logs it."""
-    api_key = env.get("RESEND_API_KEY", "")
-    if not api_key:
-        raise RuntimeError("RESEND_API_KEY is empty")
-    request = urllib.request.Request(
-        env.get("SSH_LOGIN_NOTIFY_URL", DEFAULT_URL),
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": "Bearer " + api_key,
-            "Content-Type": "application/json",
-            # Resend sits behind Cloudflare, which rejects urllib's default agent.
-            "User-Agent": "ssh-login-notify/1.0",
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=SEND_TIMEOUT_SECONDS):
-        pass
+    """Post the login to hush as a problem event (hush sends the mail). Raises on any failure."""
+    token = env.get("HUSH_TOKEN", "")
+    if not token:
+        raise RuntimeError("HUSH_TOKEN is empty")
+    event = {
+        "schema": "hush.event.v1",
+        "host": socket.getfqdn(),
+        "check": "ssh-login",
+        "service": "",
+        "status": "problem",
+        "message": payload["subject"],
+        "log_excerpt": payload["text"],
+        "occurred_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    source = env.get("SSH_LOGIN_NOTIFY_SOURCE", HUSH_SOURCE_DEFAULT)
+    with tempfile.NamedTemporaryFile("w", suffix=".json") as handle:
+        json.dump(event, handle)
+        handle.flush()
+        subprocess.run(
+            [HUSH_POST, source, "bearer", handle.name],
+            env={**env, "HUSH_TOKEN": token},
+            check=True,
+            timeout=SEND_TIMEOUT_SECONDS,
+        )
 
 
 def process(lines, env, networks):
@@ -168,7 +176,7 @@ def process(lines, env, networks):
             send(payload, env)
             sent += 1
             log("mailed login of %s from %s" % (login["user"], login["addr"]))
-        except (OSError, RuntimeError, urllib.error.URLError) as exc:
+        except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
             # Never the key or the request: only the reason.
             log("sending the login mail for %s from %s failed: %s" % (login["user"], login["addr"], exc))
     return sent

@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: hush
+  author: Erik Wahlberger
+  description: Hush intelligent alerting service, running as a Podman Quadlet.
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - hush
+    - alerting
+    - podman
+
+dependencies: []

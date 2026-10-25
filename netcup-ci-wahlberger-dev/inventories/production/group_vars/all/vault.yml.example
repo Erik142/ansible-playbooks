@@ -12,3 +12,4 @@ vault_forgejo_runner_registration_token: ""
 
 # Cloudflare DNS API token (Zone:DNS:Edit on wahlberger.dev), for cloudflare_dns.
 vault_cloudflare_dns_api_token: ""
+vault_hush_source_hooks_netcup: ""

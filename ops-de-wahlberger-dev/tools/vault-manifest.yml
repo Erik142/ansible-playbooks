@@ -21,3 +21,29 @@ vault_notify_failure_resend_api_key: pi:vault_notify_failure_resend_api_key
 # SH-BR-09: new values; T-20 copies both into the NAS vault.
 vault_restic_backup_repo_password: generate:alnum32
 vault_restic_backup_rest_server_password: generate:alnum32
+
+# Hush (roles/hush). Generated secrets are kept on a rebuild. The three manual
+# values are typed by the operator and kept from the current vault on a rebuild.
+# Forgejo pull token (read:package), created by hand in Forgejo.
+vault_hush_forgejo_pull_token: manual
+# Healthchecks.io ping URL (dead-man's switch). Created by hand at healthchecks.io.
+vault_hush_heartbeat_url: manual
+# Bearer and HMAC secrets for hush sources. Each must also be entered in the
+# consumer (Uptime Kuma webhook, hook scripts, restic hook); see roles/hush/README.md.
+vault_hush_source_kuma: generate:alnum32
+vault_hush_source_hooks_ops: generate:alnum32
+vault_hush_source_hooks_nas: generate:alnum32
+vault_hush_source_hooks_cloud: generate:alnum32
+vault_hush_source_hooks_netcup: generate:alnum32
+vault_hush_source_backup_ops: generate:alnum32
+vault_hush_source_backup_cloud: generate:alnum32
+vault_hush_maintenance_ansible: generate:alnum32
+vault_hush_metrics_token: generate:alnum32
+# Inert while auth.break_glass.enabled is false. Replace with a real password hash
+# before enabling break-glass login.
+vault_hush_break_glass_hash: generate:alnum32
+# Operator-supplied: Anthropic API key, a separate Resend key for hush, and the
+# Pocket ID client secret of the hush OIDC client.
+vault_hush_anthropic_key: manual
+vault_hush_resend_key: manual
+vault_hush_oidc_secret: manual

@@ -1,0 +1,164 @@
+---
+# Input guards first: nothing below changes anything if one of them fails.
+- name: Require the Forgejo pull token
+  ansible.builtin.assert:
+    that:
+      - hush_forgejo_pull_token | default('', true) | length > 0
+    fail_msg: >-
+      hush_forgejo_pull_token is empty. Set vault_hush_forgejo_pull_token in
+      Vault (see roles/hush/README.md).
+    quiet: true
+  tags: [hush, hush_guard]
+
+- name: Require every Hush secret value to be present and non-empty
+  ansible.builtin.assert:
+    that:
+      - hush_secret_names | select('in', hush_secrets.keys()) | list | length == hush_secret_names | length
+      - hush_secret_names | map('extract', hush_secrets) | select('match', '.+') | list | length == hush_secret_names | length
+    fail_msg: >-
+      One or more Hush secrets are missing or empty. Every name in
+      hush_secret_names needs a value in hush_secrets (see roles/hush/README.md).
+    quiet: true
+  no_log: true
+  tags: [hush, hush_guard]
+
+- name: Refuse to run with the placeholder values from hush-config.yaml
+  ansible.builtin.assert:
+    that:
+      - "'REPLACE' not in hush_heartbeat_url"
+      - hush_allowed_groups | length > 0
+      - hush_alert_recipient | length > 0
+    fail_msg: >-
+      hush_heartbeat_url must hold a real value, not the REPLACE placeholder,
+      hush_alert_recipient must be set, and hush_allowed_groups must not be empty.
+    quiet: true
+  tags: [hush, hush_guard]
+
+# A hush restart makes the Kuma "Hush" monitor report down, which hush would
+# alert on. An ad-hoc maintenance window for this apply holds those alerts. It
+# is scoped to the ops host, which the Kuma monitor's URL host is an alias of
+# (topology). It expires on its own; a failed call does not block the deploy.
+- name: Set the maintenance window id for this apply
+  ansible.builtin.set_fact:
+    hush_maintenance_window_id: "ansible-hush-{{ lookup('pipe', 'date +%s') }}"
+  tags: [hush]
+
+- name: Open a hush maintenance window for this apply
+  ansible.builtin.uri:
+    url: "https://{{ hush_public_host }}/maintenance/windows"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ hush_secrets.hush_maintenance_ansible }}"
+    body_format: json
+    body:
+      scope:
+        - host: ops.de.wahlberger.dev
+      duration_seconds: 900
+      reason: "ansible apply of the hush role"
+      id: "{{ hush_maintenance_window_id }}"
+    status_code: [200, 201]
+    timeout: 15
+  no_log: true
+  register: hush_window_open
+  failed_when: false
+  when: not ansible_check_mode
+  tags: [hush]
+
+- name: Report that the maintenance window could not be opened
+  ansible.builtin.debug:
+    msg: "hush maintenance window not opened (status {{ hush_window_open.status | default('none') }}); hush alerts during the restart are not held"
+  when:
+    - not ansible_check_mode
+    - hush_window_open.status | default(0) not in [200, 201]
+  tags: [hush]
+
+- name: Create the Hush data directory
+  ansible.builtin.file:
+    path: "{{ hush_data_path }}"
+    state: directory
+    owner: "{{ hush_container_uid }}"
+    group: "{{ hush_container_uid }}"
+    mode: "0750"
+  tags: [hush]
+
+- name: Create the Hush secrets directory
+  ansible.builtin.file:
+    path: "{{ hush_secrets_dir }}"
+    state: directory
+    owner: "{{ hush_container_uid }}"
+    group: "{{ hush_container_uid }}"
+    mode: "0700"
+  tags: [hush]
+
+# Quadlets run as root, so the registry login belongs to root.
+- name: Log in to the Forgejo registry
+  containers.podman.podman_login:
+    registry: "{{ hush_registry }}"
+    username: "{{ hush_registry_user }}"
+    password: "{{ hush_forgejo_pull_token }}"
+  no_log: true
+  tags: [hush]
+
+- name: Pull the Hush image
+  containers.podman.podman_image:
+    name: "{{ hush_image }}"
+    state: present
+  tags: [hush]
+
+# Secrets are plain 0400 files owned by the container user, mounted read-only
+# at /run/secrets. Files rather than `podman secret`: a Podman secret cannot be
+# updated in place, so a changed value would need a recreate on every run. A
+# file changes only when its content does.
+- name: Write the Hush secret files
+  ansible.builtin.copy:
+    content: "{{ hush_secrets[item] }}"
+    dest: "{{ hush_secrets_dir }}/{{ item }}"
+    owner: "{{ hush_container_uid }}"
+    group: "{{ hush_container_uid }}"
+    mode: "0400"
+  loop: "{{ hush_secret_names }}"
+  loop_control:
+    label: "{{ item }}"
+  no_log: true
+  diff: false
+  notify: Restart hush
+  tags: [hush]
+
+- name: Render the Hush config
+  ansible.builtin.copy:
+    content: "{{ hush_config | to_nice_yaml(indent=2) }}"
+    dest: "{{ hush_config_path }}"
+    owner: root
+    group: "{{ hush_container_uid }}"
+    mode: "0640"
+  diff: false
+  notify: Restart hush
+  tags: [hush]
+
+- name: Deploy the Hush container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: hush
+    container_quadlet_src: hush.container.j2
+  tags: [hush]
+
+# Run the restart handlers now, so the restart happens inside the window.
+- name: Restart Hush now if its config, secrets or unit changed
+  ansible.builtin.meta: flush_handlers
+  tags: [hush]
+
+- name: Close the hush maintenance window
+  ansible.builtin.uri:
+    url: "https://{{ hush_public_host }}/maintenance/windows/{{ hush_maintenance_window_id }}"
+    method: DELETE
+    headers:
+      Authorization: "Bearer {{ hush_secrets.hush_maintenance_ansible }}"
+    status_code: [200, 404]
+    timeout: 15
+  no_log: true
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - hush_window_open.status | default(0) in [200, 201]
+  tags: [hush]

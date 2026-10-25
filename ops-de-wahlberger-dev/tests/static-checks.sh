@@ -111,7 +111,7 @@ import os, sys, yaml
 ops, nas, cloud = (os.environ[k] for k in ("SC_OPS", "SC_NAS", "SC_CLOUD"))
 errors = []
 want = ["common", "notify_failure", "disk_space", "ssh_authorized_keys", "security", "reboot_notify",
-        "firewall", "podman", "zerotier", "beszel_agent", "cloudflare_dns", "caddy", "semaphore", "restic_backup"]
+        "firewall", "podman", "zerotier", "beszel_agent", "cloudflare_dns", "caddy", "semaphore", "hush", "restic_backup"]
 
 def load(path):
     try:

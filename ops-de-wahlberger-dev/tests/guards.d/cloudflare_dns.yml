@@ -56,6 +56,8 @@
       proxied: false
       state: present
       check_mode: false
+    # Hush's site in production caddy_sites gets a CNAME like semaphore's.
+    gt_call_hush_cname: "{{ gt_call_cname | combine({'record': 'hush.de.int.wahlberger.dev'}) }}"
     gt_first_task: "Ensure this host's own A record exists in Cloudflare"
     gt_cases:
       - name: cutover off -> host A + extra A, no CNAME (FR-36, FR-131, FR-37)
@@ -73,6 +75,7 @@
           - "{{ gt_call_host }}"
           - "{{ gt_call_extra }}"
           - "{{ gt_call_cname }}"
+          - "{{ gt_call_hush_cname }}"
         output_has: ["failed=0"]
         output_lacks: ["{{ gt_token }}"]
       - name: cutover on, check mode -> same calls, flagged as check mode
@@ -83,6 +86,7 @@
           - "{{ gt_call_host | combine({'check_mode': true}) }}"
           - "{{ gt_call_extra | combine({'check_mode': true}) }}"
           - "{{ gt_call_cname | combine({'check_mode': true}) }}"
+          - "{{ gt_call_hush_cname | combine({'check_mode': true}) }}"
         output_has: ["failed=0"]
         output_lacks: ["{{ gt_token }}"]
       - name: custom cname target and cnames flag set directly -> CNAME follows the target
@@ -95,6 +99,7 @@
           - "{{ gt_call_host }}"
           - "{{ gt_call_extra }}"
           - "{{ gt_call_cname | combine({'value': 'other-target.wahlberger.dev'}) }}"
+          - "{{ gt_call_hush_cname | combine({'value': 'other-target.wahlberger.dev'}) }}"
         output_has: ["failed=0"]
         output_lacks: ["{{ gt_token }}"]
       - name: two caddy sites and cutover on -> one CNAME each
