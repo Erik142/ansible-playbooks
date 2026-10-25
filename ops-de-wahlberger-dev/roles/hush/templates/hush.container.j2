@@ -1,0 +1,28 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Hush alerting service
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=hush
+Image={{ hush_image }}
+ReadOnly=true
+Tmpfs=/tmp
+User={{ hush_container_uid }}:{{ hush_container_uid }}
+# Config and secrets are read-only; the data directory holds the SQLite database.
+Volume={{ hush_data_path }}:/data:Z
+Volume={{ hush_config_path }}:/etc/hush/config.yaml:ro,Z
+Volume={{ hush_secrets_dir }}:/run/secrets:ro,Z
+# Loopback only: Caddy (host network) and the hooks on ops reach it here.
+PublishPort={{ hush_publish_address }}:{{ hush_port }}:8080
+HealthCmd=python -c "import urllib.request as u; u.urlopen('http://127.0.0.1:8080/healthz', timeout=4)"
+HealthInterval=30s
+HealthTimeout=5s
+
+[Service]
+Restart=always
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

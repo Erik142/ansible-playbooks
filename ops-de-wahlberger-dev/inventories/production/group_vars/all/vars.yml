@@ -134,6 +134,9 @@ caddy_allowed_sources:
 caddy_sites:
   - host: semaphore.de.int.wahlberger.dev
     upstream: "127.0.0.1:3000"
+  # Hush: ZeroTier only. Its CNAME points at ops (vm_zt_ip) like semaphore's; Caddy binds vm_zt_ip.
+  - host: hush.de.int.wahlberger.dev
+    upstream: "127.0.0.1:8080"
 
 # --- Semaphore UI ---------------------------------------------------------------
 semaphore_url: "https://semaphore.de.int.wahlberger.dev"
@@ -174,3 +177,32 @@ semaphore_cookie_hash: "{{ vault_semaphore_cookie_hash | default('') }}"
 semaphore_cookie_encryption: "{{ vault_semaphore_cookie_encryption | default('') }}"
 semaphore_oidc_client_secret: "{{ vault_semaphore_oidc_client_secret | default('') }}"
 notify_failure_resend_api_key: "{{ vault_notify_failure_resend_api_key | default('') }}"
+notify_failure_hush_token: "{{ vault_hush_source_hooks_ops | default('') }}"
+notify_failure_hush_source: hooks-ops
+restic_backup_hush_hmac_secret: "{{ vault_hush_source_backup_ops | default('') }}"
+
+# --- Hush (roles/hush) ---------------------------------------------------------
+# ZeroTier only: a CNAME (caddy_sites) to ops.de.int, which resolves to vm_zt_ip.
+hush_public_host: hush.de.int.wahlberger.dev
+hush_alert_recipient: ewahlberger@gmail.com
+# Pocket ID client "hush" (not secret; its secret is vault_hush_oidc_secret).
+hush_oidc_client_id: "14fd3186-6f65-46be-b0af-7fbaffdfb745"
+hush_forgejo_pull_token: "{{ vault_hush_forgejo_pull_token | default('') }}"
+hush_heartbeat_url: "{{ vault_hush_heartbeat_url | default('') }}"
+# Pocket ID group whose members may log in to the dashboard. The group is created in Pocket ID.
+hush_allowed_groups:
+  - hush_admins
+hush_secrets:
+  hush_source_kuma: "{{ vault_hush_source_kuma | default('') }}"
+  hush_source_hooks_ops: "{{ vault_hush_source_hooks_ops | default('') }}"
+  hush_source_hooks_nas: "{{ vault_hush_source_hooks_nas | default('') }}"
+  hush_source_hooks_cloud: "{{ vault_hush_source_hooks_cloud | default('') }}"
+  hush_source_hooks_netcup: "{{ vault_hush_source_hooks_netcup | default('') }}"
+  hush_source_backup_ops: "{{ vault_hush_source_backup_ops | default('') }}"
+  hush_source_backup_cloud: "{{ vault_hush_source_backup_cloud | default('') }}"
+  hush_maintenance_ansible: "{{ vault_hush_maintenance_ansible | default('') }}"
+  hush_anthropic_key: "{{ vault_hush_anthropic_key | default('') }}"
+  hush_resend_key: "{{ vault_hush_resend_key | default('') }}"
+  hush_oidc_secret: "{{ vault_hush_oidc_secret | default('') }}"
+  hush_break_glass_hash: "{{ vault_hush_break_glass_hash | default('') }}"
+  hush_metrics_token: "{{ vault_hush_metrics_token | default('') }}"

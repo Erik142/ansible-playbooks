@@ -47,6 +47,9 @@
       tags: [caddy]
     - role: semaphore
       tags: [semaphore]
+    # Hush alerting. ZeroTier only, behind caddy (SH-FR-13 amended 2026-10-24).
+    - role: hush
+      tags: [hush]
     # Last: backs up what the roles above wrote under the Podman data dir.
     - role: restic_backup
       tags: [restic_backup]

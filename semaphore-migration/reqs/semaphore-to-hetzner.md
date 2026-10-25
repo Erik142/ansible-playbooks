@@ -326,7 +326,8 @@ Each step has a gate (see [Step gates](#step-gates)) that must hold before the n
 - SH-FR-141 [Must]: CI shall install `<vm-dir>`'s Galaxy dependencies and run `ansible-playbook site.yml --syntax-check` in `<vm-dir>` for every pull request.
 - SH-FR-142 [Must]: CI's vault-encryption check shall cover `<vm-dir>`'s `vault.yml`.
 - SH-FR-12 [Must]: `<vm-dir>` shall have a Molecule scenario that converges `common`, `notify_failure`, `disk_space`, `ssh_authorized_keys` and `security` twice on openSUSE Tumbleweed, and that fails on any change in the second converge.
-- SH-FR-13 [Must]: The set of roles in `site.yml` shall be exactly: `common`, `notify_failure`, `disk_space`, `ssh_authorized_keys`, `security`, `reboot_notify`, `firewall`, `podman`, `zerotier`, `beszel_agent`, `cloudflare_dns`, `caddy`, `semaphore`, `restic_backup`.
+- SH-FR-13 [Must]: The set of roles in `site.yml` shall be exactly: `common`, `notify_failure`, `disk_space`, `ssh_authorized_keys`, `security`, `reboot_notify`, `firewall`, `podman`, `zerotier`, `beszel_agent`, `cloudflare_dns`, `caddy`, `semaphore`, `hush`, `restic_backup`.
+  - Amendment 2026-10-24: `hush` added (Hush alerting, ZeroTier only, behind `caddy`; placed after `semaphore`, before the last role `restic_backup`). Role: `ops-de-wahlberger-dev/roles/hush`.
 - SH-FR-143 [Must]: Each role entry in `site.yml` shall carry a tag equal to the role name.
 - SH-FR-14 [Must]: The VM's hostname shall be `<vm-fqdn>`.
 - SH-FR-15 [Must]: sshd on the VM shall refuse password authentication.

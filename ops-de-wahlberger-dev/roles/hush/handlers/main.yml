@@ -1,0 +1,9 @@
+---
+# Restarts hush after its config or a secret file changes. The container helper
+# restarts it separately when hush.container itself changes.
+- name: Restart hush
+  ansible.builtin.systemd:
+    name: hush.service
+    state: restarted
+    daemon_reload: true
+  when: not ansible_check_mode

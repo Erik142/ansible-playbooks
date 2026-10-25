@@ -33,3 +33,24 @@ vault_notify_failure_resend_api_key: ""
 # unrecoverable.
 vault_restic_backup_repo_password: ""
 vault_restic_backup_rest_server_password: ""
+
+# --- Hush (roles/hush) --------------------------------------------------------
+# Forgejo token with read:package, created by hand (manual: enter it with ansible-vault edit).
+vault_hush_forgejo_pull_token: ""
+# Healthchecks.io ping URL, created by hand (manual).
+vault_hush_heartbeat_url: ""
+# Generated (32 alphanumeric characters). Copy each into its consumer, see roles/hush/README.md.
+vault_hush_source_kuma: ""
+vault_hush_source_hooks_ops: ""
+vault_hush_source_hooks_nas: ""
+vault_hush_source_hooks_cloud: ""
+vault_hush_source_hooks_netcup: ""
+vault_hush_source_backup_ops: ""
+vault_hush_source_backup_cloud: ""
+vault_hush_maintenance_ansible: ""
+vault_hush_metrics_token: ""
+vault_hush_break_glass_hash: ""
+# Operator-supplied (manual): Anthropic API key, Resend key for hush, Pocket ID client secret.
+vault_hush_anthropic_key: ""
+vault_hush_resend_key: ""
+vault_hush_oidc_secret: ""

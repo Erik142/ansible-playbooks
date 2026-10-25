@@ -41,6 +41,18 @@ COPIED = {
     "vault_notify_failure_resend_api_key": "SRC-resend-key-777",
 }
 GENERATED = ("vault_restic_backup_repo_password", "vault_restic_backup_rest_server_password")
+# Hush (roles/hush): generated secrets and operator-supplied (manual) values.
+HUSH_GENERATED = (
+    "vault_hush_source_kuma", "vault_hush_source_hooks_ops", "vault_hush_source_hooks_nas",
+    "vault_hush_source_hooks_cloud", "vault_hush_source_hooks_netcup", "vault_hush_source_backup_ops",
+    "vault_hush_source_backup_cloud", "vault_hush_maintenance_ansible",
+    "vault_hush_metrics_token", "vault_hush_break_glass_hash",
+)
+HUSH_MANUAL = (
+    "vault_hush_forgejo_pull_token", "vault_hush_heartbeat_url", "vault_hush_anthropic_key",
+    "vault_hush_resend_key", "vault_hush_oidc_secret",
+)
+ALL_KEYS = {*COPIED, *GENERATED, *HUSH_GENERATED, *HUSH_MANUAL}
 ALL_VALUES = [*COPIED.values(), VM_PW, PI_PW]
 SOURCE_SCRIPT = """#!/bin/sh
 cat "$(dirname "$0")/pw"
@@ -160,7 +172,7 @@ def test_builds_vault_with_copied_and_generated_keys_and_prints_no_value(scratch
 
     assert proc.returncode == 0, proc.stderr
     data = scratch.vm_view()
-    assert set(data) == set(COPIED) | set(GENERATED)
+    assert set(data) == ALL_KEYS
     for key, value in COPIED.items():
         assert data[key] == value
     for key in GENERATED:
@@ -204,7 +216,7 @@ def test_show_hash_prints_sha256_first_8_hex_but_still_no_value(scratch):
     key = "vault_semaphore_admin_password"
     digest = hashlib.sha256(COPIED[key].encode()).hexdigest()[:8]
     assert f"{key}: copied from pi:{key}  sha256:{digest}" in proc.stdout
-    assert len(re.findall(r"sha256:[0-9a-f]{8}\b", proc.stdout)) == 9
+    assert len(re.findall(r"sha256:[0-9a-f]{8}\b", proc.stdout)) == len(ALL_KEYS)
     assert_no_values(proc.stdout, proc.stderr, extra=tuple(scratch.vm_view()[k] for k in GENERATED))
 
 
@@ -218,7 +230,7 @@ def test_real_manifest_example_and_vars_agree_on_the_key_set():
     )
     referenced = set(re.findall(r"\bvault_[a-z0-9_]+", (group_vars / "vars.yml").read_text()))
     assert manifest == example == referenced
-    assert len(manifest) == 9
+    assert len(manifest) == 24  # 9 original + 15 Forgejo/Hush keys
 
 
 def test_real_vault_pass_sh_holds_exactly_one_op_reference_for_the_vm_item():
@@ -281,7 +293,7 @@ def test_placeholder_vault_needs_replace_placeholder_and_is_then_replaced(scratc
 
     done = scratch.run("--replace-placeholder")
     assert done.returncode == 0, done.stderr
-    assert set(scratch.vm_view()) == set(COPIED) | set(GENERATED)
+    assert set(scratch.vm_view()) == ALL_KEYS
 
 
 def test_plaintext_file_at_the_target_is_refused_without_force(scratch):
@@ -378,6 +390,7 @@ cat "$d/pw"
         ("vault_a: pi:vault_a\nvault_a: pi:vault_b\n", "duplicate"),
         ("plain_a: pi:vault_a\n", "not a vault_* key"),
         ("vault_a: laptop:vault_a\n", "source must be"),
+        ("vault_a: manual:x\n", "manual takes no argument"),
         ("vault_a: generate:alnum8\n", "unknown generator"),
         ("vault_a: pi:Bad Key\n", "bad source key"),
         ("# nothing\n", "no entries"),
@@ -408,3 +421,38 @@ def test_manifest_can_name_other_playbooks_and_the_value_is_copied_from_there(tm
     assert s.vm_view()["vault_from_cloud"] == "CLOUD-val-123"
     assert "vault_from_cloud: match" in proc.stdout
     assert "CLOUD-val-123" not in proc.stdout + proc.stderr
+
+
+def test_manual_entries_parse_as_operator_supplied_keys():
+    from populate_vault import parse_manifest
+
+    entries = parse_manifest("vault_token: manual\nvault_gen: generate:alnum32\n")
+    kinds = {e.key: e.kind for e in entries}
+    assert kinds == {"vault_token": "manual", "vault_gen": "generate"}
+
+
+def test_manual_value_survives_a_forced_rebuild(scratch):
+    import json
+    import shutil
+
+    assert scratch.run().returncode == 0
+    data = scratch.vm_view()
+    data["vault_hush_forgejo_pull_token"] = "TYPED-TOKEN-QQQ"
+    plain = scratch.tmp / "typed.yml"
+    plain.write_text("".join(f"{k}: {json.dumps(v)}\n" for k, v in data.items()))
+    shutil.copy(plain, scratch.target)
+    pw = scratch.tmp / "vmpw"
+    pw.write_text(VM_PW)
+    cfg = scratch.tmp / "empty.cfg"
+    cfg.write_text("")
+    subprocess.run(
+        [str(ANSIBLE_VAULT), "encrypt", str(scratch.target), "--vault-password-file", str(pw)],
+        check=True,
+        env={**os.environ, "ANSIBLE_CONFIG": str(cfg)},
+        capture_output=True,
+    )
+
+    rebuilt = scratch.run("--force")
+    assert rebuilt.returncode == 0, rebuilt.stderr
+    assert "vault_hush_forgejo_pull_token: kept" in rebuilt.stdout
+    assert scratch.vm_view()["vault_hush_forgejo_pull_token"] == "TYPED-TOKEN-QQQ"

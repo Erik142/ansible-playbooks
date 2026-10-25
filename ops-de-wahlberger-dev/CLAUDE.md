@@ -10,7 +10,7 @@ operator runbook for the Pi-to-VM migration: do not duplicate it here.
 ## Entry point & commands
 
 - Playbook: `site.yml` (top-level). Default inventory is set in `ansible.cfg`.
-  `site.yml` holds exactly the 14 roles of SH-FR-13, in that order, each tagged
+  `site.yml` holds exactly the 15 roles of SH-FR-13, in that order, each tagged
   with its role name (SH-FR-143).
 - Run: `ansible-playbook site.yml` (add `--check --diff` first, always). The vault
   password comes from 1Password via `.vault_pass.sh` (`ansible.cfg`'s
