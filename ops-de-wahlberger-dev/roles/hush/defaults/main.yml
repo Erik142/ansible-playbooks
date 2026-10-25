@@ -6,7 +6,7 @@
 # Semaphore. The container image comes from the Forgejo registry on the NAS.
 
 # --- Image --------------------------------------------------------------------
-hush_image: git.de.int.wahlberger.dev/erikwahlberger/hush:0.4.0
+hush_image: git.de.int.wahlberger.dev/erikwahlberger/hush:0.4.2
 # Registry login user. The token is the Forgejo token with read:package only,
 # passed in as hush_forgejo_pull_token (vault_hush_forgejo_pull_token).
 hush_registry: git.de.int.wahlberger.dev
