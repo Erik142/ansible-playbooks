@@ -121,7 +121,7 @@
         gt_listed: "{{ lookup('ansible.builtin.file', gt_example) | regex_findall('(?m)^(vault_[a-z0-9_]+): \"\"$') | sort }}"
       ansible.builtin.assert:
         that:
-          - gt_used | length == 24  # 9 original + Forgejo, Healthchecks, Hush (15), netcup source
+          - gt_used | length == 25  # 9 original + Forgejo, Healthchecks, Hush (15), netcup source, TrueNAS
           - gt_used == gt_listed
         quiet: true
 

@@ -4,6 +4,7 @@ Description=Send an immediate failure notification email for %i
 [Service]
 Type=oneshot
 EnvironmentFile=/etc/notify-failure/notify-failure.env
+EnvironmentFile=/etc/hush/hook.env
 # NOTIFY_CRASH_THRESHOLD is NOT in the shared file above (see the comment
 # there) specifically so this can set it here without a same-key conflict
 # — EnvironmentFile= always wins over a same-named Environment=, so this

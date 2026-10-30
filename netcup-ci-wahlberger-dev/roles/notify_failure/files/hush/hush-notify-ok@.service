@@ -1,0 +1,8 @@
+# Template unit: add OnSuccess=hush-notify-ok@%n.service to report a successful run.
+[Unit]
+Description=Report success of %i to Hush
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/hush/hook.env
+ExecStart=/usr/local/bin/hush-systemd-event ok %I

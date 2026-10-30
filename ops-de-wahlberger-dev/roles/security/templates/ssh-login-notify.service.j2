@@ -7,7 +7,7 @@ OnFailure=notify-failure@%n.service
 [Service]
 Type=simple
 # RESEND_API_KEY, NOTIFY_FROM, NOTIFY_TO: written by the notify_failure role.
-EnvironmentFile=/etc/notify-failure/notify-failure.env
+EnvironmentFile=/etc/hush/hook.env
 Environment="SSH_LOGIN_NOTIFY_IGNORE={{ security_ssh_login_notify_ignore | unique | join(',') }}"
 ExecStart=/usr/bin/python3 /usr/local/bin/ssh-login-notify.py
 Restart=always

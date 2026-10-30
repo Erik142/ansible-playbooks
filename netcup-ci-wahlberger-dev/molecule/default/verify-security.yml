@@ -493,8 +493,8 @@
   vars:
     verify_mail_dir: /tmp/t05-mail
     verify_mail_env:
-      HUSH_TOKEN: t05-test-key
-      HUSH_URL: http://127.0.0.1:18025
+      HUSH_TOKEN_FILE: /tmp/t05-mail/hush.token
+      HUSH_URL: http://127.0.0.1:18025/ingest/hooks-ops
       NOTIFY_FROM: "Homelab Alerts <alerts@example.test>"
       NOTIFY_TO: owner@example.test
       SSH_LOGIN_NOTIFY_IGNORE: "127.0.0.0/8,10.10.0.0/16,10.243.0.0/16,198.51.100.0/24,not-a-network"
@@ -523,6 +523,12 @@
             path: "{{ verify_mail_dir }}"
             state: directory
             mode: "0700"
+
+        - name: Write the test bearer token file
+          ansible.builtin.copy:
+            content: t05-test-key
+            dest: "{{ verify_mail_dir }}/hush.token"
+            mode: "0600"
 
         - name: Write a fake Resend endpoint that records every request
           ansible.builtin.copy:
@@ -563,6 +569,10 @@
           environment: "{{ verify_mail_env }}"
           register: verify_notify_run
           changed_when: false
+
+        - name: Show what the login notifier printed
+          ansible.builtin.debug:
+            var: verify_notify_run
 
         - name: Read what the fake endpoint received
           ansible.builtin.slurp:
@@ -608,7 +618,7 @@
             stdin: |
               Accepted publickey for erikwahlberger from 203.0.113.9 port 1 ssh2: ED25519 SHA256:one
               Accepted publickey for erikwahlberger from 203.0.113.10 port 2 ssh2: ED25519 SHA256:two
-          environment: "{{ verify_mail_env | combine({'HUSH_URL': 'http://127.0.0.1:1'}) }}"
+          environment: "{{ verify_mail_env | combine({'HUSH_URL': 'http://127.0.0.1:1/ingest/hooks-ops'}) }}"
           register: verify_notify_down
           changed_when: false
 
@@ -625,7 +635,7 @@
           ansible.builtin.command: /usr/local/bin/ssh-login-notify.py --stdin
           args:
             stdin: "Accepted publickey for erikwahlberger from 203.0.113.9 port 1 ssh2: ED25519 SHA256:one\n"
-          environment: "{{ verify_mail_env | combine({'HUSH_TOKEN': ''}) }}"
+          environment: "{{ verify_mail_env | combine({'HUSH_TOKEN_FILE': ''}) }}"
           register: verify_notify_nokey
           changed_when: false
 
@@ -633,7 +643,7 @@
           ansible.builtin.assert:
             that:
               - verify_notify_nokey.rc == 0
-              - "'HUSH_TOKEN is empty' in verify_notify_nokey.stderr"
+              - "'HUSH_TOKEN_FILE is empty' in verify_notify_nokey.stderr"
             quiet: true
 
         - name: Reject unknown arguments

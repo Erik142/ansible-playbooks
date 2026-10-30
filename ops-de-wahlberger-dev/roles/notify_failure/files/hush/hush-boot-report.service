@@ -1,0 +1,20 @@
+# Implements: HUSH-DEPLOY-028
+# Runs once after boot and reports the boot_id (and service versions) to Hush. hush-post already
+# retries each request three times; the unit retries the whole report up to three times more
+# (StartLimitBurst=4: the first run plus three restarts) and then fails, which shows in the journal.
+[Unit]
+Description=Report boot to Hush
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=4
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/hush/hook.env
+ExecStart=/usr/local/bin/hush-boot-report
+Restart=on-failure
+RestartSec=20
+
+[Install]
+WantedBy=multi-user.target

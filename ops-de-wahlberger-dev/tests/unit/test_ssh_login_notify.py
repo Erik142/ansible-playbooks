@@ -110,23 +110,23 @@ def test_long_value_is_capped(mod, template):
     assert "u" * 101 not in p["html"] and "u" * 101 not in p["text"]
 
 
-def test_send_posts_a_hush_event_through_hush_post(mod, monkeypatch):
-    import json
+def test_send_reports_a_problem_through_hush_post(mod, monkeypatch):
     seen = {}
 
-    def fake_run(argv, env, check, timeout):
-        seen.update(argv=argv, env=env, check=check, timeout=timeout,
-                    event=json.load(open(argv[3], encoding="utf-8")))
+    def fake_run(argv, **kwargs):
+        seen.update(argv=argv, **kwargs)
 
     monkeypatch.setattr(mod.subprocess, "run", fake_run)
     payload = {"from": "f", "to": ["t"], "subject": "s", "text": "x", "html": "<p>x</p>"}
-    mod.send(payload, {"HUSH_TOKEN": "t-secret"})
-    assert seen["argv"][:3] == [mod.HUSH_POST, mod.HUSH_SOURCE_DEFAULT, "bearer"]
-    assert seen["env"]["HUSH_TOKEN"] == "t-secret" and seen["check"] is True
-    assert seen["event"]["schema"] == "hush.event.v1"
-    assert seen["event"]["status"] == "problem" and seen["event"]["check"] == "ssh-login"
-    assert seen["event"]["message"] == "s" and seen["event"]["log_excerpt"] == "x"
+    mod.send(payload, {"HUSH_TOKEN_FILE": "/etc/hush/systemd.token", "HUSH_URL": "https://h/ingest/hooks-ops"})
+    assert seen["argv"] == [mod.HUSH_POST, "problem", mod.socket.getfqdn(), "ssh-login"]
+    assert seen["input"] == "x" and seen["check"] is True
+    assert seen["env"]["HUSH_MESSAGE"] == "s"
 
+
+def test_send_refuses_an_empty_token_file_setting(mod):
+    with pytest.raises(RuntimeError):
+        mod.send({"subject": "s", "text": "x"}, {"HUSH_TOKEN_FILE": ""})
 
 def test_send_refuses_an_empty_token(mod):
     with pytest.raises(RuntimeError):

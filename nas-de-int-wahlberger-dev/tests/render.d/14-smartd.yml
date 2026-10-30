@@ -27,9 +27,8 @@ render_items:
     dest: smartd-notify.sh
     kind: text
     asserts:
-      - '^ENV_FILE=/etc/notify-failure/notify-failure\.env$'
+      - '^ENV_FILE=/etc/hush/hook\.env$'
       - 'SMARTD_DEVICE'
       - 'SMARTD_FULLMESSAGE'
-      - '/usr/local/bin/hush-post hooks-nas bearer'
-      - '--arg check "smartd:'
-      - 'status: "problem"'
+      - '/usr/local/bin/hush-post problem'
+      - 'smartd:'

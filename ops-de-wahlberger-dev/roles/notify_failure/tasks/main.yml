@@ -15,6 +15,12 @@
     name: jq
     state: present
 
+# The hush hook scripts use awk (json escaping); minimal images may lack it.
+- name: Install gawk for the hush hook scripts
+  community.general.zypper:
+    name: gawk
+    state: present
+
 - name: Create the notify_failure config directory
   ansible.builtin.file:
     path: /etc/notify-failure
@@ -49,13 +55,61 @@
     group: root
     mode: "0700"
 
-- name: Deploy the hush-post helper
-  ansible.builtin.template:
-    src: hush-post.sh.j2
-    dest: /usr/local/bin/hush-post
+# Hush hook scripts (vendored from hush v0.5.0, deploy/hooks). Contract: hush docs,
+# deploy/hooks/README.md. The environment comes from /etc/hush/hook.env.
+- name: Create the hush configuration directory
+  ansible.builtin.file:
+    path: /etc/hush
+    state: directory
     owner: root
     group: root
-    mode: "0700"
+    mode: "0755"
+
+- name: Deploy the hush hook scripts
+  ansible.builtin.copy:
+    src: "hush/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop: [hush-post, hush-run-job, hush-systemd-event, hush-change, hush-boot-report]
+
+- name: Deploy the hush hook units
+  ansible.builtin.copy:
+    src: "hush/{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: [hush-notify@.service, hush-notify-ok@.service, hush-boot-report.service]
+  notify: Reload systemd
+
+- name: Write the hush hook environment file
+  ansible.builtin.template:
+    src: hook.env.j2
+    dest: /etc/hush/hook.env
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  diff: false
+
+- name: Write the hush bearer token file for this host
+  ansible.builtin.copy:
+    content: "{{ notify_failure_hush_token }}"
+    dest: /etc/hush/systemd.token
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  diff: false
+
+- name: Enable the boot report to hush
+  ansible.builtin.systemd:
+    name: hush-boot-report.service
+    enabled: true
+    daemon_reload: true
+  when: not ansible_check_mode
 
 - name: Deploy the notify-failure@.service template unit
   ansible.builtin.template:

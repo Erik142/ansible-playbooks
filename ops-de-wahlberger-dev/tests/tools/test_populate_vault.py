@@ -44,7 +44,7 @@ GENERATED = ("vault_restic_backup_repo_password", "vault_restic_backup_rest_serv
 # Hush (roles/hush): generated secrets and operator-supplied (manual) values.
 HUSH_GENERATED = (
     "vault_hush_source_kuma", "vault_hush_source_hooks_ops", "vault_hush_source_hooks_nas",
-    "vault_hush_source_hooks_cloud", "vault_hush_source_hooks_netcup", "vault_hush_source_backup_ops",
+    "vault_hush_source_hooks_cloud", "vault_hush_source_hooks_netcup", "vault_hush_source_truenas", "vault_hush_source_backup_ops",
     "vault_hush_source_backup_cloud", "vault_hush_maintenance_ansible",
     "vault_hush_metrics_token", "vault_hush_break_glass_hash",
 )
@@ -230,7 +230,7 @@ def test_real_manifest_example_and_vars_agree_on_the_key_set():
     )
     referenced = set(re.findall(r"\bvault_[a-z0-9_]+", (group_vars / "vars.yml").read_text()))
     assert manifest == example == referenced
-    assert len(manifest) == 24  # 9 original + 15 Forgejo/Hush keys
+    assert len(manifest) == 25  # 9 original + 16 Forgejo/Hush keys
 
 
 def test_real_vault_pass_sh_holds_exactly_one_op_reference_for_the_vm_item():

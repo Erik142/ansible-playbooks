@@ -35,6 +35,8 @@ vault_hush_source_hooks_ops: generate:alnum32
 vault_hush_source_hooks_nas: generate:alnum32
 vault_hush_source_hooks_cloud: generate:alnum32
 vault_hush_source_hooks_netcup: generate:alnum32
+# TrueNAS alert webhook path token (hush 0.6.0). Set in the TrueNAS alert service URL.
+vault_hush_source_truenas: generate:alnum32
 vault_hush_source_backup_ops: generate:alnum32
 vault_hush_source_backup_cloud: generate:alnum32
 vault_hush_maintenance_ansible: generate:alnum32

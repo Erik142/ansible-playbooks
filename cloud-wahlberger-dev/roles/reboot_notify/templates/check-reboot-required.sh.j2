@@ -43,24 +43,13 @@ touch /var/run/reboot-required
 [ "$ALREADY_FLAGGED" = false ] || exit 0
 
 # shellcheck disable=SC1091
-set -a  # export HUSH_TOKEN for hush-post
-. /etc/notify-failure/notify-failure.env
+# Heads-up goes to hush as an info event with the label kind=heads_up: hush
+# sends it at once, even inside a maintenance window (HUSH-RULES-050), and skips
+# triage. hook.env supplies HUSH_URL and HUSH_TOKEN_FILE.
+set -a
+. /etc/hush/hook.env
 set +a
-HOST="$(hostname -f)"
-NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-
-# Advance notice goes to hush as an info event with kind=heads_up: hush sends
-# it at once and skips triage (HUSH-RULES-050).
-TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
-jq -n \
-  --arg host "$HOST" \
-  --arg ts "$NOW" \
-  --arg packages "$PACKAGES" \
-  '{schema: "hush.event.v1", host: $host, check: "reboot-pending", service: "", status: "info",
-    message: ($host + " needs a reboot for a pending software update. This is advance notice only: it has NOT rebooted yet."),
-    log_excerpt: $packages, labels: {kind: "heads_up"}, occurred_at: $ts}' > "$TMP" \
-  || { echo "jq failed building the reboot notice" >&2; exit 0; }
-
-/usr/local/bin/hush-post {{ notify_failure_hush_source }} bearer "$TMP" \
+HOST="${HUSH_HOST:-$(hostname -f)}"
+printf '%s\n' "$OUTPUT" | HUSH_LABELS="kind=heads_up" HUSH_MESSAGE="$HOST needs a reboot for a pending software update. This is advance notice only: it has NOT rebooted yet." \
+  /usr/local/bin/hush-post info "$HOST" reboot-pending \
   || echo "Posting the reboot notice to hush failed (reboot proceeds regardless)" >&2

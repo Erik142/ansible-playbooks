@@ -1,36 +1,25 @@
 #!/bin/sh
 # Managed by Ansible (role smartd). Do NOT edit on the host.
-# smartd mail hook (-M exec): posts the warning to hush, which e-mails the owner.
-# Uses the hush token of the notify_failure role (SM-FR-3, SM-FR-4). smartd passes
+# smartd mail hook (-M exec): reports the warning to hush, which e-mails the owner
+# (SM-FR-3, SM-FR-4). smartd passes
 # SMARTD_DEVICE, SMARTD_MESSAGE, SMARTD_FULLMESSAGE and SMARTD_FAILTYPE.
 set -eu
 
-ENV_FILE=/etc/notify-failure/notify-failure.env
+ENV_FILE=/etc/hush/hook.env
 if [ ! -r "$ENV_FILE" ]; then
   echo "smartd-notify: $ENV_FILE missing (notify_failure role not applied)" >&2
   exit 1
 fi
-# The file holds plain KEY=value lines, quoted where needed; sourcing is safe.
+# hook.env holds plain KEY=value lines; export them for hush-post.
+set -a
 # shellcheck source=/dev/null
-set -a  # export HUSH_TOKEN for hush-post
 . "$ENV_FILE"
 set +a
 
 DEVICE="${SMARTD_DEVICE:-unknown device}"
 MESSAGE="${SMARTD_FULLMESSAGE:-${SMARTD_MESSAGE:-no message from smartd}}"
-HOST="$(hostname -f)"
-NOW="$(date '+%Y-%m-%d %H:%M:%S %Z')"
+HOST="${HUSH_HOST:-$(hostname -f)}"
 
-# A smartd warning goes to hush as a problem event (hush decides on the mail).
-TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
-jq -n \
-  --arg host "$HOST" \
-  --arg check "smartd:$DEVICE" \
-  --arg message "smartd reported a problem with $DEVICE on $HOST." \
-  --arg logs "$MESSAGE" \
-  --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  '{schema: "hush.event.v1", host: $host, check: $check, service: "", status: "problem",
-    message: $message, log_excerpt: $logs, occurred_at: $ts}' > "$TMP"
-
-/usr/local/bin/hush-post {{ notify_failure_hush_source }} bearer "$TMP"
+# A smartd warning is a problem event for this device; hush decides on the mail.
+printf '%s\n' "$MESSAGE" | HUSH_MESSAGE="smartd reported a problem with $DEVICE on $HOST." \
+  /usr/local/bin/hush-post problem "$HOST" "smartd:$DEVICE"

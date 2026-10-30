@@ -62,6 +62,7 @@ restic_backup_on_calendar: "*-*-* 04:30:00"
 
 # Success is posted to hush as an "ok" event, signed with this HMAC secret
 # (hush backup source backup-cloud). Vault value is set in group_vars.
+restic_backup_hush_url: "https://hush.de.int.wahlberger.dev"
 restic_backup_hush_source: backup-cloud
 restic_backup_hush_secret_file: /etc/restic-backup/hush-backup.secret
 restic_backup_hush_hmac_secret: ""
