@@ -62,6 +62,14 @@
   diff: false
   when: restic_backup_notify_on_success
 
+- name: Deploy the hush HMAC post helper
+  ansible.builtin.template:
+    src: hush-hmac-post.sh.j2
+    dest: /usr/local/bin/hush-hmac-post
+    owner: root
+    group: root
+    mode: "0700"
+
 - name: Deploy the backup script
   ansible.builtin.template:
     src: restic-backup.sh.j2

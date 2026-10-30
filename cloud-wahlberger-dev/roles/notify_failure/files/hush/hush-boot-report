@@ -1,0 +1,31 @@
+#!/bin/sh
+# Implements: HUSH-DEPLOY-028
+# Report one `info` boot event with the boot_id (and service versions) to Hush through hush-post.
+# Usage: hush-boot-report
+# Environment: as hush-post (HUSH_URL, HUSH_TOKEN_FILE), HUSH_HOST (default: hostname),
+# HUSH_BOOT_ID_FILE (default /proc/sys/kernel/random/boot_id), and HUSH_VERSION_COMMANDS: one
+# `service=command` per line; the first output line of the command becomes label `version`
+# of that service's report (a service whose version cannot be read is left out).
+set -eu
+
+here=$(dirname "$0")
+host=${HUSH_HOST:-$(hostname)}
+boot_id=$(tr -d '\n' <"${HUSH_BOOT_ID_FILE:-/proc/sys/kernel/random/boot_id}")
+[ -n "$boot_id" ] || { echo "hush-boot-report: empty boot_id" >&2; exit 1; }
+
+# The host event carries the boot_id; one more event per service carries its version.
+HUSH_LABELS="boot_id=$boot_id" HUSH_MESSAGE="boot of $host" \
+  "$here/hush-post" info "$host" boot </dev/null
+
+if [ -n "${HUSH_VERSION_COMMANDS:-}" ]; then
+  while IFS= read -r entry; do
+    case $entry in *=*) ;; *) continue ;; esac
+    service=${entry%%=*}; command=${entry#*=}
+    version=$(sh -c "$command" 2>/dev/null | head -n 1) || version=
+    [ -n "$version" ] || continue
+    HUSH_LABELS="version=$version" HUSH_MESSAGE="$service version $version" \
+      "$here/hush-post" info "$host" version "$service" </dev/null
+  done <<VERSIONS
+$HUSH_VERSION_COMMANDS
+VERSIONS
+fi

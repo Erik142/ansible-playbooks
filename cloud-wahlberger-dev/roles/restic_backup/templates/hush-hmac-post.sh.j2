@@ -1,0 +1,22 @@
+#!/bin/sh
+# Rendered by the restic_backup role to /usr/local/bin/hush-hmac-post. Do NOT edit on
+# the host; re-run Ansible.
+#
+# Posts one hush.event.v1 JSON file to an HMAC-signed hush source. hush-post (the
+# official hook script) is bearer-only, so the signature is made here. The scheme is
+# hush's (hush/auth/machine.py): HMAC-SHA256 over "<timestamp>.<body>".
+#   hush-hmac-post <source-id> <json-file> <secret-file>
+set -eu
+
+SOURCE="${1:?usage: hush-hmac-post <source-id> <json-file> <secret-file>}"
+FILE="${2:?json file}"
+SECRET_FILE="${3:?secret file}"
+URL="{{ restic_backup_hush_url }}/ingest/$SOURCE"
+TS="$(date +%s)"
+SIG="$(printf '%s.' "$TS" | cat - "$FILE" | openssl dgst -sha256 -hmac "$(cat "$SECRET_FILE")" | awk '{print $NF}')"
+
+exec curl -fsS -m 15 \
+  -H "X-Hush-Timestamp: $TS" \
+  -H "X-Hush-Signature: sha256=$SIG" \
+  -H "Content-Type: application/json" \
+  --data-binary "@$FILE" "$URL"

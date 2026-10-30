@@ -1,0 +1,8 @@
+# Template unit: add OnFailure=hush-notify@%n.service to a unit to report its failure.
+[Unit]
+Description=Report failure of %i to Hush
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/hush/hook.env
+ExecStart=/usr/local/bin/hush-systemd-event problem %I

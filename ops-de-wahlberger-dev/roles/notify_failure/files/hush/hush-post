@@ -1,0 +1,76 @@
+#!/bin/sh
+# Implements: HUSH-DEPLOY-024
+# Post one generic event (schema hush.event.v1) to Hush (HUSH-DEPLOY-024, A-04).
+# Usage: hush-post STATUS HOST CHECK [SERVICE] < log-excerpt-on-stdin
+# Environment: HUSH_URL (https://hush.example.org/ingest/<source>), HUSH_TOKEN_FILE (bearer
+# token file; for HMAC sources sign with your own wrapper), HUSH_MESSAGE (optional text),
+# HUSH_LABELS (optional, one key=value per line; sent as event labels, HUSH-DEPLOY-028).
+set -eu
+
+status=$1; host=$2; check=$3; service=${4:-}
+url=${HUSH_URL:?HUSH_URL is required}
+token=$(cat "${HUSH_TOKEN_FILE:?HUSH_TOKEN_FILE is required}")
+
+json_escape() {
+  # Valid JSON for any input: backslash, quote and EVERY control character below 0x20 are
+  # escaped (ANSI colour, backspace, form feed ...); NUL bytes and bytes that are not valid
+  # UTF-8 are dropped first. Lines are joined with \n.
+  tr -d '\000' | if command -v iconv >/dev/null 2>&1; then iconv -f UTF-8 -t UTF-8 -c 2>/dev/null; else cat; fi |
+  LC_ALL=C awk '
+    BEGIN { ORS = ""
+            for (i = 1; i < 32; i++) esc[sprintf("%c", i)] = sprintf("\\u%04x", i)
+            esc["\t"] = "\\t"; esc["\r"] = "" }
+    { out = ""; n = length($0)
+      for (i = 1; i <= n; i++) {
+        c = substr($0, i, 1)
+        if (c == "\\") out = out "\\\\"
+        else if (c == "\"") out = out "\\\""
+        else if (c in esc) out = out esc[c]
+        else out = out c
+      }
+      if (NR > 1) printf "\\n"
+      print out }'
+}
+
+case $status in problem | ok | info) ;; *) echo "hush-post: status must be problem, ok or info" >&2; exit 2 ;; esac
+
+excerpt=$(tail -n 50 | json_escape)
+message=$(printf '%s' "${HUSH_MESSAGE:-}" | json_escape)
+labels=
+if [ -n "${HUSH_LABELS:-}" ]; then
+  sep=
+  while IFS= read -r line; do
+    case $line in *=*) ;; *) continue ;; esac
+    k=${line%%=*}; v=${line#*=}
+    labels="$labels$sep\"$(printf '%s' "$k" | json_escape)\":\"$(printf '%s' "$v" | json_escape)\""
+    sep=,
+  done <<LABELS
+$HUSH_LABELS
+LABELS
+fi
+labels_json=
+[ -n "$labels" ] && labels_json=",\"labels\":{$labels}"
+key="$(date +%s)-$$-$(od -An -N4 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')"
+
+body=$(printf '{"schema":"hush.event.v1","host":"%s","service":"%s","check":"%s","status":"%s","message":"%s","log_excerpt":"%s"%s}' \
+  "$(printf '%s' "$host" | json_escape)" "$(printf '%s' "$service" | json_escape)" \
+  "$(printf '%s' "$check" | json_escape)" "$status" "$message" "$excerpt" "$labels_json")
+
+bodyfile=$(mktemp)
+trap 'rm -f "$bodyfile"' EXIT
+printf '%s' "$body" >"$bodyfile"
+
+attempt=0
+while [ "$attempt" -lt 3 ]; do
+  # The bearer token goes to curl as a config on stdin, never on the command line (ps).
+  if printf 'header = "Authorization: Bearer %s"\n' "$token" |
+     curl -fsS --max-time 10 -X POST "$url" --config - \
+       -H "Content-Type: application/json" -H "Idempotency-Key: $key" \
+       --data-binary @"$bodyfile" >/dev/null; then
+    exit 0
+  fi
+  attempt=$((attempt + 1))
+  sleep 2
+done
+echo "hush-post: could not deliver the event to $url" >&2
+exit 1

@@ -1,27 +1,6 @@
 #!/bin/sh
 # Rendered by the notify_failure role. Do NOT edit on the host; re-run Ansible.
-#
 # Usage: notify-failure.sh <failed-unit-name>
-# Posts one problem event for the failed unit to hush. Whether and when an
-# e-mail goes out (crash-loop handling, incident dedupe, recovery) is decided by
-# hush. HUSH_TOKEN and NOTIFY_LOG_LINES come from notify-failure@.service's
-# EnvironmentFile.
+# Reports the unit's problem to hush. Whether an e-mail goes out is decided by hush.
 set -eu
-
-UNIT="${1:?usage: notify-failure.sh <unit-name>}"
-HOST="$(hostname -f)"
-NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-LOGS="$(journalctl -u "$UNIT" -n "${NOTIFY_LOG_LINES:-50}" --no-pager -o cat 2>/dev/null || true)"
-
-TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
-jq -n \
-  --arg host "$HOST" \
-  --arg check "$UNIT" \
-  --arg msg "$UNIT failed on $HOST" \
-  --arg logs "$LOGS" \
-  --arg ts "$NOW" \
-  '{schema: "hush.event.v1", host: $host, check: $check, service: "", status: "problem",
-    message: $msg, log_excerpt: $logs, occurred_at: $ts}' > "$TMP"
-
-exec /usr/local/bin/hush-post "{{ notify_failure_hush_source }}" bearer "$TMP"
+exec /usr/local/bin/hush-systemd-event problem "${1:?usage: notify-failure.sh <unit-name>}"

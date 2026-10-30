@@ -107,3 +107,13 @@ cloudflare_dns_extra_a_records:
   - record: ci.de.int.wahlberger.dev
     value: "{{ vm_zt_ip }}"
 cloudflare_dns_cnames_enabled: false
+
+# Baseline packages for this host: the role defaults plus `hostname`, which the hush
+# hook scripts and the reboot notice call (hush-boot-report, hush-systemd-event).
+common_packages:
+  - ca-certificates
+  - curl
+  - gpg2
+  - hostname
+  - htop
+  - vim

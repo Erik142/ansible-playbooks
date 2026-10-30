@@ -1,0 +1,15 @@
+#!/bin/sh
+# Report the state of a systemd unit (HUSH-DEPLOY-024). Used by hush-notify@.service
+# (OnFailure=) and hush-notify-ok@.service (OnSuccess=).
+# Usage: hush-systemd-event problem|ok UNIT
+set -u
+status=$1; unit=$2
+here=$(dirname "$0")
+host=${HUSH_HOST:-$(hostname)}
+if command -v journalctl >/dev/null 2>&1; then
+  excerpt=$(journalctl -u "$unit" -n 50 --no-pager 2>/dev/null || true)
+else
+  excerpt=
+fi
+printf '%s\n' "$excerpt" | HUSH_MESSAGE="unit $unit reported $status" \
+  "$here/hush-post" "$status" "$host" "$unit"

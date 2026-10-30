@@ -82,7 +82,7 @@ jq -n --arg host "$(hostname -f)" --arg msg "restic-backup succeeded" \
   --arg logs "$SUMMARY" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   '{schema: "hush.event.v1", host: $host, check: "restic-backup", service: "", status: "ok",
     message: $msg, log_excerpt: $logs, occurred_at: $ts}' > "$TMP"
-/usr/local/bin/hush-post {{ restic_backup_hush_source }} hmac "$TMP" {{ restic_backup_hush_secret_file }} \
+/usr/local/bin/hush-hmac-post {{ restic_backup_hush_source }} "$TMP" {{ restic_backup_hush_secret_file }} \
   || echo "posting the success event to hush failed (backup itself succeeded)" >&2
 rm -f "$TMP"
 {% endif %}
