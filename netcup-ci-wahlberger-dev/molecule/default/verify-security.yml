@@ -570,6 +570,10 @@
           register: verify_notify_run
           changed_when: false
 
+        - name: Show what the login notifier printed
+          ansible.builtin.debug:
+            var: verify_notify_run
+
         - name: Read what the fake endpoint received
           ansible.builtin.slurp:
             src: "{{ verify_mail_dir }}/requests.jsonl"

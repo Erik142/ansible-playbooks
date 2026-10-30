@@ -30,7 +30,7 @@ render_items:
         - 10.243.0.0/16
     asserts:
       - '^Environment="SSH_LOGIN_NOTIFY_IGNORE=127\.0\.0\.0/8,10\.243\.0\.0/16"$'
-      - '^EnvironmentFile=/etc/notify-failure/notify-failure\.env$'
+      - '^EnvironmentFile=/etc/hush/hook\.env$'
       - '^OnFailure=notify-failure@%n\.service$'
   - src: roles/security/files/ssh-login-notify.py
     dest: ssh-login-notify.py
