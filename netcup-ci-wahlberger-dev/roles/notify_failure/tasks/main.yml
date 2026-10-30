@@ -15,6 +15,12 @@
     name: jq
     state: present
 
+# The hush hook scripts use awk (json escaping); minimal images may lack it.
+- name: Install gawk for the hush hook scripts
+  community.general.zypper:
+    name: gawk
+    state: present
+
 - name: Create the notify_failure config directory
   ansible.builtin.file:
     path: /etc/notify-failure

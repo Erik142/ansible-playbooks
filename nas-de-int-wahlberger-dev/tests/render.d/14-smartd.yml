@@ -32,4 +32,3 @@ render_items:
       - 'SMARTD_FULLMESSAGE'
       - '/usr/local/bin/hush-post problem'
       - 'smartd:'
-      - 'status: "problem"'

@@ -10,6 +10,11 @@
     quiet: true
   no_log: true
 
+- name: Install gawk for the hush hook scripts
+  ansible.builtin.apt:
+    name: gawk
+    state: present
+
 - name: Install jq
   ansible.builtin.apt:
     name: jq
