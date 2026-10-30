@@ -17,7 +17,7 @@ In `site.yml` after `semaphore`. SH-FR-13 was amended on 2026-10-24 to list it
 | `hush_alert_recipient` | group_vars | E-mail address Hush sends to. |
 | `hush_heartbeat_url` | Healthchecks.io check | Replaces the REPLACE placeholder. |
 | `hush_allowed_groups` | Pocket ID | Groups whose members may log in (`hush_admins`). Must not be empty. |
-| `hush_image` | defaults | `git.de.int.wahlberger.dev/erikwahlberger/hush:0.4.2`. |
+| `hush_image` | defaults | `git.de.int.wahlberger.dev/erikwahlberger/hush:0.5.0`. |
 
 The role refuses to run while any input is empty or still holds a `REPLACE`
 placeholder.

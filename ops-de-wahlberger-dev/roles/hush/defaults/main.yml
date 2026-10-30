@@ -6,7 +6,7 @@
 # Semaphore. The container image comes from the Forgejo registry on the NAS.
 
 # --- Image --------------------------------------------------------------------
-hush_image: git.de.int.wahlberger.dev/erikwahlberger/hush:0.4.2
+hush_image: git.de.int.wahlberger.dev/erikwahlberger/hush:0.6.0
 # Registry login user. The token is the Forgejo token with read:package only,
 # passed in as hush_forgejo_pull_token (vault_hush_forgejo_pull_token).
 hush_registry: git.de.int.wahlberger.dev
@@ -55,6 +55,7 @@ hush_secret_names:
   - hush_source_hooks_nas
   - hush_source_hooks_cloud
   - hush_source_hooks_netcup
+  - hush_source_truenas
   - hush_source_backup_ops
   - hush_source_backup_cloud
   - hush_maintenance_ansible
@@ -66,7 +67,7 @@ hush_secret_names:
 
 # --- Config (rendered to config.yaml) -----------------------------------------
 hush_timezone: Europe/Berlin
-hush_shadow_mode: true   # keep true for the first week (log only, suppress nothing)
+hush_shadow_mode: false  # shadow mode ended 2026-10-30 after 5 days of decision logs
 hush_dashboard_base_url: "https://{{ hush_public_host }}"
 
 hush_config:
@@ -79,18 +80,36 @@ hush_config:
     - id: kuma
       adapter: uptime_kuma
       auth: {mode: bearer, secret_files: [/run/secrets/hush_source_kuma]}
+      # Flapping (TrueNAS 2026-10-29: six flips in 50 min) and first-problem settling.
+      settle_seconds: 120
+      flap: {transitions: 4, window_seconds: 900, hold_seconds: 3600, max_hold_seconds: 900}
+      reboot_classification: true
+      incident: {bundle: true, topology_join: true, update: true}
     - id: hooks-ops
       adapter: generic
       auth: {mode: bearer, secret_files: [/run/secrets/hush_source_hooks_ops]}
+      reboot_classification: true
+      incident: {bundle: true, topology_join: true, update: true}
     - id: hooks-nas
       adapter: generic
       auth: {mode: bearer, secret_files: [/run/secrets/hush_source_hooks_nas]}
+      reboot_classification: true
+      incident: {bundle: true, topology_join: true, update: true}
     - id: hooks-cloud
       adapter: generic
       auth: {mode: bearer, secret_files: [/run/secrets/hush_source_hooks_cloud]}
+      reboot_classification: true
+      incident: {bundle: true, topology_join: true, update: true}
+    # TrueNAS SCALE alerts (Mattermost alert service). The secret is the last URL path
+    # segment: https://hush.de.int.wahlberger.dev/ingest/truenas/<secret>. See hush docs/truenas.md.
+    - id: truenas
+      adapter: truenas
+      auth: {mode: path_token, secret_files: [/run/secrets/hush_source_truenas]}
     - id: hooks-netcup
       adapter: generic
       auth: {mode: bearer, secret_files: [/run/secrets/hush_source_hooks_netcup]}
+      reboot_classification: true
+      incident: {bundle: true, topology_join: true, update: true}
     - id: backup-ops
       adapter: generic
       dedupe_window_seconds: 900
@@ -131,6 +150,14 @@ hush_config:
           - {id: paperless}
           - {id: immich}
           - {id: homepage}
+      # TrueNAS SCALE at Boras. Its alerts name the host brasseserver; its Kuma monitor
+      # reports under the URL host, so both names are aliases of this host.
+      - id: truenas.boras.int.wahlberger.dev
+        aliases: [brasseserver]
+        host_check: {source: kuma, check: truenas.boras.int.wahlberger.dev}
+        grace_seconds: 300
+        services:
+          - {id: truenas-state}
   maintenance_windows:
     - id: reboot-sunday
       cron: "0 4 * * 0"
@@ -143,6 +170,7 @@ hush_config:
   # maintenance API. Its secret is separate from every source secret.
   maintenance:
     max_duration_seconds: 7200
+    verify_seconds: 300
   maintenance_clients:
     - id: ansible
       auth: {mode: bearer, secret_files: [/run/secrets/hush_maintenance_ansible]}
@@ -168,6 +196,12 @@ hush_config:
       from: "Hush <hush@no-reply.wahlberger.dev>"
       to: ["{{ hush_alert_recipient }}"]
     dashboard_base_url: "{{ hush_dashboard_base_url }}"
+    # Non-critical mails wait until 07:00 and go out as one batch (failsafe, always_notify
+    # and critical events are never held).
+    quiet_hours: {start: "22:00", end: "07:00", timezone: "Europe/Berlin"}
+  feedback:
+    enabled: true
+    link_ttl_days: 30
   digest:
     time: "07:00"
   escalation:
