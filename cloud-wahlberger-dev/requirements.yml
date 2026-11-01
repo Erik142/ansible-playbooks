@@ -29,4 +29,4 @@ roles:
   # SSH hardening + fail2ban + unattended-upgrades on Debian. Tuned via the
   # security_* vars in inventories/production/group_vars/all/vars.yml.
   - name: geerlingguy.security
-    version: "3.0.2"
+    version: "3.1.0"
