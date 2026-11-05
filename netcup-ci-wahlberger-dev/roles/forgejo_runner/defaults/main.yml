@@ -3,7 +3,7 @@
 
 # Exact tag (v9.1.1 checked 2026-10-17). The image has an empty entrypoint, so
 # commands name /bin/forgejo-runner explicitly.
-forgejo_runner_image: "code.forgejo.org/forgejo/runner:13.2.0"
+forgejo_runner_image: "code.forgejo.org/forgejo/runner:13.2.1"
 
 # Forgejo instance on the NAS. Reached over ZeroTier (see README). The runner
 # connects outbound only.
