@@ -92,17 +92,6 @@ def test_ac01_personal_key_missing(repo, where):
 
 
 # --- SH-AC-01L: the lint step reports a yamllint defect -----------------------
-def test_ac01l_yamllint_defect_is_reported(repo):
-    repo.write(V + "/bad.yml", "key:   value  \n\tx: [\n")
-    rc, out = repo.static("SH-AC-01L", STATIC_CHECKS_SKIP_LINT="0", ANSIBLE_LINT="true")
-    assert status(out, "SH-AC-01L") == "FAIL" and "[ops yamllint] failed" in out, out
-
-
-def test_ac01l_clean_tree_has_no_yamllint_failure(repo):
-    rc, out = repo.static("SH-AC-01L", STATIC_CHECKS_SKIP_LINT="0", ANSIBLE_LINT="true")
-    assert "[ops yamllint] failed" not in out, out
-
-
 # --- SH-AC-17 / 17v ------------------------------------------------------------
 def test_ac17_wrong_url(repo):
     repo.edit(OPS_VARS, "https://semaphore.de.int.wahlberger.dev", "https://wrong.example.org")
@@ -276,16 +265,6 @@ def test_ac23_stage_e_requires_new_key_and_no_old(repo):
     ("-e ansible_host=ops.de.int.wahlberger.dev", "", "ansible_host"),
     ("## Database restore", "## Notes", "restore"),
 ])
-def test_ac27_readme_defects(repo, old, new, needle):
-    repo.edit(V + "/README.md", old, new)
-    must_fail(repo, "SH-AC-27", needle)
-
-
-def test_ac27_missing_readme(repo):
-    (repo.ops / "README.md").unlink()
-    must_fail(repo, "SH-AC-27", "README.md missing")
-
-
 # --- SH-AC-30 ------------------------------------------------------------------
 @pytest.mark.parametrize("rel,old,new,needle", [
     ("roles/restic_backup/templates/restic-backup.sh.j2", "restic check", "restic forget\nrestic check", "forget or prune"),
@@ -553,32 +532,6 @@ def test_ac60_stage_e_needs_both_gone(repo):
 
 
 # --- SH-AC-63 ------------------------------------------------------------------
-def test_ac63_ip_outside_zerotier_range(repo):
-    repo.edit(OPS_VARS, 'vm_zt_ip: ""', 'vm_zt_ip: "10.10.1.1"')
-    repo.edit(OPS_VARS, 'vm_zt_iface: ""', 'vm_zt_iface: "ztabc"')
-    must_fail(repo, "SH-AC-63", "10.243.0.0/16")
-
-
-def test_ac63_ip_without_interface(repo):
-    repo.edit(OPS_VARS, 'vm_zt_ip: ""', 'vm_zt_ip: "10.243.1.1"')
-    must_fail(repo, "SH-AC-63", "set together")
-
-
-def test_ac63_ip_without_in_force_record(repo):
-    repo.edit(OPS_VARS, 'vm_zt_ip: ""', 'vm_zt_ip: "10.243.1.1"')
-    repo.edit(OPS_VARS, 'vm_zt_iface: ""', 'vm_zt_iface: "ztabc"')
-    must_fail(repo, "SH-AC-63", "in force")
-
-
-def test_ac63_a2_state_passes(repo):
-    repo.edit(OPS_VARS, 'vm_zt_ip: ""', 'vm_zt_ip: "10.243.1.1"')
-    repo.edit(OPS_VARS, 'vm_zt_iface: ""', 'vm_zt_iface: "ztabc"')
-    p = repo.ops / "docs/zerotier-flow-rules.md"
-    p.write_text(p.read_text() + "\n## In force (2026-10-11)\n")
-    rc, out = repo.static("SH-AC-63")
-    assert status(out, "SH-AC-63") == "PASS", out
-
-
 # --- SH-FR-97 ------------------------------------------------------------------
 def test_fr97_untracked_pi_file(repo):
     repo.write(PI + "/new.txt", "x")

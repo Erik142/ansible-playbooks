@@ -198,7 +198,7 @@ class Repo:
         cfg.write_text("")
         env.update(
             ANSIBLE_CONFIG=str(cfg), PATH="%s:%s" % (self.canary_dir, env["PATH"]),
-            STATIC_CHECKS_SKIP_LINT="1", STATIC_CHECKS_SKIP_RENDER="1", STATIC_CHECKS_SKIP_UNIT="1",
+            STATIC_CHECKS_SKIP_RENDER="1", STATIC_CHECKS_SKIP_UNIT="1",
             TMPDIR=str(self.tmp), HOME=str(self.tmp), GIT_CONFIG_GLOBAL="/dev/null",
         )
         env.pop("ANSIBLE_VAULT_PASSWORD_FILE", None)

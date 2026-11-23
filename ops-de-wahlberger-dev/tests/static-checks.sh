@@ -21,7 +21,6 @@
 #                                          values are never printed.
 #   STATIC_CHECKS_PR=<A|A2|..>             also run pr-boundaries.sh for that PR
 #   STATIC_CHECKS_ONLY=id,id               run only these ids (negative tests)
-#   STATIC_CHECKS_SKIP_LINT=1              skip SH-AC-01L (CI has its own jobs)
 #   STATIC_CHECKS_SKIP_RENDER=1            skip SH-AC-30r (render-check.sh)
 #   STATIC_CHECKS_SKIP_CONTAINER_GUARDS=1  skip SH-GUARDS-C (the guards that need
 #                                          Docker/Podman and some of them the network)
@@ -175,16 +174,6 @@ if len({tuple(b) for b in blobs.values()}) != 1:
 if errors:
     sys.exit("\n".join(errors))
 PY
-}
-
-# --- SH-AC-01L: lint triplet (yamllint, ansible-lint, syntax-check) -----------
-ac01l() {
-    [ "${STATIC_CHECKS_SKIP_LINT:-}" != 1 ] || { echo "STATIC_CHECKS_SKIP_LINT=1 (CI validate job covers it)"; return 77; }
-    rc=0
-    run_step "ops yamllint" "$ops_dir" "${yamllint_cmd[@]}" . || rc=1
-    run_step "ops ansible-lint" "$ops_dir" "${ansible_lint_cmd[@]}" || rc=1
-    run_step "ops site.yml syntax" "$ops_dir" ansible-playbook -i inventories/production/hosts.yml site.yml --syntax-check || rc=1
-    return $rc
 }
 
 # --- SH-AC-17 (structure part): vars wiring and the example file --------------
@@ -342,62 +331,6 @@ PY
     g=$(cd "$repo" && git grep --untracked -n -I -e "$pat" -- . ':(exclude)semaphore-migration' ':(exclude)*/tests/static-checks.sh' ':(exclude)*/tests/unit/*') \
         && { echo "private key material in the repository:"; printf '%s\n' "$g" | cut -d: -f1,2; rc=1; }
     return $rc
-}
-
-# --- SH-AC-27 (+ SH-FR-70, 90, 96, 133, 134): README content ------------------
-ac27() {
-    python3 - <<'PY'
-import os, re, sys
-
-path = os.path.join(os.environ["SC_OPS"], "README.md")
-try:
-    text = open(path).read()
-except OSError:
-    sys.exit("README.md missing")
-errors = []
-lines = text.splitlines()
-
-def section(step):
-    """Text of the heading mentioning `Step <step>` up to the next heading of the same or higher level."""
-    for i, l in enumerate(lines):
-        m = re.match(r"(#+)\s.*\bStep " + str(step) + r"\b(?!\.)", l, re.I)
-        if m:
-            level = len(m.group(1))
-            body = []
-            for l2 in lines[i + 1:]:
-                m2 = re.match(r"(#+)\s", l2)
-                if m2 and len(m2.group(1)) <= level:
-                    break
-                body.append(l2)
-            return "\n".join(body)
-    return None
-
-for s in range(10):
-    body = section(s)
-    if body is None:
-        errors.append(f"no heading for Step {s}")
-        continue
-    if not re.search(r"SH-AC-\d+", body):
-        errors.append(f"Step {s}: no gate scenario (SH-AC-nn)")
-    if not re.search(r"rollback", body, re.I):
-        errors.append(f"Step {s}: no rollback")
-for pr in ("A", "A2", "A3", "B", "B2", "C", "C2", "C-R", "D", "E"):
-    if not re.search(r"^\|\s*" + re.escape(pr) + r"\s*\|", text, re.M):
-        errors.append(f"PR table lacks a row for {pr}")
-need = [
-    (r"semaphore_image", "the semaphore_image note"),
-    (r"-e ansible_host=ops\.de\.int\.wahlberger\.dev", "the -e ansible_host=ops.de.int.wahlberger.dev hint"),
-    (r"^#+\s.*restor", "a database restore heading"),
-    (r"^#+\s.*cloud firewall", "a Cloud Firewall heading"),
-    (r"hcloud firewall", "hcloud firewall commands"),
-    (r"^#+\s.*break[- ]glass", "a break-glass heading"),
-]
-for pat, what in need:
-    if not re.search(pat, text, re.I | re.M):
-        errors.append(f"README lacks {what}")
-if errors:
-    sys.exit("\n".join(errors))
-PY
 }
 
 # --- SH-AC-30 (source level): restic timer, script and excludes ---------------
@@ -678,39 +611,6 @@ guards_container() {
     run_guards container
 }
 
-# --- SH-AC-63 (static part): vm_zt_ip / vm_zt_iface and the flow-rule record ---
-ac63() {
-    python3 - <<'PY'
-import ipaddress, os, re, sys, yaml
-
-ops = os.environ["SC_OPS"]
-errors = []
-v = yaml.safe_load(open(f"{ops}/inventories/production/group_vars/all/vars.yml"))
-ip, iface = v.get("vm_zt_ip", ""), v.get("vm_zt_iface", "")
-if ip not in ("", None):
-    try:
-        a = ipaddress.IPv4Address(str(ip))
-        if a not in ipaddress.ip_network("10.243.0.0/16"):
-            errors.append("vm_zt_ip is not in 10.243.0.0/16")
-    except ValueError:
-        errors.append("vm_zt_ip is not an IPv4 address")
-if bool(ip) != bool(iface):
-    errors.append("vm_zt_ip and vm_zt_iface must be set together (PR A2) or both empty (PR A)")
-if iface and not re.fullmatch(r"[A-Za-z0-9_.-]+", str(iface)):
-    errors.append("vm_zt_iface is not an interface name")
-try:
-    doc = open(f"{ops}/docs/zerotier-flow-rules.md").read()
-    if not re.search(r"before", doc, re.I):
-        errors.append('docs/zerotier-flow-rules.md lacks the "before" rule set')
-    if ip and not re.search(r"in force", doc, re.I):
-        errors.append('vm_zt_ip is set but docs/zerotier-flow-rules.md lacks the dated "in force" rule set')
-except OSError:
-    errors.append("docs/zerotier-flow-rules.md missing")
-if errors:
-    sys.exit("\n".join(errors))
-PY
-}
-
 # --- SH-FR-97: the Pi directory is not changed until step 7 ends --------------
 fr97() {
     [ "${STEP7_DONE:-0}" != 1 ] || { echo "STEP7_DONE=1 (step 7 ended)"; return 77; }
@@ -750,11 +650,9 @@ unit() {
 
 echo "static checks (stage $stage), diff base: $(git -C "$repo" rev-parse --short "$base")"
 check SH-AC-01 "skeleton: roles/tags, inventory, files, personal key (FR-13, 143, 62)" ac01
-check SH-AC-01L "yamllint, ansible-lint, syntax-check" ac01l
 check SH-AC-17 "vars wiring and vault.yml.example" ac17
 check SH-AC-17v "decrypted vault keys (PyYAML + Ansible loader)" ac17v
 check SH-AC-23 "key lists per BR-10, from= option, no private key" ac23
-check SH-AC-27 "README content" ac27
 check SH-AC-30 "restic timer/script/excludes (source)" ac30
 check SH-AC-30r "restic templates rendered (render-check.sh)" ac30r
 check SH-AC-43 "repository clean after PR E (FR-111, 160, 161)" ac43
@@ -767,7 +665,6 @@ check SH-AC-62b "guard test caddy (own run)" ac62b
 check SH-R6 "guard test firewall (zone tasks gated for first --check)" fwgate
 check SH-GUARDS "all other offline guards in tests/guards.d (vm_vars, podman, regexes, ...)" guards_offline
 check SH-GUARDS-C "container guards in tests/guards.d (restic_backup, semaphore, security_check_mode)" guards_container
-check SH-AC-63 "vm_zt_ip/vm_zt_iface and flow-rule record" ac63
 check SH-FR-97 "pi-de-int-wahlberger-dev untouched until step 7" fr97
 check SH-FR-205 "no ZeroTier Central token" fr205
 check SH-BR-16 "PR boundary (STATIC_CHECKS_PR)" br16

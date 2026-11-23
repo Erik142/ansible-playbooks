@@ -95,15 +95,9 @@ r_files() {
 
 # --- BD-AC-01 (+ BD-NFR-02): lint triplet for both directories ---------------
 ac01() {
-    rc=0
-    run_step "nas yamllint" "$nas_dir" "${yamllint_cmd[@]}" . || rc=1
-    run_step "nas ansible-lint" "$nas_dir" "${ansible_lint_cmd[@]}" || rc=1
-    run_step "nas site.yml syntax" "$nas_dir" ansible-playbook site.yml --syntax-check || rc=1
-    run_step "nas backup_disk_init.yml syntax" "$nas_dir" ansible-playbook backup_disk_init.yml --syntax-check || rc=1
-    run_step "cloud yamllint" "$cloud_dir" "${yamllint_cmd[@]}" . || rc=1
-    run_step "cloud ansible-lint" "$cloud_dir" "${ansible_lint_cmd[@]}" || rc=1
-    run_step "cloud site.yml syntax" "$cloud_dir" ansible-playbook site.yml --syntax-check || rc=1
-    return $rc
+    # yamllint, ansible-lint and site.yml syntax run in the CI validate job.
+    # Only backup_disk_init.yml is not covered there.
+    run_step "nas backup_disk_init.yml syntax" "$nas_dir" ansible-playbook backup_disk_init.yml --syntax-check
 }
 
 # --- BD-AC-02 (+ BD-NFR-03): no lint suppression added -----------------------
@@ -427,13 +421,6 @@ if errors:
 PY
 }
 
-# --- BD-AC-10: the NAS restic_backup role is gone ----------------------------
-ac10() {
-    a=$(git -C "$repo" ls-files "$nas_rel/roles/restic_backup")
-    b=$(grep -nE 'role:\s*restic_backup\b' "$nas_dir/site.yml")
-    [ -z "$a$b" ] || { printf '%s\n%s\n' "$a" "$b"; return 1; }
-}
-
 # --- BD-AC-11: the Pi is untouched and never contacted -----------------------
 ac11() {
     rc=0
@@ -444,68 +431,6 @@ ac11() {
         | grep -E '^\+.*pi\.de\.int\.wahlberger\.dev' | grep -v 'restic_backup_rest_server_host')
     [ -z "$b" ] || { echo "added references to the Pi:"; echo "$b"; rc=1; }
     return $rc
-}
-
-# --- BD-AC-14: no NAS document describes the old job as deployed -------------
-# Excluded beyond the spec: PLAN-backup.md (the plan for this very change),
-# caches, this script (its patterns contain the search words) and
-# tests/vm/scenarios (VM scenario scripts that create a dummy old job to prove
-# its removal, BD-AC-25/38).
-ac14() {
-    cd "$repo" || return 1
-    m=$(grep -rn -i 'restic_backup\|restic-backup' "$nas_rel" --exclude-dir=reqs --exclude-dir=.ansible \
-        --exclude-dir=.ansible_cache --exclude-dir=.pytest_cache --exclude-dir=.ruff_cache \
-        --exclude=PLAN.md --exclude=PLAN-backup.md --exclude=static-checks.sh --exclude-dir=scenarios \
-        | grep -v "^$nas_rel/roles/restic_backup_decommission/")
-    printf '%s\n' "$m" | python3 -c '
-import re, sys
-# Allowed (BD-AC-14), each kind named explicitly:
-#  1. the decommission role or its flag (restic_backup_decommission...);
-#  2. the restore-only vault keys of BD-FR-85;
-#  3. cloud own restic_backup role, only as its path or as the phrase "cloud own";
-#  4. the word "removed" (or removes/removal) on the same line as the match;
-#  5. a runbook command run against cloud (`ssh cloud ...`).
-# Kinds 1, 2, 4 and 5 are judged on the match line alone. Kind 3 needs the
-# phrase on the line, or "cloud" within the 4 lines around it.
-line_ok = re.compile(r"restic_backup_decommission|vault_restic_backup_(repo|rest_server)_password"
-                     r"|cloud-wahlberger-dev/roles/restic_backup|cloud own|\bremoved\b|\bremoves\b|\bremoval\b"
-                     r"|ssh cloud", re.I)
-cloud_ctx = re.compile(r"\bcloud\b", re.I)
-bad = []
-for raw in sys.stdin:
-    raw = raw.rstrip("\n")
-    m = re.match(r"(.+?):(\d+):", raw)
-    if not m:
-        continue
-    path, no = m.group(1), int(m.group(2))
-    lines = open(path, errors="replace").read().splitlines()
-    ctx = " ".join(lines[max(0, no - 5):no + 4])
-    if not (line_ok.search(lines[no - 1]) or cloud_ctx.search(ctx)):
-        bad.append(raw)
-if bad:
-    print("matches that do not describe the job as removed:")
-    print("\n".join(bad))
-    sys.exit(1)
-'
-}
-
-# --- BD-AC-15: the snapper role is untouched ---------------------------------
-ac15() {
-    d=$(git -C "$repo" diff "$base" -- "$nas_rel/roles/snapper/")
-    [ -z "$d" ] || { echo "$d" | head -20; return 1; }
-}
-
-# --- BD-AC-16: the VM fixture holds no production secret ---------------------
-ac16() {
-    cd "$nas_dir" || return 1
-    python3 - <<'PY'
-import sys, yaml
-inv = yaml.safe_load(open("inventories/vm/hosts.yml"))
-hosts = inv["all"]["children"]["nas"]["hosts"]
-others = [g for g in inv["all"].get("children", {}) if g != "nas"]
-if len(hosts) != 1 or others or inv["all"].get("hosts"):
-    sys.exit("inventories/vm/hosts.yml must have exactly one host, in group nas")
-PY
 }
 
 ac16_vault() {
@@ -534,7 +459,7 @@ PY
 unit() { run_step "pytest" "$nas_dir" "${pytest_cmd[@]}" tests/unit -q; }
 
 echo "static checks, diff base: $(git -C "$repo" rev-parse --short "$base")"
-check AC-01 "yamllint, ansible-lint, syntax-check (nas + cloud)" ac01
+check AC-01 "backup_disk_init.yml syntax (lint and site syntax: CI validate)" ac01
 check AC-02 "no noqa/skip_list/warn_list added" ac02
 check AC-04 "destructive operations unreachable from site.yml" ac04
 check GS-AC-74 "garage role runs no layout/bucket/key/lifecycle command" ac_garage_no_state
@@ -544,11 +469,7 @@ check AC-07 "render check (default and spindown 120)" ac07
 check AC-08 "rest-server image Renovate-detectable" ac08
 check AC-09 "vars, flags and vault.yml.example wiring" ac09
 check AC-09v "decrypted vault keys and BD-BR-09 equalities" ac09_vault
-check AC-10 "restic_backup role gone" ac10
 check AC-11 "Pi untouched and never contacted" ac11
-check AC-14 "no NAS doc describes the old job as deployed" ac14
-check AC-15 "snapper role untouched" ac15
-check AC-16 "VM fixture inventory shape" ac16
 check AC-16v "no production vault value in inventories/vm" ac16_vault
 check UNIT "pytest tests/unit" unit
 

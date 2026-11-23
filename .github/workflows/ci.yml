@@ -194,7 +194,16 @@ jobs:
           echo "ci-cannot-decrypt-this-is-expected" > "$RUNNER_TEMP/dummy-vault-pass"
           echo "ANSIBLE_VAULT_PASSWORD_FILE=$RUNNER_TEMP/dummy-vault-pass" >> "$GITHUB_ENV"
 
+      - id: galaxy-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.ansible/collections
+            ~/.ansible/roles
+          key: galaxy-${{ runner.os }}-${{ hashFiles('nas-de-int-wahlberger-dev/requirements.yml', 'cloud-wahlberger-dev/requirements.yml') }}
+
       - name: Install collection/role requirements
+        if: steps.galaxy-cache.outputs.cache-hit != 'true'
         run: |
           for d in nas-de-int-wahlberger-dev cloud-wahlberger-dev; do
             (cd "$d" && ansible-galaxy collection install -r requirements.yml && ansible-galaxy role install -r requirements.yml)
@@ -243,16 +252,18 @@ jobs:
           echo "ci-cannot-decrypt-this-is-expected" > "$RUNNER_TEMP/dummy-vault-pass"
           echo "ANSIBLE_VAULT_PASSWORD_FILE=$RUNNER_TEMP/dummy-vault-pass" >> "$GITHUB_ENV"
 
+      - id: galaxy-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.ansible/collections
+            ~/.ansible/roles
+          key: galaxy-${{ runner.os }}-${{ hashFiles('ops-de-wahlberger-dev/requirements.yml') }}
+
       - name: Install collection requirements
+        if: steps.galaxy-cache.outputs.cache-hit != 'true'
         working-directory: ops-de-wahlberger-dev
         run: ansible-galaxy collection install -r requirements.yml
-
-      # Test-only: the container guards (SH-GUARDS-C, e.g. security_check_mode)
-      # talk to their throwaway container via the community.docker.docker
-      # connection plugin. Not in requirements.yml: the playbook itself never
-      # uses it, so the production collection set stays unchanged.
-      - name: Install collections used only by the container guards
-        run: ansible-galaxy collection install "community.docker:>=5.4.0"
 
       - name: Render check
         working-directory: ops-de-wahlberger-dev
@@ -264,8 +275,59 @@ jobs:
       - name: Static checks
         working-directory: ops-de-wahlberger-dev
         env:
-          # The render check ran in the previous step.
+          # The render check ran in the previous step; the container guards
+          # run in the ops-container-guards job.
           STATIC_CHECKS_SKIP_RENDER: "1"
+          STATIC_CHECKS_SKIP_CONTAINER_GUARDS: "1"
           # Stage D: the Semaphore cut-over is done (PR D); PR E sets E.
+          STATIC_CHECKS_STAGE: "D"
+        run: tests/static-checks.sh
+
+  # Container guards of the Semaphore VM (SH-GUARDS-C, e.g. security_check_mode),
+  # split out of ops-static so they run in parallel. They need Docker and the
+  # community.docker connection plugin, which is test-only: not in
+  # requirements.yml, so the production collection set stays unchanged.
+  ops-container-guards:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Install Ansible tooling
+        run: pip install "ansible-core==2.20.8" docker
+
+      - name: Provide a dummy vault password (CI never decrypts real secrets)
+        run: |
+          echo "ci-cannot-decrypt-this-is-expected" > "$RUNNER_TEMP/dummy-vault-pass"
+          echo "ANSIBLE_VAULT_PASSWORD_FILE=$RUNNER_TEMP/dummy-vault-pass" >> "$GITHUB_ENV"
+
+      - id: galaxy-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.ansible/collections
+            ~/.ansible/roles
+          key: galaxy-${{ runner.os }}-${{ hashFiles('ops-de-wahlberger-dev/requirements.yml') }}
+
+      - name: Install collections
+        if: steps.galaxy-cache.outputs.cache-hit != 'true'
+        working-directory: ops-de-wahlberger-dev
+        run: |
+          ansible-galaxy collection install -r requirements.yml
+          ansible-galaxy collection install "community.docker:>=5.4.0"
+
+      - name: Container guards (SH-GUARDS-C)
+        working-directory: ops-de-wahlberger-dev
+        env:
+          STATIC_CHECKS_ONLY: "SH-GUARDS-C"
+          STATIC_CHECKS_SKIP_RENDER: "1"
+          STATIC_CHECKS_SKIP_UNIT: "1"
           STATIC_CHECKS_STAGE: "D"
         run: tests/static-checks.sh
