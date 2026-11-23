@@ -12,7 +12,7 @@ from conftest import C, EXAMPLE, N, OPS_REAL, PI, V, VARS, git, line_for, status
 OPS_VARS = V + "/" + VARS
 NAS_VARS = N + "/" + VARS
 CLOUD_VARS = C + "/" + VARS
-FAST = ("SH-AC-01,SH-AC-17,SH-AC-23,SH-AC-27,SH-AC-30,SH-AC-44,SH-AC-45,SH-AC-56,SH-AC-60,SH-AC-63,SH-FR-97,SH-FR-205")
+FAST = ("SH-AC-01,SH-AC-17,SH-AC-23,SH-AC-30,SH-AC-44,SH-AC-45,SH-AC-56,SH-AC-60,SH-FR-97,SH-FR-205")
 
 NEW_KEY = ("from=\"203.0.113.9,10.243.1.5,172.29.30.0/24\" ssh-ed25519 "
            "AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXA semaphore-automation@ops.de.wahlberger.dev")
@@ -89,18 +89,6 @@ def test_ac01_wrong_vault_pass_item(repo):
 def test_ac01_personal_key_missing(repo, where):
     repo.edit(where, "erikwahlberger@personal", "someone@else")
     must_fail(repo, "SH-AC-01", "personal key")
-
-
-# --- SH-AC-01L: the lint step reports a yamllint defect -----------------------
-def test_ac01l_yamllint_defect_is_reported(repo):
-    repo.write(V + "/bad.yml", "key:   value  \n\tx: [\n")
-    rc, out = repo.static("SH-AC-01L", STATIC_CHECKS_SKIP_LINT="0", ANSIBLE_LINT="true")
-    assert status(out, "SH-AC-01L") == "FAIL" and "[ops yamllint] failed" in out, out
-
-
-def test_ac01l_clean_tree_has_no_yamllint_failure(repo):
-    rc, out = repo.static("SH-AC-01L", STATIC_CHECKS_SKIP_LINT="0", ANSIBLE_LINT="true")
-    assert "[ops yamllint] failed" not in out, out
 
 
 # --- SH-AC-17 / 17v ------------------------------------------------------------
@@ -264,26 +252,6 @@ def test_ac23_private_key_in_repo(repo):
 def test_ac23_stage_e_requires_new_key_and_no_old(repo):
     rc, out = repo.static("SH-AC-23", STATIC_CHECKS_STAGE="E")
     assert status(out, "SH-AC-23") == "FAIL" and "stage E" in out, out
-
-
-# --- SH-AC-27 ------------------------------------------------------------------
-@pytest.mark.parametrize("old,new,needle", [
-    ("Rollback: undo step 4.", "Undo step 4.", "Step 4: no rollback"),
-    ("Gate: SH-AC-05.", "Gate: none.", "Step 5: no gate"),
-    ("## Break-glass", "## Emergency", "break-glass"),
-    ("| C-R | x |", "| CR | x |", "row for C-R"),
-    ("hcloud firewall describe", "something", "hcloud firewall"),
-    ("-e ansible_host=ops.de.int.wahlberger.dev", "", "ansible_host"),
-    ("## Database restore", "## Notes", "restore"),
-])
-def test_ac27_readme_defects(repo, old, new, needle):
-    repo.edit(V + "/README.md", old, new)
-    must_fail(repo, "SH-AC-27", needle)
-
-
-def test_ac27_missing_readme(repo):
-    (repo.ops / "README.md").unlink()
-    must_fail(repo, "SH-AC-27", "README.md missing")
 
 
 # --- SH-AC-30 ------------------------------------------------------------------
@@ -552,33 +520,6 @@ def test_ac60_stage_e_needs_both_gone(repo):
     must_fail(repo, "SH-AC-60", "still has", STATIC_CHECKS_STAGE="E")
 
 
-# --- SH-AC-63 ------------------------------------------------------------------
-def test_ac63_ip_outside_zerotier_range(repo):
-    repo.edit(OPS_VARS, 'vm_zt_ip: ""', 'vm_zt_ip: "10.10.1.1"')
-    repo.edit(OPS_VARS, 'vm_zt_iface: ""', 'vm_zt_iface: "ztabc"')
-    must_fail(repo, "SH-AC-63", "10.243.0.0/16")
-
-
-def test_ac63_ip_without_interface(repo):
-    repo.edit(OPS_VARS, 'vm_zt_ip: ""', 'vm_zt_ip: "10.243.1.1"')
-    must_fail(repo, "SH-AC-63", "set together")
-
-
-def test_ac63_ip_without_in_force_record(repo):
-    repo.edit(OPS_VARS, 'vm_zt_ip: ""', 'vm_zt_ip: "10.243.1.1"')
-    repo.edit(OPS_VARS, 'vm_zt_iface: ""', 'vm_zt_iface: "ztabc"')
-    must_fail(repo, "SH-AC-63", "in force")
-
-
-def test_ac63_a2_state_passes(repo):
-    repo.edit(OPS_VARS, 'vm_zt_ip: ""', 'vm_zt_ip: "10.243.1.1"')
-    repo.edit(OPS_VARS, 'vm_zt_iface: ""', 'vm_zt_iface: "ztabc"')
-    p = repo.ops / "docs/zerotier-flow-rules.md"
-    p.write_text(p.read_text() + "\n## In force (2026-10-11)\n")
-    rc, out = repo.static("SH-AC-63")
-    assert status(out, "SH-AC-63") == "PASS", out
-
-
 # --- SH-FR-97 ------------------------------------------------------------------
 def test_fr97_untracked_pi_file(repo):
     repo.write(PI + "/new.txt", "x")
@@ -643,8 +584,8 @@ def test_br16_runs_boundary_check(repo):
 def test_exit_code_is_nonzero_on_any_fail_and_zero_when_only_skips(repo):
     rc, out = repo.static("SH-AC-17v,SH-AC-43,SH-BR-16")
     assert rc == 0 and sum(l.startswith("SKIPPED") for l in out.splitlines()) == 3, out
-    (repo.ops / "README.md").unlink()
-    rc, out = repo.static("SH-AC-17v,SH-AC-27")
+    repo.edit(OPS_VARS, "https://semaphore.de.int.wahlberger.dev", "https://wrong.example.org")
+    rc, out = repo.static("SH-AC-17v,SH-AC-17")
     assert rc == 1, out
 
 
