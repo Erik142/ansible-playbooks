@@ -8,7 +8,7 @@
 #                                  from it (group_vars, BD-FR-109).
 
 # Single line, matched by the Renovate custom manager in renovate.json.
-restic_server_image: docker.io/restic/rest-server:0.14.0
+restic_server_image: docker.io/restic/rest-server:0.15.0
 
 # The storage_mounts filesystem the repositories live on. Also the path the
 # units wait for (RequiresMountsFor=).

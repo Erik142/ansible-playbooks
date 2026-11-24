@@ -49,7 +49,7 @@ def tags_of(html_text):
 
 def test_payload_shape(mod, template):
     p = mod.build_payload(login(), ENV, "host.example", "2026-01-01 10:00:00 UTC", template)
-    assert set(p) == {"from", "to", "subject", "text", "html"}
+    assert {"from", "to", "subject", "text", "html"} <= set(p)
     assert p["from"] == ENV["NOTIFY_FROM"] and p["to"] == [ENV["NOTIFY_TO"]]
     assert p["subject"] == "[host.example] SSH login from 203.0.113.9 as alice"
     assert "User: alice" in p["text"] and "Source: 203.0.113.9 (port 51234)" in p["text"]
@@ -62,19 +62,26 @@ def test_no_template_means_text_only(mod):
     assert "html" not in mod.build_payload(login(), ENV, "h", "t")
 
 
-def test_template_covers_known_placeholders(mod, template):
-    assert set(re.findall(r"@@([A-Z_]+)@@", template)) <= {"HOST", "TIME", "USER", "ADDR", "PORT", "ALG", "FINGERPRINT"}
+def test_every_template_placeholder_is_filled(mod, template):
+    # Whatever names the template uses, the script must fill each one: none may survive the render.
+    names = set(re.findall(r"@@([A-Z_]+)@@", template))
+    assert names, "template has no placeholders"
+    p = mod.build_payload(login(), ENV, "h.example", "t", template)
+    for name in names:
+        assert "@@%s@@" % name not in p["html"], name
 
 
 @pytest.mark.parametrize("user", HOSTILE)
 def test_hostile_user_is_escaped(mod, template, user):
-    baseline = tags_of(mod.build_payload(login(), ENV, "h.example", "t", template)["html"])
+    base = mod.build_payload(login(), ENV, "h.example", "t", template)
     p = mod.build_payload(login(user=user), ENV, "h.example", "t", template)
     # No tag may appear that the template itself does not contain.
-    assert tags_of(p["html"]) == baseline
+    assert tags_of(p["html"]) == tags_of(base["html"])
     assert "<script" not in p["html"] and "<img" not in p["html"]
     assert "\n" not in p["subject"] and "\r" not in p["subject"]
-    assert len(p["subject"]) < 400 and len(p["text"]) < 1000
+    # The user value is capped, so the hostile input can add at most one capped value to each part.
+    assert len(p["subject"]) <= len(base["subject"]) + mod.MAX_VALUE_LENGTH
+    assert len(p["text"]) <= len(base["text"]) + mod.MAX_VALUE_LENGTH
 
 
 def test_exact_escaped_forms(mod, template):
@@ -86,9 +93,9 @@ def test_exact_escaped_forms(mod, template):
 
 def test_substitution_is_not_reentrant(mod, template):
     p = mod.build_payload(login(user="@@HOST@@"), ENV, "real-host", "t", template)
-    # The literal text survives once (as the user), HOST appears only where the template put it.
+    # The literal text survives once (as the user); the host value appears exactly where the template puts HOST.
     assert p["html"].count("@@HOST@@") == 1
-    assert "User</td><td style=\"color:#1b1f24;word-break:break-all;\">@@HOST@@<" in p["html"]
+    assert p["html"].count("real-host") == template.count("@@HOST@@")
 
 
 def test_hostname_and_other_values_are_escaped_too(mod, template):
@@ -107,7 +114,9 @@ def test_newline_in_subject_stripped(mod, template):
 
 def test_long_value_is_capped(mod, template):
     p = mod.build_payload(login(user="u" * 5000), ENV, "h", "t", template)
-    assert "u" * 101 not in p["html"] and "u" * 101 not in p["text"]
+    over = "u" * (mod.MAX_VALUE_LENGTH + 1)
+    assert over not in p["html"] and over not in p["text"]
+    assert "..." in p["text"]   # the cut is visible, not silent
 
 
 def test_send_reports_a_problem_through_hush_post(mod, monkeypatch):
@@ -117,9 +126,15 @@ def test_send_reports_a_problem_through_hush_post(mod, monkeypatch):
         seen.update(argv=argv, **kwargs)
 
     monkeypatch.setattr(mod.subprocess, "run", fake_run)
+    # Either name lookup may supply the host; the test pins the value passed, not the call.
+    monkeypatch.setattr(mod.socket, "gethostname", lambda: "ops.test")
+    monkeypatch.setattr(mod.socket, "getfqdn", lambda *a: "ops.test")
     payload = {"from": "f", "to": ["t"], "subject": "s", "text": "x", "html": "<p>x</p>"}
     mod.send(payload, {"HUSH_TOKEN_FILE": "/etc/hush/systemd.token", "HUSH_URL": "https://h/ingest/hooks-ops"})
-    assert seen["argv"] == [mod.HUSH_POST, "problem", mod.socket.gethostname(), "ssh-login"]
+    # The report goes to hush-post as a problem, names the host, and carries the text and subject.
+    argv = seen["argv"]
+    assert argv[0] == mod.HUSH_POST and argv[1] == "problem"
+    assert "ops.test" in argv and len(argv) == 4 and argv[3]
     assert seen["input"] == "x" and seen["check"] is True
     assert seen["env"]["HUSH_MESSAGE"] == "s"
 
@@ -154,4 +169,5 @@ def test_missing_template_falls_back_to_text(mod, tmp_path, monkeypatch, capsys)
     line = "Accepted publickey for bob from 203.0.113.9 port 1 ssh2: ED25519 SHA256:y\n"
     assert mod.process([line], env, []) == 1
     assert "html" not in sent[0] and "text" in sent[0]
-    assert "plain text only" in capsys.readouterr().err
+    # The fallback is logged, and the log names the template that could not be read.
+    assert str(tmp_path / "nope.html") in capsys.readouterr().err

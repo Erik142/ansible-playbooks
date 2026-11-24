@@ -101,11 +101,17 @@ ac01() {
 }
 
 # --- BD-AC-02 (+ BD-NFR-03): no lint suppression added -----------------------
-# static-checks.sh is excluded: its own grep pattern contains the keywords.
+# Scope is the whole repo's added lines, minus Markdown (specs and docs name the
+# markers on purpose). Nothing else is excluded: an excluded path is a bypass.
+# The marker list is assembled from pieces so this file's own added lines do
+# not contain the literal words the pattern searches for.
 ac02() {
-    d=$(git -C "$repo" diff "$base" -- "$nas_rel" "$cloud_rel" ":(exclude)$nas_rel/reqs" \
-        ":(exclude)$nas_rel/tests/static-checks.sh" ":(exclude)$nas_rel/PLAN-backup.md" ":(exclude,glob)$nas_rel/tests/**/*.py") || { echo "git diff against $base failed"; return 1; }
-    hits=$(printf '%s\n' "$d" | grep -E '^\+.*(noqa|skip_list|warn_list)')
+    kw="no""qa|skip""_list|warn""_list|yamllint[[:space:]]+disable|shellcheck[[:space:]]+disable|pylint:[[:space:]]*disable"
+    d=$(git -C "$repo" diff "$base" -- ':(exclude)*.md') || { echo "git diff against $base failed"; return 1; }
+    # Keep added content lines only ("+++ b/<path>" headers are not content).
+    # Extended regex throughout: in basic regex `\+` is a repetition operator,
+    # so a bad pattern here used to make grep fail and the check pass silently.
+    hits=$(printf '%s\n' "$d" | grep -E '^\+' | grep -vE '^\+\+\+ ' | grep -iE "$kw")
     [ -z "$hits" ] || { printf '%s\n' "$hits"; return 1; }
 }
 
@@ -303,7 +309,7 @@ ac09() {
     # that one line is filtered (PLAN-backup.md, "Spec defect, BD-AC-09").
     g=$(grep -nE '^\s*restic_backup_' "$vars" | grep -v '^[0-9]*:restic_backup_decommission_enabled:')
     [ -z "$g" ] || { echo "restic_backup_ variables in vars.yml:"; echo "$g"; rc=1; }
-    python3 - "$vars" inventories/production/group_vars/all/vault.yml.example <<'PY' || rc=1
+    python3 - "$vars" inventories/production/group_vars/all/vault.yml.example "$nas_dir" "$repo" <<'PY' || rc=1
 import re, sys, yaml
 
 vars_path, example_path = sys.argv[1:3]
@@ -329,16 +335,64 @@ for key, step in (("backup_disk_enabled", "step 3"), ("restic_backup_decommissio
     c = comment_above(lines, rf"{key}:")
     if not c or step not in c:
         errors.append(f"{key} needs a comment naming runbook {step}")
-if v.get("disk_space_paths") != ["/", "/mnt/data", "/mnt/containers", "/mnt/backup/btrbk"]:
-    errors.append(f"disk_space_paths is {v.get('disk_space_paths')}")
-if v.get("restic_server_clients") != [
-        {"username": "cloud", "password": "{{ vault_restic_server_cloud_htpasswd_password | default('') }}"},
-        {"username": "ops", "password": "{{ vault_restic_server_ops_htpasswd_password | default('') }}"}]:
-    errors.append("restic_server_clients differs from BD-FR-138 (cloud, ops)")
-if v.get("restic_server_maintenance_repos") != [
-        {"repo": "cloud", "password": "{{ vault_restic_server_cloud_repo_password | default('') }}"},
-        {"repo": "ops", "password": "{{ vault_restic_server_ops_repo_password | default('') }}"}]:
-    errors.append("restic_server_maintenance_repos differs from SH-CC-01 (cloud, ops)")
+# The expected lists are read from the specs (single source of truth); vars.yml
+# and vault.yml.example must agree with them. Changing a list means changing
+# the spec line it is read from, not this check.
+nas, repo = sys.argv[3:5]
+cut = f"{nas}/reqs/backup-cutover-and-decommission.md"
+sem = f"{repo}/semaphore-migration/reqs/semaphore-to-hetzner.md"
+
+def spec_line(path, marker):
+    hits = [l for l in open(path, encoding="utf-8").read().splitlines() if marker in l]
+    if len(hits) != 1:
+        sys.exit(f"{path}: expected one line containing {marker!r}, found {len(hits)}")
+    return hits[0]
+
+ex_text = open(example_path).read()
+
+# disk_space_paths: BD-AC-09 lists the exact paths.
+want_paths = re.findall(r"`(/[^`]*)`", spec_line(cut, "And `disk_space_paths` lists"))
+if not want_paths or sorted(v.get("disk_space_paths") or []) != sorted(want_paths):
+    errors.append(f"disk_space_paths is {v.get('disk_space_paths')}, BD-AC-09 (BD-FR-45) lists {want_paths}")
+
+# restic_server_allowed_sources: the literal list in BD-FR-141.
+lit = re.search(r"`restic_server_allowed_sources: (\[[^`]*\])`", spec_line(cut, "BD-FR-141 [Must]"))
+if not lit:
+    sys.exit("BD-FR-141 has no restic_server_allowed_sources literal")
+want_sources = yaml.safe_load(lit.group(1))
+if v.get("restic_server_allowed_sources") != want_sources:
+    errors.append(f"restic_server_allowed_sources is {v.get('restic_server_allowed_sources')}, BD-FR-141 says {want_sources}")
+
+# restic_server_clients: BD-FR-138 gives the cloud entry verbatim. Every client
+# has a vault placeholder (BD-FR-140), so the usernames are those placeholders.
+lit = re.search(r"`(\{username:[^`]*\})`", spec_line(cut, "BD-FR-138 [Must]"))
+if not lit:
+    sys.exit("BD-FR-138 has no {username: ...} literal")
+clients = v.get("restic_server_clients") or []
+if yaml.safe_load(lit.group(1)) not in clients:
+    errors.append("restic_server_clients lacks the BD-FR-138 cloud entry")
+users = sorted(set(re.findall(r"^vault_restic_server_(\w+?)_htpasswd_password:", ex_text, re.M)))
+if not users:
+    errors.append("vault.yml.example has no restic_server_* htpasswd placeholder")
+want_clients = [{"username": u, "password": "{{ vault_restic_server_" + u + "_htpasswd_password | default('') }}"} for u in users]
+if sorted(clients, key=lambda e: str(e.get("username"))) != sorted(want_clients, key=lambda e: e["username"]):
+    errors.append(f"restic_server_clients is {clients}, vault.yml.example placeholders give {want_clients}")
+
+# restic_server_maintenance_repos: SH-CC-01 names the repositories
+# ("production `cloud` and `ops`"); each password is that repo's vault key.
+sh = spec_line(sem, "- SH-CC-01 (NAS")
+want_repos = re.findall(r"`([A-Za-z0-9_.-]+)`", sh.split("production", 1)[1].split(". ", 1)[0])
+repos = v.get("restic_server_maintenance_repos") or []
+if not want_repos or sorted(str(r.get("repo")) for r in repos) != sorted(want_repos):
+    errors.append(f"restic_server_maintenance_repos names {[r.get('repo') for r in repos]}, SH-CC-01 names {want_repos}")
+for r in repos:
+    if r.get("password") != "{{ vault_restic_server_" + str(r.get("repo")) + "_repo_password | default('') }}":
+        errors.append(f"maintenance repo {r.get('repo')}: password must be its vault_restic_server_<repo>_repo_password")
+repo_keys = set(re.findall(r"^vault_restic_server_(\w+?)_repo_password:", ex_text, re.M))
+for name in want_repos:
+    if name not in repo_keys:
+        errors.append(f"vault.yml.example lacks vault_restic_server_{name}_repo_password")
+
 fc = v.get("backup_disk_freshness_checks") or []
 if isinstance(fc, str):
     # Jinja expression (Garage entries are appended behind garage_enabled).
@@ -347,8 +401,6 @@ else:
     ops_ok = {"path": "/mnt/data/restic-repos/ops/snapshots", "max_age_hours": 26} in fc
 if not ops_ok:
     errors.append("backup_disk_freshness_checks lacks the ops path (SH-FR-87)")
-if v.get("restic_server_allowed_sources") != ["10.10.0.0/16", "10.243.0.0/16"]:
-    errors.append("restic_server_allowed_sources must be [10.10.0.0/16, 10.243.0.0/16]")
 if not comment_above(lines, r"firewall_rich_rules:"):
     errors.append("firewall_rich_rules needs the BD-FR-141 comment")
 
@@ -370,16 +422,20 @@ PY
     # firewall_rich_rules evaluates to one BD-FR-109 rule per allowed source.
     ansible localhost -c local -i localhost, -e @roles/restic_server/defaults/main.yml -e @"$vars" \
         -m ansible.builtin.debug -a var=firewall_rich_rules >"$tmp/rules.out" 2>&1
-    python3 - "$tmp/rules.out" <<'PY' || rc=1
-import json, re, sys
+    python3 - "$tmp/rules.out" "$vars" <<'PY' || rc=1
+import json, re, sys, yaml
 
 raw = open(sys.argv[1]).read()
 m = re.search(r"=> (\{.*\})", raw, re.S)
 if not m:
     sys.exit("could not evaluate firewall_rich_rules:\n" + raw)
 rules = json.loads(m.group(1))["firewall_rich_rules"]
-want = [f'rule family="ipv4" source address="{s}" port port="8000" protocol="tcp" accept'
-        for s in ("10.10.0.0/16", "10.243.0.0/16")]
+# Expected: one rule per allowed source (the list the BD-FR-141 check above pins
+# to the spec), on restic_server_port (the default, which the rule must match).
+sources = yaml.safe_load(open(sys.argv[2]))["restic_server_allowed_sources"]
+port = yaml.safe_load(open("roles/restic_server/defaults/main.yml"))["restic_server_port"]
+want = [f'rule family="ipv4" source address="{s}" port port="{port}" protocol="tcp" accept'
+        for s in sources]
 if rules != want:
     sys.exit(f"firewall_rich_rules evaluates to {rules}, expected {want}")
 PY

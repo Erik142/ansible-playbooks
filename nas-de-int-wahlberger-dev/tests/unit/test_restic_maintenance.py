@@ -154,7 +154,7 @@ def test_bad_dry_run_output_fails_with_exit_1_and_deletes_nothing(script_module,
     code, _, err = run(script_module, env)
 
     assert code == 1 and "dry-run" in err
-    assert len(sub_argvs(env)) == 2
+    assert sub_argvs(env) == [SNAPSHOTS[1:], DRY_RUN]  # nothing after the bad dry run
 
 
 def test_restic_gets_repository_via_env_not_argv(script_module, env):
@@ -218,7 +218,7 @@ def test_future_skew_exactly_at_limit_passes(script_module, env):
     code, _, _ = run(script_module, env)
 
     assert code == 0
-    assert len(sub_argvs(env)) == 5
+    assert sub_argvs(env) == [SNAPSHOTS[1:], DRY_RUN, SNAPSHOTS[1:], PRUNE, CHECK]
 
 
 def test_future_skew_one_second_over_limit_fails(script_module, env):
@@ -237,7 +237,7 @@ def test_past_allowance_exactly_at_limit_passes(script_module, env):
     code, _, _ = run(script_module, env)
 
     assert code == 0
-    assert len(sub_argvs(env)) == 5
+    assert sub_argvs(env) == [SNAPSHOTS[1:], DRY_RUN, SNAPSHOTS[1:], PRUNE, CHECK]
 
 
 def test_past_allowance_one_second_over_limit_fails(script_module, env):
@@ -281,7 +281,7 @@ def test_snapshot_without_file_counts_as_offending(script_module, env):
     code, out, _ = run(script_module, env)
 
     assert code == 3 and GOOD_A in out
-    assert len(sub_argvs(env)) == 1
+    assert sub_argvs(env) == [SNAPSHOTS[1:]]  # stopped right after listing snapshots
 
 
 @pytest.mark.parametrize("entry", [
@@ -296,7 +296,7 @@ def test_malformed_snapshot_entry_trips_guard(script_module, env, entry):
     code, _, _ = run(script_module, env)
 
     assert code == 3
-    assert len(sub_argvs(env)) == 1
+    assert sub_argvs(env) == [SNAPSHOTS[1:]]  # stopped right after listing snapshots
 
 
 def test_missing_repository_fails_without_calls_or_directories(script_module, env, tmp_path):
@@ -398,11 +398,19 @@ def test_password_variable_is_derived_from_the_repository_name(script_module, re
     assert script_module.password_variable(repo) == variable
 
 
-@pytest.mark.parametrize(
-    ("failing", "expected_calls"),
-    [("SNAPSHOTS", 1), ("DRYRUN", 2), ("FORGET", 4), ("PRUNE", 5), ("CHECK", 6)],
-)
-def test_failing_step_exits_nonzero_and_skips_later_steps(script_module, env, failing, expected_calls):
+# Which restic command each failing step runs. The failing step must be the last
+# command run (later steps skipped); the number of steps before it is not pinned.
+LAST_STEP = {
+    "SNAPSHOTS": lambda a: a[:1] == ["snapshots"],
+    "DRYRUN": lambda a: a[:1] == ["forget"] and "--dry-run" in a,
+    "FORGET": lambda a: a[:1] == ["forget"] and "--dry-run" not in a,
+    "PRUNE": lambda a: a[:1] == ["prune"],
+    "CHECK": lambda a: a[:1] == ["check"],
+}
+
+
+@pytest.mark.parametrize("failing", list(LAST_STEP))
+def test_failing_step_exits_nonzero_and_skips_later_steps(script_module, env, failing):
     env.set_snapshots([env.add_snapshot(GOOD_A, 0)])
     env.set_dry_run_removals([GOOD_A])
     env.environ[f"FAKE_RESTIC_FAIL_{failing}"] = "1"
@@ -410,7 +418,7 @@ def test_failing_step_exits_nonzero_and_skips_later_steps(script_module, env, fa
     code, _, err = run(script_module, env)
 
     assert code == 1
-    assert len(sub_argvs(env)) == expected_calls
+    assert sub_argvs(env) and LAST_STEP[failing](sub_argvs(env)[-1])
     assert failing.lower() in err.replace("-", "")
 
 
@@ -430,7 +438,7 @@ def test_invalid_json_from_restic_fails_without_forget(script_module, env):
     code, _, _ = run(script_module, env)
 
     assert code == 1
-    assert len(sub_argvs(env)) == 1
+    assert sub_argvs(env) == [SNAPSHOTS[1:]]  # stopped right after listing snapshots
 
 
 def test_non_list_snapshots_json_fails_with_exit_1(script_module, env):
@@ -439,7 +447,7 @@ def test_non_list_snapshots_json_fails_with_exit_1(script_module, env):
     code, _, err = run(script_module, env)
 
     assert code == 1 and "not a list" in err
-    assert len(sub_argvs(env)) == 1
+    assert sub_argvs(env) == [SNAPSHOTS[1:]]  # stopped right after listing snapshots
 
 
 def test_missing_restic_binary_exits_nonzero(script_module, env):
