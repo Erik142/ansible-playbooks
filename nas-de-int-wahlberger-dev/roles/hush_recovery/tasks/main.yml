@@ -21,15 +21,13 @@
   loop: "{{ hush_recovery_units }}"
   register: hush_recovery_dropins
 
-# noqa: no-handler -- the restart below must target only the drop-ins that changed,
-# which a handler cannot do with the registered loop results.
-- name: Reload systemd after a drop-in changed  # noqa: no-handler
-  ansible.builtin.systemd:
-    daemon_reload: true
-  when: hush_recovery_dropins is changed
-
+# daemon_reload on each item: systemd must load the new drop-in before the unit
+# restarts. Only the units whose drop-in changed are restarted. Skipped in
+# check mode, where the drop-in is not written and the unit may not exist.
 - name: Restart the units whose drop-in changed
   ansible.builtin.systemd:
     name: "{{ item }}"
     state: restarted
+    daemon_reload: true
   loop: "{{ hush_recovery_dropins.results | selectattr('changed') | map(attribute='item') | list }}"
+  when: not ansible_check_mode

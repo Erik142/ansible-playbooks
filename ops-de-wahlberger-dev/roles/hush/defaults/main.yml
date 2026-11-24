@@ -105,8 +105,12 @@ hush_config:
       policies: {reboot_check: true, bundle: true, join_topology: true, update: true}
       # Certificate expiry of the ops sites.
       poll:
-        tls-semaphore: {type: tls_expiry, host: ops.de.wahlberger.dev, service: semaphore, address: semaphore.de.int.wahlberger.dev, port: 443, server_name: semaphore.de.int.wahlberger.dev}
-        tls-hush: {type: tls_expiry, host: ops.de.wahlberger.dev, service: hush, address: hush.de.int.wahlberger.dev, port: 443, server_name: hush.de.int.wahlberger.dev}
+        tls-semaphore:
+          {type: tls_expiry, host: ops.de.wahlberger.dev, service: semaphore, address: semaphore.de.int.wahlberger.dev, port: 443,
+           server_name: semaphore.de.int.wahlberger.dev}
+        tls-hush:
+          {type: tls_expiry, host: ops.de.wahlberger.dev, service: hush, address: hush.de.int.wahlberger.dev, port: 443,
+           server_name: hush.de.int.wahlberger.dev}
     hooks-nas:
       type: generic
       auth: token
@@ -114,12 +118,22 @@ hush_config:
       policies: {reboot_check: true, bundle: true, join_topology: true, update: true}
       # Certificate expiry of the NAS sites (Let's Encrypt through Caddy).
       poll:
-        tls-recipes: {type: tls_expiry, host: nas.de.int.wahlberger.dev, service: tandoor, address: recipes.de.int.wahlberger.dev, port: 443, server_name: recipes.de.int.wahlberger.dev}
-        tls-docs: {type: tls_expiry, host: nas.de.int.wahlberger.dev, service: paperless, address: docs.de.int.wahlberger.dev, port: 443, server_name: docs.de.int.wahlberger.dev}
-        tls-photos: {type: tls_expiry, host: nas.de.int.wahlberger.dev, service: immich, address: photos.de.int.wahlberger.dev, port: 443, server_name: photos.de.int.wahlberger.dev}
+        tls-recipes:
+          {type: tls_expiry, host: nas.de.int.wahlberger.dev, service: tandoor, address: recipes.de.int.wahlberger.dev, port: 443,
+           server_name: recipes.de.int.wahlberger.dev}
+        tls-docs:
+          {type: tls_expiry, host: nas.de.int.wahlberger.dev, service: paperless, address: docs.de.int.wahlberger.dev, port: 443,
+           server_name: docs.de.int.wahlberger.dev}
+        tls-photos:
+          {type: tls_expiry, host: nas.de.int.wahlberger.dev, service: immich, address: photos.de.int.wahlberger.dev, port: 443,
+           server_name: photos.de.int.wahlberger.dev}
         tls-git: {type: tls_expiry, host: nas.de.int.wahlberger.dev, address: git.de.int.wahlberger.dev, port: 443, server_name: git.de.int.wahlberger.dev}
-        tls-lab-grab: {type: tls_expiry, host: nas.de.int.wahlberger.dev, address: lab-grab.de.int.wahlberger.dev, port: 443, server_name: lab-grab.de.int.wahlberger.dev}
-        tls-www: {type: tls_expiry, host: nas.de.int.wahlberger.dev, service: homepage, address: www.de.int.wahlberger.dev, port: 443, server_name: www.de.int.wahlberger.dev}
+        tls-lab-grab:
+          {type: tls_expiry, host: nas.de.int.wahlberger.dev, address: lab-grab.de.int.wahlberger.dev, port: 443,
+           server_name: lab-grab.de.int.wahlberger.dev}
+        tls-www:
+          {type: tls_expiry, host: nas.de.int.wahlberger.dev, service: homepage, address: www.de.int.wahlberger.dev, port: 443,
+           server_name: www.de.int.wahlberger.dev}
     hooks-cloud:
       type: generic
       auth: token
@@ -127,9 +141,13 @@ hush_config:
       policies: {reboot_check: true, bundle: true, join_topology: true, update: true}
       # Certificate expiry of cloud's public names (Caddy renews them; this catches a renewal that fails).
       poll:
-        tls-id.wahlberger.dev: {type: tls_expiry, host: cloud.wahlberger.dev, service: pocket-id, address: id.wahlberger.dev, port: 443, server_name: id.wahlberger.dev}
-        tls-rss.wahlberger.dev: {type: tls_expiry, host: cloud.wahlberger.dev, service: freshrss, address: rss.wahlberger.dev, port: 443, server_name: rss.wahlberger.dev}
-        tls-status.wahlberger.dev: {type: tls_expiry, host: cloud.wahlberger.dev, service: uptime-kuma, address: status.wahlberger.dev, port: 443, server_name: status.wahlberger.dev}
+        tls-id.wahlberger.dev:
+          {type: tls_expiry, host: cloud.wahlberger.dev, service: pocket-id, address: id.wahlberger.dev, port: 443, server_name: id.wahlberger.dev}
+        tls-rss.wahlberger.dev:
+          {type: tls_expiry, host: cloud.wahlberger.dev, service: freshrss, address: rss.wahlberger.dev, port: 443, server_name: rss.wahlberger.dev}
+        tls-status.wahlberger.dev:
+          {type: tls_expiry, host: cloud.wahlberger.dev, service: uptime-kuma, address: status.wahlberger.dev, port: 443,
+           server_name: status.wahlberger.dev}
         tls-beszel.wahlberger.dev: {type: tls_expiry, host: cloud.wahlberger.dev, address: beszel.wahlberger.dev, port: 443, server_name: beszel.wahlberger.dev}
     # TrueNAS SCALE alerts (Mattermost alert service). The secret is the last URL path
     # segment: https://hush.de.int.wahlberger.dev/ingest/truenas/<secret>. See hush docs/truenas.md.

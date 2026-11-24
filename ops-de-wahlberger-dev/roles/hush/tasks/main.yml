@@ -209,10 +209,10 @@
     - hush_dropin is changed
   tags: [hush]
 
+# No `when` on purpose: the gate is skipped when no drop-in changed, and then this is false.
 - name: Record whether watched units may restart
   ansible.builtin.set_fact:
     hush_watched_restart: "{{ hush_health_gate.status | default(0) == 200 }}"
-  when: hush_dropin is changed
   tags: [hush]
 
 - name: Report that watched units were not restarted
