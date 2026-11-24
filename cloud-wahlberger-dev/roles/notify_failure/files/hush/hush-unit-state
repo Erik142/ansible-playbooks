@@ -1,0 +1,60 @@
+#!/bin/sh
+# Implements: HUSH-DEPLOY-039, HUSH-DEPLOY-041, HUSH-DEPLOY-043
+# Post one state report (check unit-state, label state_report=v1, one <Id>=<ActiveState>/<SubState>
+# label per distinct unit) for the units in HUSH_STATE_UNITS to Hush through hush-post.
+# Usage: hush-unit-state
+# Environment: as hush-post (HUSH_URL, HUSH_TOKEN_FILE), HUSH_HOST (default: hostname),
+# HUSH_STATE_UNITS (whitespace-separated unit names; at most 31 distinct Ids of at most 64 chars).
+# Exit: 0 delivered; 1 hush-post or systemctl failed; 2 input error (nothing is posted).
+set -eu
+
+here=$(dirname "$0")
+host=${HUSH_HOST:-$(hostname)}
+max_units=31   # an event carries 32 labels; one is the state_report marker
+max_id=64      # label key limit
+
+fail() { echo "hush-unit-state: $1" >&2; exit "${2:-2}"; }
+
+units=${HUSH_STATE_UNITS:-}
+case $units in *[![:space:]]*) ;; *) fail "HUSH_STATE_UNITS is unset or empty" ;; esac
+
+# Unquoted on purpose: split on whitespace, without pathname expansion.
+set -f
+# shellcheck disable=SC2086
+shown=$(systemctl show -p Id,ActiveState,SubState -- $units) || fail "systemctl show failed" 1
+set +f
+
+nl='
+'
+labels="state_report=v1"
+seen=
+count=0
+id=; active=; sub=
+
+add_unit() {
+  [ -n "$id" ] || return 0
+  [ "${#id}" -le "$max_id" ] || fail "unit Id longer than $max_id characters: $id"
+  case "$nl$seen$nl" in *"$nl$id$nl"*) id=; active=; sub=; return 0 ;; esac
+  seen="$seen$nl$id"
+  count=$((count + 1))
+  [ "$count" -le "$max_units" ] || fail "more than $max_units distinct units in HUSH_STATE_UNITS"
+  labels="$labels$nl$id=$active/$sub"
+  id=; active=; sub=
+}
+
+# systemctl show prints one block per unit, separated by an empty line; property order is not fixed.
+while IFS= read -r line; do
+  case $line in
+    Id=*) id=${line#Id=} ;;
+    ActiveState=*) active=${line#ActiveState=} ;;
+    SubState=*) sub=${line#SubState=} ;;
+    "") add_unit ;;
+  esac
+done <<SHOW
+$shown
+SHOW
+add_unit
+[ "$count" -gt 0 ] || fail "systemctl show returned no unit" 1
+
+HUSH_LABELS=$labels HUSH_MESSAGE="unit state of $host: $count units" \
+  "$here/hush-post" info "$host" unit-state </dev/null

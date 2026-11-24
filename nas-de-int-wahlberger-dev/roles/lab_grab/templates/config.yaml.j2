@@ -1,0 +1,27 @@
+# Rendered by the lab_grab role. Mounted read-only into the app and sync at
+# /app/backend/config.yaml. Holds secrets: the file is 0644 so the non-root `app`
+# user in the container can read it, and the 0750 config dir keeps it off-limits
+# to other host users.
+coordinator_host: "{{ lab_grab_coordinator_host_for_app }}"
+labgrid_host: "lab-grab"
+log_level: "INFO"
+frontend_url: "{{ lab_grab_url }}"
+max_reservation_duration_hours: 8
+auto_maintenance_issue_threshold: 0
+
+auth:
+  mode: "oauth2"
+  jwt_secret: "{{ lab_grab_jwt_secret }}"
+  jwt_algorithm: "HS256"
+  access_token_expire_minutes: 60
+  max_session_hours: 12
+  oauth2:
+    # Pocket ID. Discovery is read from {issuer}/.well-known/openid-configuration.
+    issuer: "{{ lab_grab_oidc_issuer }}"
+    client_id: "{{ lab_grab_oidc_client_id }}"
+    client_secret: "{{ lab_grab_oidc_client_secret }}"
+    redirect_uri: "{{ lab_grab_oidc_redirect_uri }}"
+
+# Pocket ID group claim -> Lab-Grab role. Members of the admin group get admin.
+role_mappings:
+  {{ lab_grab_admin_group }}: [admin]

@@ -5,7 +5,7 @@
 # Cross-role variables read from the other roles' defaults (all roles of a play
 # see each other's defaults, so ansible.cfg must not set DEFAULT_PRIVATE_ROLE_VARS):
 #   btrbk_sources, storage_mounts, forgejo_volume_dir, paperless_ngx_db_password,
-#   immich_db_password, tandoor_db_password.
+#   immich_db_password, tandoor_db_password, lab_grab_db_password.
 
 # Dumps land here; btrbk snapshots /mnt/containers, so the files travel with the
 # `containers` snapshot. Must be below a btrbk_sources path (BD-FR-67).
@@ -35,6 +35,11 @@ db_dump_postgres:
     database: tandoor
     user: tandoor
     password: "{{ tandoor_db_password }}"
+  - name: lab-grab
+    container: lab-grab-db
+    database: labgrab
+    user: labgrab
+    password: "{{ lab_grab_db_password }}"
 
 # Forgejo's SQLite file on the host (bind-mounted volume); copied with the host's
 # sqlite3 into db_dump_dir/forgejo.db. Must match Forgejo's [database] PATH.

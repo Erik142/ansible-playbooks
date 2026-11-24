@@ -1,0 +1,12 @@
+# Implements: HUSH-DEPLOY-040
+# The 300 s interval is fixed: Hush treats a report as stale after 900 s (HUSH-RULES-087).
+[Unit]
+Description=Report unit state to Hush every 5 minutes
+
+[Timer]
+OnBootSec=120
+OnUnitActiveSec=300
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

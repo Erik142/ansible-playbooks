@@ -1,0 +1,8 @@
+[Unit]
+Description=Restart the ARP labgrid exporter after lab-grab-sync rewrote its config
+
+[Service]
+Type=oneshot
+# A path unit can only start its target, and a running exporter is not restarted by
+# a start, so this oneshot does the restart. The exporter reads its config only at start.
+ExecStart=/usr/bin/systemctl restart labgrid-exporter-arp.service

@@ -39,16 +39,24 @@ A run without `ansible_host` connects to the public name, which is closed.
   It runs `/bin/forgejo-runner daemon` as `0:0` inside the rootless namespace, which
   is the `forgejo-runner` host user. The Podman API is the user's socket only; no
   root socket is mounted.
-- **Concurrency:** `capacity: 1`. Jobs are uncapped: job containers are created
+- **Concurrency:** `capacity: 3`. Jobs are uncapped: job containers are created
   through the socket and sit outside the unit's cgroup, so `MemoryMax`/`CPUQuota`
   (4G / 200%) cover only the daemon. Decision recorded in the PR.
-- **Labels:** `ubuntu-latest`, `python`, `node` (node-capable images, pinned by
-  digest) and `podman` (`localhost/ci-podman-node:1`, built on the host).
+- **Labels:** `ubuntu-latest` and `ubuntu-24.04` (`localhost/ci-ubuntu-hosted:1`,
+  GitHub-hosted look-alike with a populated tool cache), `ubuntu-node` (the older
+  node-only image), `python`, `node` (node-capable images, pinned by digest) and
+  `podman` (`localhost/ci-podman-node:1`, built on the host).
+- **Hosted-style image:** Ubuntu 24.04, `RUNNER_TOOL_CACHE=/opt/hostedtoolcache`
+  with Python 3.10–3.13, Node 20/22/24 and the newest stable Go. `setup-*` actions
+  find these locally. Built from `templates/Containerfile.ubuntu-hosted.j2`, the
+  base is not yet pinned by digest.
 - **Job image `podman`:** `quay.io/podman/stable` plus node and git, with the
   `vfs` storage driver. `fuse-overlayfs` needs `/dev/fuse`, which job containers
   do not get. `vfs` builds are slower and use more disk.
-- **Image pruning:** the user timer `forgejo-runner-image-prune.timer` removes
-  dangling images weekly. Tagged images are kept.
+- **Image pruning:** the user timer `forgejo-runner-image-prune.timer` runs
+  `files/forgejo-runner-image-prune.sh` weekly. It removes dangling images, and
+  tagged images that are unused, not in `forgejo_runner_keep_images`, and created
+  more than `forgejo_runner_prune_max_age_days` (14) ago.
 - **Registration:** `.runner` in the state dir, created once. Labels are read from
   `config.yaml` at daemon start, so changing them does not need re-registration.
   Changing the registration token does: delete `.runner` and the runner in Forgejo.

@@ -1,0 +1,35 @@
+[Unit]
+Description=Lab-Grab place sync and ARP exporter config generator
+After=network-online.target lab-grab-redis.service labgrid-coordinator.service
+Wants=network-online.target lab-grab-redis.service labgrid-coordinator.service
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=lab-grab-sync
+Image={{ lab_grab_image }}
+# Host networking: ARP broadcasts from the LAN never reach a bridge namespace.
+Network=host
+DropCapability=ALL
+# NET_RAW is needed for the ARP sniffer and active scan. Nothing else.
+AddCapability=NET_RAW
+NoNewPrivileges=true
+# The image healthcheck polls the web app on :8000, which the sync CLI never serves.
+HealthCmd=none
+Exec=python -m app.tasks.sync
+Environment=LG_COORDINATOR=127.0.0.1:{{ lab_grab_coordinator_port }}
+Environment=SYNC_SPEC_FILE=/app/backend/places.yaml
+Environment=SYNC_INTERVAL_SECONDS=60
+Environment=SYNC_LOG_LEVEL=INFO
+Environment=SYNC_ARP_ENABLED=true
+Environment=ARP_SUBNET={{ lab_grab_arp_subnet }}
+Environment=EXPORTER_CONFIG_OUTPUT=/var/lib/lab-grab/exporter/exporter.yaml
+Environment=REDIS_URL=redis://127.0.0.1:{{ lab_grab_redis_loopback_port }}/0
+Volume={{ lab_grab_config_dir }}/places.yaml:/app/backend/places.yaml:ro,Z
+# Shared label (z): the exporter container mounts this directory too, and a private label (Z) would lock it out.
+Volume={{ lab_grab_exporter_arp_dir }}:/var/lib/lab-grab/exporter:z
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

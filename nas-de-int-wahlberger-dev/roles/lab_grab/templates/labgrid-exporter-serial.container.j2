@@ -1,0 +1,30 @@
+[Unit]
+Description=Labgrid exporter (USB serial adapter)
+After=network-online.target labgrid-coordinator.service
+Wants=network-online.target labgrid-coordinator.service
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=labgrid-exporter-serial
+Image={{ lab_grab_exporter_image }}
+# Clients connect to the exporter at this name (labgrid RFC2217 port), so it must resolve.
+HostName=nas.de.int.wahlberger.dev
+Network=host
+Environment=LG_COORDINATOR=127.0.0.1:{{ lab_grab_coordinator_port }}
+Volume={{ lab_grab_exporter_serial_dir }}:/opt/conf:ro,Z
+# pyudev needs the udev database, and the adapter's ttyACM node can be
+# re-enumerated on replug, so /dev is bound rather than one device node.
+Volume=/dev:/dev
+Volume=/run/udev:/run/udev:ro
+# Allow the char major used by CDC-ACM (Pi Debug Probe). Rootful podman's default
+# device cgroup blocks it otherwise.
+PodmanArgs="--device-cgroup-rule=c 166:* rwm"
+# SELinux (enforcing on this host) blocks container_t from opening the tty even with
+# the device rule, so the label is disabled for this container only. Not --privileged.
+SecurityLabelDisable=true
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

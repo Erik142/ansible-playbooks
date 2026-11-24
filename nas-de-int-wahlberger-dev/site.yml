@@ -87,6 +87,10 @@
     # After samba: its inbox directory lives inside the Samba share.
     - role: paperless_ngx
       tags: [paperless_ngx]
+    # Lab-Grab (app, sync, Postgres, Redis) + Labgrid coordinator and two
+    # exporters. After caddy (shared network). Its Postgres is dumped by db_dump.
+    - role: lab_grab
+      tags: [lab_grab]
     # Photo/video backup. After samba: its library/import directories live
     # inside the Samba share.
     - role: immich
@@ -125,3 +129,7 @@
     - role: restic_backup_decommission
       tags: [restic_backup_decommission]
       when: restic_backup_decommission_enabled | bool
+    # Hush "ok" drop-ins for every long-running unit with an OnFailure= hook.
+    # Last, so every unit exists; a changed drop-in restarts that unit.
+    - role: hush_recovery
+      tags: [hush_recovery]

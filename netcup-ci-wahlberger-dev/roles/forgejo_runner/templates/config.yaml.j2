@@ -16,11 +16,25 @@ host:
   workdir_parent: {{ forgejo_runner_state_dir }}/work
 
 container:
+  # Job containers on the same bridge as the runner (see the Quadlet).
+  network: "{{ forgejo_runner_job_network }}"
   # Rootless Podman API socket of the forgejo-runner user, mounted into the
   # runner container. Not the root socket.
-  docker_host: unix:///run/podman/podman.sock
+  # "-": the runner connects through DOCKER_HOST (set in the Quadlet) and does NOT mount
+  # the socket into job containers. With a path here, act_runner mounts it at the same
+  # path in every job, and job creation fails when that mountpoint cannot be made.
+  docker_host: "-"
   # Only the build cache may be bind-mounted into jobs, nothing else from the host.
   valid_volumes:
     - "{{ forgejo_runner_cache_dir }}"
     - "{{ forgejo_runner_cache_dir }}/**"
   force_pull: false
+
+# actions/cache proxy. Reached at the runner's fixed address on the shared bridge.
+cache:
+  enabled: true
+  host: "{{ forgejo_runner_static_ip }}"
+  proxy_port: {{ forgejo_runner_cache_proxy_port }}
+  # Under the persistent cache dir (/srv/ci-cache), not the runner container's home,
+  # so saved caches survive runner restarts and re-creation.
+  dir: "{{ forgejo_runner_actions_cache_dir }}"

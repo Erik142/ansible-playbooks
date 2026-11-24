@@ -69,7 +69,7 @@
     owner: root
     group: root
     mode: "0755"
-  loop: [hush-post, hush-run-job, hush-systemd-event, hush-change, hush-boot-report]
+  loop: [hush-post, hush-run-job, hush-systemd-event, hush-change, hush-boot-report, hush-unit-state]
 
 - name: Deploy the hush hook units
   ansible.builtin.copy:
@@ -78,7 +78,7 @@
     owner: root
     group: root
     mode: "0644"
-  loop: [hush-notify@.service, hush-notify-ok@.service, hush-boot-report.service]
+  loop: [hush-notify@.service, hush-notify-ok@.service, hush-boot-report.service, hush-unit-state.service, hush-unit-state.timer]
   notify: Reload systemd
 
 - name: Write the hush hook environment file
@@ -105,6 +105,14 @@
   ansible.builtin.systemd:
     name: hush-boot-report.service
     enabled: true
+    daemon_reload: true
+  when: not ansible_check_mode
+
+- name: Enable the unit state timer to hush
+  ansible.builtin.systemd:
+    name: hush-unit-state.timer
+    enabled: true
+    state: started
     daemon_reload: true
   when: not ansible_check_mode
 

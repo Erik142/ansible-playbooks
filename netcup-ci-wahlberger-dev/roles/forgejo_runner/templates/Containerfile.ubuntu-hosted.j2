@@ -1,0 +1,74 @@
+# Rendered by Ansible (roles/forgejo_runner). Job image for the `ubuntu-latest`
+# and `ubuntu-24.04` labels. Aims at GitHub's hosted ubuntu runners: a populated
+# tool cache, so setup-python, setup-node and setup-go find their versions locally.
+FROM {{ forgejo_runner_hosted_base_image }}
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    RUNNER_TOOL_CACHE=/opt/hostedtoolcache \
+    AGENT_TOOLSDIRECTORY=/opt/hostedtoolcache
+
+# Base tools. nodejs is not here: the system node comes from the tool cache below.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      ca-certificates curl git jq unzip xz-utils zstd rsync file gnupg \
+      openssh-client sudo lsb-release iproute2 build-essential \
+      python3 python3-venv python3-pip pipx \
+      podman podman-docker \
+ && rm -rf /var/lib/apt/lists/*
+
+# Rootless-style nested podman, same as the podman job image: vfs, no /dev/fuse.
+RUN printf '[storage]\ndriver = "vfs"\n' > /etc/containers/storage.conf
+
+# Python 3.10-3.13 via uv (python-build-standalone). setup-python expects
+# <tool cache>/Python/<full version>/x64 plus the x64.complete marker. uv marks its
+# builds EXTERNALLY-MANAGED (PEP 668), which makes pip refuse to install. GitHub's
+# toolcache Pythons are not marked, so the marker is removed here.
+RUN set -eux; \
+    curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh; \
+    export UV_PYTHON_INSTALL_DIR=/tmp/uvpy; \
+    uv python install 3.10 3.11 3.12 3.13; \
+    for d in /tmp/uvpy/cpython-*; do \
+      ver="$("$d/bin/python3" -c 'import platform; print(platform.python_version())')"; \
+      dest="$RUNNER_TOOL_CACHE/Python/$ver/x64"; \
+      mkdir -p "$dest"; \
+      cp -a "$d/." "$dest/"; \
+      find "$dest" -name EXTERNALLY-MANAGED -delete; \
+      touch "$RUNNER_TOOL_CACHE/Python/$ver/x64.complete"; \
+    done; \
+    rm -rf /tmp/uvpy
+
+# Node 20, 22, 24 (newest release of each major) from the official index.
+# setup-node expects <tool cache>/node/<version>/x64 plus x64.complete.
+RUN set -eux; \
+    index="$(curl -fsSL https://nodejs.org/dist/index.json)"; \
+    for major in 20 22 24; do \
+      full="$(printf '%s' "$index" | python3 -c "import json,sys; print(next(e['version'] for e in json.load(sys.stdin) if e['version'].startswith('v${major}.')))")"; \
+      ver="${full#v}"; \
+      dest="$RUNNER_TOOL_CACHE/node/$ver/x64"; \
+      mkdir -p "$dest"; \
+      curl -fsSL "https://nodejs.org/dist/${full}/node-${full}-linux-x64.tar.xz" | tar -xJ -C "$dest" --strip-components=1; \
+      touch "$RUNNER_TOOL_CACHE/node/$ver/x64.complete"; \
+    done; \
+    sys="$(ls -d "$RUNNER_TOOL_CACHE"/node/22.*/x64)"; \
+    ln -sf "$sys/bin/node" /usr/local/bin/node; \
+    ln -sf "$sys/bin/npm" /usr/local/bin/npm; \
+    ln -sf "$sys/bin/npx" /usr/local/bin/npx; \
+    ln -sf "$sys/bin/corepack" /usr/local/bin/corepack
+
+# Go: newest stable release, setup-go layout <tool cache>/go/<version>/x64.
+RUN set -eux; \
+    rel="$(curl -fsSL 'https://go.dev/dl/?mode=json' | python3 -c "import json,sys; r=next(x for x in json.load(sys.stdin) if x['stable']); print(r['version'])")"; \
+    ver="${rel#go}"; \
+    dest="$RUNNER_TOOL_CACHE/go/$ver/x64"; \
+    mkdir -p "$dest"; \
+    curl -fsSL "https://go.dev/dl/${rel}.linux-amd64.tar.gz" | tar -xz -C "$dest" --strip-components=1; \
+    touch "$RUNNER_TOOL_CACHE/go/$ver/x64.complete"; \
+    ln -sf "$dest/bin/go" /usr/local/bin/go; \
+    ln -sf "$dest/bin/gofmt" /usr/local/bin/gofmt
+
+# Python on PATH for scripts that call `python3`: the newest 3.13 from the cache.
+RUN set -eux; \
+    py="$(ls -d "$RUNNER_TOOL_CACHE"/Python/3.13.*/x64 | tail -n 1)"; \
+    ln -sf "$py/bin/python3" /usr/local/bin/python; \
+    ln -sf "$py/bin/python3" /usr/local/bin/python3; \
+    ln -sf "$py/bin/pip3" /usr/local/bin/pip3 || true

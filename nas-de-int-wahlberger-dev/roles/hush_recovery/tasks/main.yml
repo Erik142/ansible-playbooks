@@ -1,0 +1,35 @@
+---
+# Hush "ok" drop-in for every long-running unit that notify-failure@ covers. The
+# drop-in is written to /etc/systemd/system/<unit>.d/hush.conf. A changed drop-in
+# reloads systemd and restarts that unit once, so the change takes effect now.
+- name: Create the drop-in directories
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item }}.d"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ hush_recovery_units }}"
+
+- name: Deploy the Hush recovery drop-in
+  ansible.builtin.copy:
+    src: hush-recovery.conf
+    dest: "/etc/systemd/system/{{ item }}.d/hush.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ hush_recovery_units }}"
+  register: hush_recovery_dropins
+
+# noqa: no-handler -- the restart below must target only the drop-ins that changed,
+# which a handler cannot do with the registered loop results.
+- name: Reload systemd after a drop-in changed  # noqa: no-handler
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: hush_recovery_dropins is changed
+
+- name: Restart the units whose drop-in changed
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop: "{{ hush_recovery_dropins.results | selectattr('changed') | map(attribute='item') | list }}"

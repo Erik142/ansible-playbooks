@@ -70,3 +70,7 @@
     # capture.
     - role: restic_backup
       tags: [restic_backup]
+    # Hush "ok" drop-ins for every long-running unit with an OnFailure= hook.
+    # Last, so every unit exists; a changed drop-in restarts that unit.
+    - role: hush_recovery
+      tags: [hush_recovery]

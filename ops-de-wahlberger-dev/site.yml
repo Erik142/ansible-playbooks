@@ -53,3 +53,7 @@
     # Last: backs up what the roles above wrote under the Podman data dir.
     - role: restic_backup
       tags: [restic_backup]
+    # Hush "ok" drop-ins for the long-running units with an OnFailure= hook that the
+    # hush role does not cover. Last, so every unit exists.
+    - role: hush_recovery
+      tags: [hush_recovery]

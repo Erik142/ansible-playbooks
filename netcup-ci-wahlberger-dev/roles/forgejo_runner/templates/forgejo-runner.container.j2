@@ -14,6 +14,10 @@ User=0:0
 # that API by design, so the runner container runs unconfined. Job containers the
 # runner creates through the API still get the default confined label.
 SecurityLabelDisable=true
+# Join the "podman" bridge (10.88.0.0/16), the network job containers use, at a fixed
+# address, so job containers can reach the cache proxy. The default network has no
+# DNS, so a name would not resolve. Not host networking.
+Network=podman:ip={{ forgejo_runner_static_ip }}
 Image={{ forgejo_runner_image }}
 # Rootless: runs as the forgejo-runner user's systemd --user instance. No root
 # socket is mounted. %t is that instance's XDG_RUNTIME_DIR.
@@ -22,6 +26,7 @@ WorkingDir={{ forgejo_runner_state_dir }}
 Volume={{ forgejo_runner_state_dir }}:{{ forgejo_runner_state_dir }}:Z
 Volume={{ forgejo_runner_config_dir }}/config.yaml:{{ forgejo_runner_config_dir }}/config.yaml:ro,Z
 Volume=%t/podman/podman.sock:/run/podman/podman.sock
+Environment=DOCKER_HOST=unix:///run/podman/podman.sock
 Volume={{ forgejo_runner_cache_dir }}:{{ forgejo_runner_cache_dir }}
 {% if forgejo_runner_ca_file | length > 0 %}
 Volume={{ forgejo_runner_ca_file }}:/etc/ssl/certs/forgejo-instance-ca.pem:ro,Z

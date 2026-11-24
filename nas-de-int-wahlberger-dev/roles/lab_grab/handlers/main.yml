@@ -1,0 +1,68 @@
+---
+# Restart only units whose Quadlet is installed: the container role writes the
+# unit files, and check mode writes none, so an early flush would find no unit.
+# daemon_reload makes freshly written Quadlets visible to systemd.
+
+- name: Check the lab-grab Quadlet is installed
+  ansible.builtin.stat:
+    path: /etc/containers/systemd/lab-grab.container
+  register: lab_grab_stat_lab_grab
+  listen: restart lab-grab
+
+- name: Restart lab-grab if installed
+  ansible.builtin.systemd:
+    name: lab-grab.service
+    state: restarted
+    daemon_reload: true
+  when:
+    - not ansible_check_mode
+    - lab_grab_stat_lab_grab.stat.exists
+  listen: restart lab-grab
+
+- name: Check the lab-grab-db Quadlet is installed
+  ansible.builtin.stat:
+    path: /etc/containers/systemd/lab-grab-db.container
+  register: lab_grab_stat_lab_grab_db
+  listen: restart lab-grab-db
+
+- name: Restart lab-grab-db if installed
+  ansible.builtin.systemd:
+    name: lab-grab-db.service
+    state: restarted
+    daemon_reload: true
+  when:
+    - not ansible_check_mode
+    - lab_grab_stat_lab_grab_db.stat.exists
+  listen: restart lab-grab-db
+
+- name: Check the lab-grab-sync Quadlet is installed
+  ansible.builtin.stat:
+    path: /etc/containers/systemd/lab-grab-sync.container
+  register: lab_grab_stat_lab_grab_sync
+  listen: restart lab-grab-sync
+
+- name: Restart lab-grab-sync if installed
+  ansible.builtin.systemd:
+    name: lab-grab-sync.service
+    state: restarted
+    daemon_reload: true
+  when:
+    - not ansible_check_mode
+    - lab_grab_stat_lab_grab_sync.stat.exists
+  listen: restart lab-grab-sync
+
+- name: Check the labgrid-exporter-serial Quadlet is installed
+  ansible.builtin.stat:
+    path: /etc/containers/systemd/labgrid-exporter-serial.container
+  register: lab_grab_stat_labgrid_exporter_serial
+  listen: restart labgrid-exporter-serial
+
+- name: Restart labgrid-exporter-serial if installed
+  ansible.builtin.systemd:
+    name: labgrid-exporter-serial.service
+    state: restarted
+    daemon_reload: true
+  when:
+    - not ansible_check_mode
+    - lab_grab_stat_labgrid_exporter_serial.stat.exists
+  listen: restart labgrid-exporter-serial

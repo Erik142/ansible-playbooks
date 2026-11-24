@@ -22,7 +22,7 @@
   no_log: true
   tags: [hush, hush_guard]
 
-- name: Refuse to run with the placeholder values from hush-config.yaml
+- name: Refuse to run with placeholder values
   ansible.builtin.assert:
     that:
       - "'REPLACE' not in hush_heartbeat_url"
@@ -141,6 +141,89 @@
   vars:
     container_name: hush
     container_quadlet_src: hush.container.j2
+  tags: [hush]
+
+# Hush hook guard: the drop-ins call hush-systemd-event and read hook.env, which
+# notify_failure deploys earlier in site.yml. Skipped in check mode (copies do not run).
+- name: Stat the hush hook script and environment file
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /usr/local/bin/hush-systemd-event
+    - /etc/hush/hook.env
+  register: hush_hook_files
+  tags: [hush]
+
+- name: Require the hush hook script and environment file
+  ansible.builtin.assert:
+    that:
+      - hush_hook_files.results | map(attribute='stat') | map(attribute='exists') | select | list | length == 2
+    fail_msg: >-
+      /usr/local/bin/hush-systemd-event or /etc/hush/hook.env is missing. The notify_failure
+      role deploys both and must run before hush.
+    quiet: true
+  when: not ansible_check_mode
+  tags: [hush]
+
+# ExecStartPost reports each watched unit's start to hush. Only the drop-in changes;
+# the unit restart happens through the handler, inside the maintenance window.
+- name: Create the drop-in directories for watched units
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item }}.d"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ hush_systemd_watched_units }}"
+  tags: [hush]
+
+- name: Deploy the hush ExecStartPost drop-in for watched units
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/{{ item }}.d/hush.conf"
+    content: |
+      [Service]
+      ExecStartPost=-/usr/local/bin/hush-systemd-event ok %n
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ hush_systemd_watched_units }}"
+  loop_control:
+    label: "{{ item }}"
+  register: hush_dropin
+  notify: Restart watched units
+  tags: [hush]
+
+# Runs only when a drop-in changed. Restarts wait until hush answers on its loopback port.
+- name: Wait for hush to answer before restarting watched units
+  ansible.builtin.uri:
+    url: "http://{{ hush_publish_address }}:{{ hush_port }}/healthz"
+    status_code: 200
+    timeout: 5
+  register: hush_health_gate
+  until: hush_health_gate.status == 200
+  retries: 30
+  delay: 2
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - hush_dropin is changed
+  tags: [hush]
+
+- name: Record whether watched units may restart
+  ansible.builtin.set_fact:
+    hush_watched_restart: "{{ hush_health_gate.status | default(0) == 200 }}"
+  when: hush_dropin is changed
+  tags: [hush]
+
+- name: Report that watched units were not restarted
+  ansible.builtin.debug:
+    msg: >-
+      hush is not answering on {{ hush_publish_address }}:{{ hush_port }}; watched units
+      were not restarted. Their hush ExecStartPost takes effect on their next start.
+  when:
+    - not ansible_check_mode
+    - hush_dropin is changed
+    - not (hush_watched_restart | default(false) | bool)
   tags: [hush]
 
 # Run the restart handlers now, so the restart happens inside the window.
