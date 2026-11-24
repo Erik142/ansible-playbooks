@@ -43,6 +43,18 @@ check "unit not on the allowlist is refused" 2 "$rc"
 run "n8n.service; id"
 check "shell metacharacters are refused" 2 "$rc"
 
+run "cd / ; n8n.service"
+check "the n8n SSH node's cd prefix is accepted" 0 "$rc"
+
+run "cd / ; id ; n8n.service"
+check "a cd prefix with a second command is refused" 2 "$rc"
+
+run "cd /;id ; n8n.service"
+check "a cd prefix without spaces is refused" 2 "$rc"
+
+run "cd / && n8n.service"
+check "an && prefix (not what node-ssh sends) is refused" 2 "$rc"
+
 run "n8n.service --help"
 check "extra arguments are refused" 2 "$rc"
 

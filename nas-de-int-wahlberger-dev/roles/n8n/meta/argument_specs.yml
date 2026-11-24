@@ -45,6 +45,16 @@ argument_specs:
         elements: str
         required: false
         description: Units n8n-diag-bundle may report on.
+      n8n_hush_secret:
+        type: str
+        required: true
+        no_log: true
+        description: HMAC key Hush signs handoffs with (same value as ops hush_n8n_webhook).
+      n8n_anthropic_key:
+        type: str
+        required: true
+        no_log: true
+        description: Anthropic API key for the triage workflow (separate from Hush's own key).
       n8n_url:
         type: str
         required: true

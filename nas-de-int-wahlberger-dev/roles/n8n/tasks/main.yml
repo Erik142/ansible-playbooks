@@ -132,6 +132,28 @@
   no_log: true
   notify: Restart n8n
 
+# The encryption key as a file, read by n8n through N8N_ENCRYPTION_KEY_FILE. It is kept out
+# of the environment because workflows can read the environment (N8N_BLOCK_ENV_ACCESS_IN_NODE=false).
+# Owned by the n8n uid so the container can read it. Losing it loses every credential.
+- name: Render the n8n encryption key file
+  ansible.builtin.copy:
+    content: "{{ n8n_encryption_key }}"
+    dest: "{{ n8n_data_dir }}/encryption.key"
+    owner: "{{ n8n_uid }}"
+    group: "{{ n8n_gid }}"
+    mode: "0400"
+  no_log: true
+  notify: Restart n8n
+
+# The triage workflow, for the one-time import described in roles/n8n/README.md.
+- name: Copy the triage workflow for import
+  ansible.builtin.copy:
+    src: triage-workflow.json
+    dest: "{{ n8n_data_dir }}/triage-workflow.json"
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Deploy the n8n container
   ansible.builtin.include_role:
     name: container

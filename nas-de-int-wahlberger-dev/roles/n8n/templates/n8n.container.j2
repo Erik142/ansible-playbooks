@@ -12,6 +12,8 @@ Image={{ n8n_image }}
 Network=caddy.network
 # No PublishPort: Caddy reaches n8n:{{ n8n_port }} over caddy.network.
 Volume={{ n8n_volume_dir }}:/home/node/.n8n:Z
+# The encryption key file, read through N8N_ENCRYPTION_KEY_FILE (see the n8n role's tasks).
+Volume={{ n8n_data_dir }}/encryption.key:/run/secrets/n8n_encryption_key:ro
 Environment=TZ={{ n8n_timezone }}
 Environment=GENERIC_TIMEZONE={{ n8n_timezone }}
 Environment=N8N_HOST={{ n8n_url | urlsplit('hostname') }}
@@ -36,7 +38,12 @@ Environment=N8N_BLOCK_FILE_ACCESS_TO_N8N_FILES=true
 # session; Caddy strips any client copy) and issues n8n's own session cookie.
 Environment=EXTERNAL_HOOK_FILES=/home/node/.n8n/hooks.js
 Environment=N8N_TRUSTED_EMAIL_HEADER=x-auth-request-email
-# N8N_ENCRYPTION_KEY: root-only env file, same EnvironmentFile= pattern as roles/forgejo.
+# Triage workflow (architecture/n8n-triage-workflow.md): the Code nodes read the two secrets
+# from the environment, and the crypto builtin is needed for the HMAC check.
+Environment=N8N_ENCRYPTION_KEY_FILE=/run/secrets/n8n_encryption_key
+Environment=N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+Environment=NODE_FUNCTION_ALLOW_BUILTIN=crypto
+# Root-only env file with the triage secrets, same EnvironmentFile= pattern as roles/forgejo.
 EnvironmentFile={{ n8n_data_dir }}/n8n.env
 
 [Service]

@@ -353,3 +353,4 @@ jobs:
           echo "image: $image"
           nas-de-int-wahlberger-dev/tests/n8n-hook/run.sh "$image"
           nas-de-int-wahlberger-dev/tests/n8n-diag/test.sh
+          nas-de-int-wahlberger-dev/tests/n8n-triage/run.sh "$image"

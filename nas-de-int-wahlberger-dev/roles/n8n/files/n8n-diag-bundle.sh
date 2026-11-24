@@ -9,6 +9,12 @@ MAX_BYTES=${N8N_DIAG_MAX_BYTES:-8192}
 
 unit=${SSH_ORIGINAL_COMMAND:-${1:-}}
 
+# The n8n SSH node (node-ssh) sends "cd <cwd> ; <unit>". Accept that prefix only; the unit name is
+# still checked below, so nothing else can ride along.
+if [[ "$unit" =~ ^cd\ ([A-Za-z0-9/._~-]+)\ \;\ (.+)$ ]]; then
+    unit=${BASH_REMATCH[2]}
+fi
+
 case "$unit" in
     "" | *[!A-Za-z0-9@._-]*)
         echo "refused: invalid unit name" >&2

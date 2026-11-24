@@ -64,6 +64,7 @@ hush_secret_names:
   - hush_oidc_secret
   - hush_break_glass_hash
   - hush_metrics_token
+  - hush_n8n_webhook
 
 # --- Config (rendered to config.yaml) -----------------------------------------
 hush_timezone: Europe/Berlin

@@ -142,3 +142,12 @@ vault_n8n_oidc_client_secret: "REPLACE-with-pocket-id-client-secret"
 # oauth2-proxy cookie secret: exactly 16, 24 or 32 bytes.
 #     openssl rand -hex 16
 vault_n8n_oauth2_cookie_secret: "REPLACE-with-32-char-hex-string"
+# Triage workflow (architecture/n8n-triage-workflow.md). Generate the HMAC key with
+# openssl rand -hex 32; the same value goes into ops' vault as vault_hush_n8n_webhook_secret.
+vault_n8n_hush_secret: "REPLACE-with-openssl-rand-hex-32"
+# Anthropic API key for the triage workflow. Use a key of its own, so spend is separable.
+vault_n8n_anthropic_key: "REPLACE-with-anthropic-api-key"
+# Private key of the n8n-diag SSH key (block scalar). Its public half is n8n_diag_public_key in vars.yml.
+# Import it into n8n as the SSH credential "n8n-diag" (roles/n8n/README.md), then keep this copy.
+vault_n8n_diag_ssh_key: |
+  REPLACE-with-the-openssh-private-key
