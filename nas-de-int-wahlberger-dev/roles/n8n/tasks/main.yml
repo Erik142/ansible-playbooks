@@ -35,6 +35,61 @@
     fail_msg: n8n_allowed_emails is empty. Without it oauth2-proxy admits nobody. See roles/n8n/README.md.
     quiet: true
 
+# Diagnostics account for the triage workflow. Locked password, no sudo, read-only journal
+# access through systemd-journal. Logins are only ever the forced command below.
+- name: Create the n8n-diag account
+  ansible.builtin.user:
+    name: n8n-diag
+    system: true
+    shell: /bin/bash
+    password: "!"
+    home: /var/lib/n8n-diag
+    create_home: true
+    groups: systemd-journal
+    append: true
+
+- name: Install the n8n-diag-bundle forced command
+  ansible.builtin.copy:
+    src: n8n-diag-bundle.sh
+    dest: /usr/local/sbin/n8n-diag-bundle
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create the n8n-diag configuration directory
+  ansible.builtin.file:
+    path: /etc/n8n-diag
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write the n8n-diag unit allowlist
+  ansible.builtin.copy:
+    content: "{{ n8n_diag_units | join('\n') }}\n"
+    dest: /etc/n8n-diag/units
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create the n8n-diag .ssh directory
+  ansible.builtin.file:
+    path: /var/lib/n8n-diag/.ssh
+    state: directory
+    owner: n8n-diag
+    group: n8n-diag
+    mode: "0700"
+
+# The forced command is the only thing this key can run. No port forwarding, no pty, no agent.
+- name: Authorize the n8n-diag key for the forced command only
+  ansible.builtin.copy:
+    content: "restrict,command=\"/usr/local/sbin/n8n-diag-bundle\" {{ n8n_diag_public_key }}\n"
+    dest: /var/lib/n8n-diag/.ssh/authorized_keys
+    owner: n8n-diag
+    group: n8n-diag
+    mode: "0600"
+  when: n8n_diag_public_key | length > 0
+
 - name: Create the n8n data volume directory
   ansible.builtin.file:
     path: "{{ n8n_volume_dir }}"
