@@ -19,8 +19,24 @@
       vault_lab_grab_registry_token.
     quiet: true
 
-# Data dirs follow roles/tandoor: pgdata and redis are written by container UIDs
-# this host cannot map, so they are world-writable like the other Podman data dirs.
+# Postgres and Redis write as their own container uids. Live state on the NAS (2026-11-24):
+# pgdata 70:0 0700, redis 999:0 0777. Postgres refuses to start on a data dir it does not own.
+- name: Create the Lab-Grab Postgres data directory
+  ansible.builtin.file:
+    path: "{{ lab_grab_db_data_dir }}"
+    state: directory
+    owner: "{{ lab_grab_db_uid }}"
+    group: root
+    mode: "0700"
+
+- name: Create the Lab-Grab Redis data directory
+  ansible.builtin.file:
+    path: "{{ lab_grab_redis_data_dir }}"
+    state: directory
+    owner: "{{ lab_grab_redis_uid }}"
+    group: root
+    mode: "0777"
+
 - name: Create Lab-Grab data directories
   ansible.builtin.file:
     path: "{{ item.path }}"
@@ -31,8 +47,6 @@
   loop:
     - { path: "{{ lab_grab_data_dir }}", mode: "0750" }
     - { path: "{{ lab_grab_config_dir }}", mode: "0750" }
-    - { path: "{{ lab_grab_db_data_dir }}", mode: "0777" }
-    - { path: "{{ lab_grab_redis_data_dir }}", mode: "0777" }
     # Written by lab-grab-sync, which runs as the non-root `app` user. The parent
     # lab-grab dir is 0750, so other host users cannot reach this directory.
     - { path: "{{ lab_grab_exporter_arp_dir }}", mode: "0777" }

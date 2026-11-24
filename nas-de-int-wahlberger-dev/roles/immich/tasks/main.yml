@@ -12,21 +12,25 @@
       roles/immich/README.md.
     quiet: true
 
-# world-writable (0777): the immich-server image runs as root by default (no
-# non-root user, no UID/GID remap) so 0750 root:root would work for
-# model-cache alone — kept uniform with the Postgres dir below, which DOES
-# need it (the official-pattern postgres image drops to a non-root user with
-# no remap option). Matches paperless_ngx's reasoning for the same loop.
-- name: Create the Immich container data directories
+# Postgres drops to its own uid and needs a 0700 data dir that uid owns. Live state
+# on the NAS (2026-11-24): 999:0 0700. Owning it as root with 0777 makes postgres refuse to start.
+- name: Create the Immich Postgres data directory
   ansible.builtin.file:
-    path: "{{ immich_data_dir }}/{{ item }}"
+    path: "{{ immich_data_dir }}/postgres"
+    state: directory
+    owner: "{{ immich_db_uid }}"
+    group: root
+    mode: "0700"
+
+# The immich-server image runs as root (no non-root user, no UID/GID remap), so
+# model-cache stays root-owned and world-writable. Live state matches.
+- name: Create the Immich model-cache directory
+  ansible.builtin.file:
+    path: "{{ immich_data_dir }}/model-cache"
     state: directory
     owner: root
     group: root
     mode: "0777"
-  loop:
-    - postgres
-    - model-cache
 
 # Root-only (0750): nothing outside Immich itself (which runs as root — see
 # README.md) needs to touch this. Its "library" subfolder is a different

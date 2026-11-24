@@ -20,6 +20,9 @@ lab_grab_exporter_image: "docker.io/labgrid/exporter:v25.0.1"
 lab_grab_data_dir: /mnt/containers/lab-grab
 lab_grab_db_data_dir: "{{ lab_grab_data_dir }}/pgdata"
 lab_grab_redis_data_dir: "{{ lab_grab_data_dir }}/redis"
+# uids the official postgres and redis images run as (live state 2026-11-24: pgdata 70, redis 999).
+lab_grab_db_uid: 70
+lab_grab_redis_uid: 999
 lab_grab_config_dir: "{{ lab_grab_data_dir }}/config"
 # Directory (not a single file) so the sync's replace-on-write stays visible
 # to the exporter container. Holds exporter.yaml written by the sync (ARP).

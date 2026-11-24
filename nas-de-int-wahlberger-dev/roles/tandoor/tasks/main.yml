@@ -17,27 +17,23 @@
       roles/tandoor/README.md.
     quiet: true
 
-# world-writable (0777): matches the other Podman data directories on this
-# host used by images that run as a non-root user with no UID/GID remap
-# option (the official postgres image below is a proven example — see
-# roles/paperless_ngx/tasks/main.yml for the detailed per-image rationale).
-# Kept uniform rather than special-casing the Tandoor app directory, whose
-# exact user model has not been confirmed upstream yet.
+# Matches live state on the NAS (2026-11-24). Postgres needs a 0700 data dir owned
+# by its own uid; 0777 would make it refuse to start.
 - name: Create the Tandoor media directory
   ansible.builtin.file:
     path: "{{ tandoor_data_dir }}/mediafiles"
     state: directory
     owner: root
     group: root
-    mode: "0777"
+    mode: "0755"
 
 - name: Create the Tandoor Postgres data directory
   ansible.builtin.file:
     path: "{{ tandoor_db_data_dir }}"
     state: directory
-    owner: root
+    owner: "{{ tandoor_db_uid }}"
     group: root
-    mode: "0777"
+    mode: "0700"
 
 - name: Create the Tandoor Podman network
   containers.podman.podman_network:

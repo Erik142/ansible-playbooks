@@ -22,8 +22,8 @@
   ansible.builtin.file:
     path: "{{ paperless_ngx_data_dir }}/{{ item }}"
     state: directory
-    owner: root
-    group: root
+    owner: "{{ paperless_ngx_uid }}"
+    group: "{{ paperless_ngx_gid }}"
     mode: "0777"
   loop:
     - data
@@ -61,8 +61,8 @@
   ansible.builtin.file:
     path: "{{ paperless_ngx_inbox_dir }}"
     state: directory
-    owner: root
-    group: root
+    owner: "{{ paperless_ngx_uid }}"
+    group: "{{ paperless_ngx_gid }}"
     mode: "0777"
 
 - name: Create the Paperless-ngx Podman network

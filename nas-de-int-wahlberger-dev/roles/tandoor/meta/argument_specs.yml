@@ -65,3 +65,7 @@ argument_specs:
           vault_tandoor_oidc_client_secret. Not marked required: true (a
           secret, validated non-empty by the role's FR-12 assert task
           instead).
+      tandoor_db_uid:
+        type: int
+        required: false
+        description: uid of the Tandoor Postgres container; owns the 0700 pgdata dir.
