@@ -289,6 +289,8 @@ n8n_encryption_key: "{{ vault_n8n_encryption_key | default('') }}"
 # Triage workflow (architecture/n8n-triage-workflow.md). The HMAC secret equals ops' hush_n8n_webhook.
 n8n_hush_secret: "{{ vault_n8n_hush_secret | default('') }}"
 n8n_anthropic_key: "{{ vault_n8n_anthropic_key | default('') }}"
+# Renovate gate (monitor-only): read-only GitHub token, see roles/n8n/README.md.
+n8n_github_token: "{{ vault_n8n_github_token | default('') }}"
 n8n_oidc_client_secret: "{{ vault_n8n_oidc_client_secret | default('') }}"
 n8n_oauth2_cookie_secret: "{{ vault_n8n_oauth2_cookie_secret | default('') }}"
 

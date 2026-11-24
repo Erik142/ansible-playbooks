@@ -8,6 +8,7 @@ import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 RECORDED = []
+REVIEW = '{"verdict": "safe", "reasons": ["patch-level container bump"], "patch_summary": ""}'
 REPLY = ("Likely cause: caddy restarted after a config change.\n"
          "Next check: journalctl -u caddy --since -1h.\n"
          "PROPOSED_ACTION: restart caddy.service")
@@ -29,8 +30,10 @@ class Handler(BaseHTTPRequestHandler):
             RECORDED.append({"path": self.path, "headers": dict(self.headers), "body": json.loads(raw)})
         except json.JSONDecodeError:
             RECORDED.append({"path": self.path, "headers": dict(self.headers), "raw": raw})
+        prompt = json.dumps(RECORDED[-1].get("body", {}))
+        text = REVIEW if "merge safety" in prompt else REPLY
         self._send(200, {"id": "msg_stub", "type": "message", "role": "assistant",
-                         "content": [{"type": "text", "text": REPLY}]})
+                         "content": [{"type": "text", "text": text}]})
 
     def do_GET(self):
         if self.path == "/_requests":

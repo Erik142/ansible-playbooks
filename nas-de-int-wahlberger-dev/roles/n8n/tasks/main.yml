@@ -145,6 +145,15 @@
   no_log: true
   notify: Restart n8n
 
+# The Renovate gate workflow (monitor-only), imported the same way as the triage workflow.
+- name: Copy the Renovate gate workflow for import
+  ansible.builtin.copy:
+    src: renovate-gate-workflow.json
+    dest: "{{ n8n_data_dir }}/renovate-gate-workflow.json"
+    owner: root
+    group: root
+    mode: "0644"
+
 # The triage workflow, for the one-time import described in roles/n8n/README.md.
 - name: Copy the triage workflow for import
   ansible.builtin.copy:

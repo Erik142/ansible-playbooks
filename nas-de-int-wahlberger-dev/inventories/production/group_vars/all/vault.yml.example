@@ -151,3 +151,9 @@ vault_n8n_anthropic_key: "REPLACE-with-anthropic-api-key"
 # Import it into n8n as the SSH credential "n8n-diag" (roles/n8n/README.md), then keep this copy.
 vault_n8n_diag_ssh_key: |
   REPLACE-with-the-openssh-private-key
+
+# Fine-grained GitHub token for the Renovate gate in monitor-only mode. Repository
+# Erik142/ansible-playbooks only. Permissions: Metadata read, Contents read,
+# Pull requests read, Actions read (CI runs and failed-run logs). Checks is not a fine-grained
+# token permission (GitHub Apps only). Nothing else; Workflows stays off.
+vault_n8n_github_token: "REPLACE-with-fine-grained-github-token"

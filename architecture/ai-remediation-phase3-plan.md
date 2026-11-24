@@ -79,7 +79,7 @@ Both workflows run in monitor-only mode first, side by side, for two to four wee
 
 ### Monitor-only mode for the Renovate gate
 - **Polls:** every 15 minutes, open PRs from `app/renovate` only. Reads PR lists, file lists and CI results. Nothing is written to GitHub.
-- **Token:** a fine-grained, read-only token for this repository (contents, pull requests and checks, read). It cannot merge, comment or push. Erik creates it, and it is stored in the NAS vault.
+- **Token:** a fine-grained, read-only token for this repository: Metadata, Contents, Pull requests and Actions, all read. CI results come from the workflow runs endpoint. Checks is not offered for fine-grained tokens. Actions read lets the monitor pull logs of failed runs. The Workflows permission stays off, since it would allow editing `.github/workflows`. The token cannot merge, comment, rerun or push. Erik creates it, and it is stored in the NAS vault.
 - **Records:** each decision goes to the n8n execution history, with the same 30-day retention as the triage workflow.
 - **Exit criteria, as a precondition for the write token:** at least two weeks of polls, every merge the gate would have made matches a merge Erik would have made, and every escalation has a recorded reason.
 

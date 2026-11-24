@@ -55,6 +55,11 @@ argument_specs:
         required: true
         no_log: true
         description: Anthropic API key for the triage workflow (separate from Hush's own key).
+      n8n_github_token:
+        type: str
+        required: true
+        no_log: true
+        description: Fine-grained, read-only GitHub token for the Renovate gate in monitor-only mode.
       n8n_url:
         type: str
         required: true
