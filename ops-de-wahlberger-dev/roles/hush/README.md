@@ -50,7 +50,7 @@ The container runs as uid 10001 (`Containerfile`). Port 8080 is published on
 - **Secrets in Vault.** The twelve `vault_hush_*` keys are in the manifest and the
   scaffold. Nine are generated, three are typed by hand (Anthropic key, Resend key,
   Pocket ID client secret). The real `vault.yml` still has to be rebuilt with
-  `tools/populate-vault.sh --force`. Each generated secret also has to be entered in
+  the migration vault builder (migration helper under `tools/`, removed after the migration; recover it from git history before the removal commit). Each generated secret also has to be entered in
   its consumer: the Kuma webhook (`vault_hush_source_kuma`), the hook scripts
   (`hooks_*`), restic (`backup_*`) and the maintenance client (`maintenance_ansible`).
 - **Placeholders in group_vars.** The Healthchecks URL is now in Vault. The Pocket ID

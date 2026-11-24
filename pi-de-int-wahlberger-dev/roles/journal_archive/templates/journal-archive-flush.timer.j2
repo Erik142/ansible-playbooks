@@ -1,9 +1,0 @@
-[Unit]
-Description=Periodically flush the volatile systemd journal to the SD card
-
-[Timer]
-OnBootSec=30min
-OnUnitActiveSec=30min
-
-[Install]
-WantedBy=timers.target

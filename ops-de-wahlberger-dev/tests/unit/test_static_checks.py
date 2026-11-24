@@ -7,7 +7,7 @@ import subprocess
 
 import pytest
 
-from conftest import C, EXAMPLE, N, OPS_REAL, PI, V, VARS, line_for, status
+from conftest import C, EXAMPLE, N, OPS_REAL, V, VARS, line_for, status
 
 OPS_VARS = V + "/" + VARS
 NAS_VARS = N + "/" + VARS
@@ -565,7 +565,7 @@ def test_br16_skipped_without_pr(repo):
 
 
 def test_br16_runs_boundary_check(repo):
-    repo.write(PI + "/x", "x")
+    repo.write("some-other-host/x", "x")
     rc, out = repo.static("SH-BR-16", STATIC_CHECKS_PR="A")
     assert status(out, "SH-BR-16") == "FAIL", out
 

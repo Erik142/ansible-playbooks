@@ -1,4 +1,4 @@
-# Safety copy that tools/vault-copy-keys.sh leaves next to a vault after a failed write
+# Safety copy left next to a vault after a failed write (vault copy tooling, removed)
 *.yml.bak
 
 # Untracked working files (plans, notes, drafts, logs)

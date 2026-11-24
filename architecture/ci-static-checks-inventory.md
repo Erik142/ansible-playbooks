@@ -51,7 +51,7 @@ NAS static: under 10 s total for the scenarios, plus 46 s UNIT and 7 s AC-05. Th
 | SH-FR-97 | pi directory untouched until step 7 | <1 s | DELETE | Migration; PR E removes the Pi directory |
 | SH-FR-205 | no ZeroTier Central token in the repo | <1 s | KEEP | Secret-leak grep, cheap, unique |
 | SH-BR-16 | PR boundary (STATIC_CHECKS_PR) | SKIPPED | DELETE | Opt-in diff check for PR branches; migration |
-| UNIT | pytest tests/unit | 35 s | SPLIT | Tests of `static-checks.sh` itself go with the deleted checks. Tests of `tools/` stay, and move to their own job |
+| UNIT | pytest tests/unit | 35 s | SPLIT | Tests of `static-checks.sh` itself go with the deleted checks. Tests of `tools/` went with the migration tooling (removed in chore/remove-retired-hosts-tooling) |
 
 ## nas-de-int-wahlberger-dev (`tests/static-checks.sh`)
 | ID | What | CI time | Class | Action |

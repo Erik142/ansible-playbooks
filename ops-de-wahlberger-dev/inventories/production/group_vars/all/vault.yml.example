@@ -2,13 +2,12 @@
 # on purpose.
 #
 # This file is a committed, plaintext template. The REAL file is the encrypted
-# sibling `vault.yml` (same directory). On the workstation, Erik builds it with
-# `tools/populate-vault.sh` (see tools/README.md): seven values are COPIED from
-# the Pi's Vault, two are GENERATED locally. Nothing is typed by hand.
+# sibling `vault.yml` (same directory). On the workstation, Erik built it once with the
+# migration helper (removed; see git history): seven values were COPIED from
+# the Pi's Vault, two were GENERATED locally.
 #
 # Every key below is referenced from vars.yml under a friendly (non-vault_)
-# name. If you add a key to vars.yml, add it here AND to tools/vault-manifest.yml
-# (tests/tools/test_populate_vault.py checks the three agree).
+# name. If you add a key to vars.yml, add it here too.
 
 # --- Copied verbatim from the Pi's Vault (SH-FR-43/44/46/146/147/148/201) -----
 # Cloudflare DNS API token (Zone:DNS:Edit on wahlberger.dev).

@@ -83,11 +83,6 @@
       "description": "Caddy upgrades skipped for now (incl. the locally built caddy-cloudflare image)",
       "matchPackageNames": ["docker.io/library/caddy", "localhost/caddy-cloudflare"],
       "enabled": false
-    },
-    {
-      "description": "Retired host pi-de-int-wahlberger-dev is no longer in use; its directory is kept for reference, so no update PR touches it.",
-      "matchFileNames": ["pi-de-int-wahlberger-dev/**"],
-      "enabled": false
     }
   ]
 }

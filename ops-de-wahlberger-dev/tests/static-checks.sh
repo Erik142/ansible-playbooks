@@ -206,14 +206,28 @@ ac17() {
     python3 - <<'PY'
 import os, re, sys, yaml
 
-ops = os.environ["SC_OPS"]
+ops, repo = os.environ["SC_OPS"], os.environ["SC_REPO"]
 gv = f"{ops}/inventories/production/group_vars/all"
 errors = []
 vars_text = open(f"{gv}/vars.yml").read()
 v = yaml.safe_load(vars_text)
-if v.get("semaphore_url") != "https://semaphore.de.int.wahlberger.dev":
-    errors.append("vars.yml semaphore_url differs from SH-FR-42")
-if v.get("semaphore_oidc_client_id") != "63093482-d2cc-4c77-89df-9f6ff78b160e":
+# SH-FR-42: semaphore_url is https://<host of the Caddy site that proxies to the
+# primary upstream>. That upstream is the caddy role's default (what Semaphore
+# publishes on), so the expected host comes from caddy_sites, not from a copy here.
+caddy_defaults = yaml.safe_load(open(f"{ops}/roles/caddy/defaults/main.yml")) or {}
+primary = v.get("caddy_upstream_primary", caddy_defaults.get("caddy_upstream_primary"))
+sem_hosts = [s.get("host") for s in (v.get("caddy_sites") or [])
+             if isinstance(s, dict) and (s.get("upstream") or primary) == primary]
+if len(sem_hosts) != 1:
+    errors.append(f"vars.yml caddy_sites must hold exactly one site on {primary} (the Semaphore site), found {len(sem_hosts)}")
+elif v.get("semaphore_url") != f"https://{sem_hosts[0]}":
+    errors.append(f"vars.yml semaphore_url differs from SH-FR-42 (expected https://{sem_hosts[0]}, the Caddy site on {primary})")
+# SH-FR-45: no role default holds the OIDC client ID, so the spec names the expected value.
+spec = open(f"{repo}/semaphore-migration/reqs/semaphore-to-hetzner.md", encoding="utf-8").read()
+m = re.search(r"^- SH-FR-45 \[Must\]:.*?`([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`", spec, re.M)
+if not m:
+    errors.append("SH-FR-45 names no client ID (spec)")
+elif v.get("semaphore_oidc_client_id") != m.group(1):
     errors.append("vars.yml semaphore_oidc_client_id differs from SH-FR-45")
 ex = yaml.safe_load(open(f"{gv}/vault.yml.example")) or {}
 if not ex or not all(k.startswith("vault_") for k in ex):

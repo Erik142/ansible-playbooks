@@ -63,8 +63,8 @@ ops-de-wahlberger-dev/
 │   ├── hosts.yml                # one host: ops.de.wahlberger.dev (no ansible_host)
 │   └── group_vars/all/          # vars.yml, vault.yml (encrypted), vault.yml.example
 ├── molecule/default/            # common, notify_failure, disk_space, ssh_authorized_keys, security
-├── tests/                       # static-checks.sh, pr-boundaries.sh, render-check.sh, guard-tests.sh, guards.d/, render.d/, unit/, tools/
-├── tools/                       # operator tooling for steps 4 and 6 (see tools/README.md)
+├── tests/                       # static-checks.sh, pr-boundaries.sh, render-check.sh, guard-tests.sh, guards.d/, render.d/, unit/
+├── tools/hetzner-image/         # Hetzner image build notes and scripts
 └── roles/                       # common, notify_failure, disk_space, ssh_authorized_keys, security,
                                  # reboot_notify, firewall, podman, zerotier, beszel_agent,
                                  # cloudflare_dns, caddy, semaphore, restic_backup; container (helper)
@@ -263,7 +263,7 @@ BR-02 and BR-13 preconditions, used by several steps:
 
 ### Step 0 - Prepare (OP-00a, OP-00b, OP-00c)
 
-1. Create the 1Password item `Ansible Vault - ops-de-wahlberger-dev` (OP-00a). Build the VM's `vault.yml` once with `tools/populate-vault.sh` (seven values copied from the Pi's Vault, two generated); see [`tools/README.md`](tools/README.md). Check the carried-over values with `tools/vault-hash-compare.sh` (SH-AC-17).
+1. Create the 1Password item `Ansible Vault - ops-de-wahlberger-dev` (OP-00a). Build the VM's `vault.yml` once (seven values copied from the Pi's Vault, two generated) (migration helper under `tools/`, removed after the migration; recover it from git history before the removal commit). Check the carried-over values with the same tooling (SH-AC-17).
 2. Checks: personal key protection (SH-FR-163), Hetzner 2FA (SH-FR-164), Central 2FA (SH-FR-165), and the SHA-256 of the Pi's live `config.json` `access_key_encryption` against the Pi Vault's `vault_semaphore_access_key_encryption` (SH-FR-180). Compare hashes only; never print the values.
 3. Generate the new automation key on the workstation (SH-FR-56) and hand the **public** half to the pull request C branch. See "New automation key".
 4. Save Central's current rule set into `docs/zerotier-flow-rules.md`, section "Before" (SH-FR-33). The text is filled in by the PR A packaging task from your input.
@@ -387,7 +387,7 @@ Then:
 ### Step 4 - Migrate the database (OP-04)
 
 All Pi actions are reads, plus one stop and start of `semaphore.service` of at
-most 10 min (SH-FR-200). Nothing is printed from secrets: `tools/` read credentials
+most 10 min (SH-FR-200). Nothing is printed from secrets: the migration helpers read credentials
 from the environment (`SEMAPHORE_USER`, `SEMAPHORE_PASSWORD`).
 
 1. Optional: Hetzner snapshot (SH-FR-102, Could). It is subject to the 30-day deadline, see "Snapshots".
@@ -718,7 +718,7 @@ enforcing, fail2ban bans. Still not observed on the real VM:
 
 ## Tests
 
-Run with the pyenv venv's ansible first in `PATH`. The `tests/` and `tools/` helpers
+Run with the pyenv venv's ansible first in `PATH`. The `tests/` helpers
 isolate themselves from this directory's `ansible.cfg` (which calls `.vault_pass.sh`,
 a 1Password prompt), so running them from here is safe; plain `ansible-playbook`,
 `ansible-vault` and other commands are not isolated.
@@ -748,4 +748,4 @@ checks (Renovate rules, SH-AC-43, the DNS-cutover flag in `tests/guards.d/vm_var
 take `STATIC_CHECKS_STAGE=A|D|E` from the environment: pull requests A3, C and E may
 not edit `tests/`.
 
-Tooling for steps 4 and 6 is documented in [`tools/README.md`](tools/README.md).
+The operator tooling for steps 4 and 6 (`tools/populate-vault.sh`, `tools/db-prepare.sh`, `tools/step4-record.py`, `tools/compare-record.py`, `tools/vault-pair-compare.sh`, `tools/check-from-list.sh`) was removed in PR chore/remove-retired-hosts-tooling. The commands in the steps above that name it are historical: (migration helper under `tools/`, removed after the migration; recover it from git history before the removal commit).
