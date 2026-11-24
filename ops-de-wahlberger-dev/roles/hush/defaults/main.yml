@@ -64,6 +64,8 @@ hush_secret_names:
   - hush_oidc_secret
   - hush_break_glass_hash
   - hush_metrics_token
+  - hush_n8n_webhook
+  - hush_remediation_secret
 
 # --- Config (rendered to config.yaml) -----------------------------------------
 hush_timezone: Europe/Berlin
@@ -253,6 +255,13 @@ hush_config:
       api_key: /run/secrets/hush_resend_key
       from: "Hush <hush@no-reply.wahlberger.dev>"
       to: ["{{ hush_alert_recipient }}"]
+    # n8n triage (architecture/n8n-triage-workflow.md): info handoffs only. The secret is the
+    # HMAC key shared with n8n on the NAS (vault_n8n_hush_secret there).
+    webhook:
+      url: https://n8n.de.int.wahlberger.dev/webhook/hush
+      secret: /run/secrets/hush_n8n_webhook
+      timeout: 10s
+      attempts: 3
     # Non-critical mails wait until 07:00 and go out as one batch (failsafe, always_notify
     # and critical events are never held).
     quiet_hours: {from: "22:00", to: "07:00", timezone: Europe/Berlin}
@@ -272,6 +281,14 @@ hush_config:
     escalation: {after: 1h, max_repeats: 1}
     storm: {threshold: 10, window: 5m}
     feedback_links: {enabled: true, valid_for: 30d}
+  # Remediation handoff, escalate-only: routes are empty, so nothing is held and e-mail
+  # timing is unchanged (architecture/n8n-triage-workflow.md). Replies are not used yet.
+  remediation:
+    enabled: true
+    routes: []
+    # Replies from n8n (phase 2b, alert handoffs). Required while enabled.
+    reply_url: https://hush.de.int.wahlberger.dev/ingest/remediation
+    secret: /run/secrets/hush_remediation_secret
   dashboard:
     public_url: "{{ hush_dashboard_base_url }}"
     login:

@@ -148,3 +148,4 @@ Create `roles/<svc>/` (underscore, not hyphen — ansible-lint), put a
 templated unit at `roles/<svc>/templates/<svc>.container.j2`, then
 `include_role: container` with `container_name` and `container_quadlet_src`.
 Add `- role: <svc>` to `site.yml`. See `roles/container/README.md`.
+If the service has a web UI, add it to `roles/homepage/templates/services.yaml.j2` in the same change (the NAS homepage lists every web UI).

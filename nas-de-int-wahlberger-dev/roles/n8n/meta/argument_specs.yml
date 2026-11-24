@@ -36,6 +36,30 @@ argument_specs:
         elements: str
         required: true
         description: Emails allowed through the editor gate (oauth2-proxy) and logged in by the trusted-header hook. Must match the n8n owner's email.
+      n8n_diag_public_key:
+        type: str
+        required: false
+        description: Public key of the n8n-diag SSH key (forced command only). Empty disables it.
+      n8n_diag_units:
+        type: list
+        elements: str
+        required: false
+        description: Units n8n-diag-bundle may report on.
+      n8n_hush_secret:
+        type: str
+        required: true
+        no_log: true
+        description: HMAC key Hush signs handoffs with (same value as ops hush_n8n_webhook).
+      n8n_anthropic_key:
+        type: str
+        required: true
+        no_log: true
+        description: Anthropic API key for the triage workflow (separate from Hush's own key).
+      n8n_github_token:
+        type: str
+        required: true
+        no_log: true
+        description: Fine-grained, read-only GitHub token for the Renovate gate in monitor-only mode.
       n8n_url:
         type: str
         required: true

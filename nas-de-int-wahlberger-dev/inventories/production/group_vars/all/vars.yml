@@ -280,11 +280,17 @@ forgejo_oidc_client_id: "e49c8dc5-2a21-4735-bf3b-cc3c8dadbf2e"
 # https://n8n.de.int.wahlberger.dev/oauth2/callback.
 # Until n8n_oidc_client_id is set, the n8n role's assert fails loudly.
 n8n_url: "https://n8n.de.int.wahlberger.dev"
+n8n_diag_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMNsI50JkKSFrfy/xx7Pf7M/tNM+fUaOBwUQP1ueWWP+ n8n-diag@nas"
 # The only editor user. Must equal the Pocket ID email and the n8n owner email.
 n8n_allowed_emails:
   - "erik@wahlberger.dev"
 n8n_oidc_client_id: "cc5ff956-e839-4cb9-a4e8-727bbf16d582"
 n8n_encryption_key: "{{ vault_n8n_encryption_key | default('') }}"
+# Triage workflow (architecture/n8n-triage-workflow.md). The HMAC secret equals ops' hush_n8n_webhook.
+n8n_hush_secret: "{{ vault_n8n_hush_secret | default('') }}"
+n8n_anthropic_key: "{{ vault_n8n_anthropic_key | default('') }}"
+# Renovate gate (monitor-only): read-only GitHub token, see roles/n8n/README.md.
+n8n_github_token: "{{ vault_n8n_github_token | default('') }}"
 n8n_oidc_client_secret: "{{ vault_n8n_oidc_client_secret | default('') }}"
 n8n_oauth2_cookie_secret: "{{ vault_n8n_oauth2_cookie_secret | default('') }}"
 

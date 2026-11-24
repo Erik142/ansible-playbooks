@@ -121,7 +121,9 @@
         gt_listed: "{{ lookup('ansible.builtin.file', gt_example) | regex_findall('(?m)^(vault_[a-z0-9_]+): \"\"$') | sort }}"
       ansible.builtin.assert:
         that:
-          - gt_used | length == 25  # 9 original + Forgejo, Healthchecks, Hush (15), netcup source, TrueNAS
+          # A floor, not an exact count: exact counts broke on every new secret. The equality
+          # check below is the real rule (every name used is listed in the example).
+          - gt_used | length >= 25
           - gt_used == gt_listed
         quiet: true
 

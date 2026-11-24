@@ -47,6 +47,25 @@ n8n_oauth2_proxy_port: 4180
 # only as the n8n user with the same email, so this list must stay short: one owner.
 n8n_allowed_emails: []
 
+# Diagnostics for the triage workflow (architecture/n8n-triage-workflow.md). The n8n-diag
+# key may run exactly one command: n8n-diag-bundle <unit>, and only for these units.
+# Public key of the n8n-diag key (private key lives in vault_n8n_diag_ssh_key). Empty = no access.
+n8n_diag_public_key: ""
+n8n_diag_units:
+  - btrbk.service
+  - db-dump.service
+  - restic-server.service
+  - restic-server-maintenance.service
+  - backup-disk-health.service
+  - caddy.service
+  - forgejo.service
+  - n8n.service
+  - oauth2-proxy.service
+  - immich-server.service
+  - tandoor.service
+  - paperless-ngx.service
+  - lab-grab.service
+
 # Pocket ID OIDC client for the editor. Not secret (a UUID). Create it in Pocket ID
 # with redirect URI "{{ n8n_url }}/oauth2/callback", then set it in group_vars.
 n8n_oidc_client_id: ""

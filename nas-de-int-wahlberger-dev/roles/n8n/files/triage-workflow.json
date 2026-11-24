@@ -1,0 +1,495 @@
+{
+  "id": "n8ntriage01",
+  "name": "Hush triage (phase 2a, read-only)",
+  "nodes": [
+    {
+      "id": "wh",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "7a1f0e62-5b1e-4d55-9c1e-8e2a6c0f1a01",
+      "parameters": {
+        "path": "hush",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      }
+    },
+    {
+      "id": "verify",
+      "name": "Verify",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst first = $input.first();\n// With the Webhook option rawBody, the exact request bytes are the binary 'data' property.\nconst binKeys = Object.keys(first.binary || {});\nconst raw = binKeys.length ? Buffer.from(first.binary[binKeys[0]].data, 'base64').toString('utf8') : '';\nconst headers = (first.json && first.json.headers) || {};\nconst sig = String(headers['x-hush-signature'] || '');\nconst ts = String(headers['x-hush-timestamp'] || '');\nconst secret = $env.HUSH_N8N_SECRET || '';\nlet ok = false;\nif (secret && raw && /^[0-9]+$/.test(ts) && Math.abs(Date.now() / 1000 - Number(ts)) <= 300) {\n  const mac = 'sha256=' + crypto.createHmac('sha256', secret).update(ts + '.' + raw).digest('hex');\n  ok = sig.length === mac.length && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(mac));\n}\nlet body = null;\ntry { body = JSON.parse(raw); } catch (e) { body = null; }\nconst valid = ok && body !== null && typeof body === 'object' && body.schema_version === 1\n  && typeof body.problem_key === 'string' && (body.kind === 'alert' || body.kind === 'info');\nreturn [{ json: { ok, valid, body: valid ? body : {} } }];"
+      }
+    },
+    {
+      "id": "signed",
+      "name": "Signed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "signedc",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "unauth",
+      "name": "Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        480
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"message\": \"unauthorized\"}",
+        "options": {
+          "responseCode": 401
+        }
+      }
+    },
+    {
+      "id": "valid",
+      "name": "Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "validc",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "badreq",
+      "name": "Bad request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        480
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"message\": \"invalid handoff\"}",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    },
+    {
+      "id": "alert",
+      "name": "Alert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "alertc",
+              "leftValue": "={{ $json.body.kind }}",
+              "rightValue": "alert",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "notsup",
+      "name": "Alerts not handled",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        480
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"message\": \"alert handoffs are not handled in phase 2a\"}",
+        "options": {
+          "responseCode": 409
+        }
+      }
+    },
+    {
+      "id": "plan",
+      "name": "Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst unitOk = /^[A-Za-z0-9@._-]+$/;\nconst isNas = body.host === 'nas.de.int.wahlberger.dev' || body.host === 'nas';\nconst diagUnit = isNas && body.service && unitOk.test(body.service) ? body.service + '.service' : '';\nreturn [{ json: { body, diag: diagUnit !== '', diagUnit } }];"
+      }
+    },
+    {
+      "id": "diag",
+      "name": "Diag?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "diagc",
+              "leftValue": "={{ $json.diag }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ssh",
+      "name": "Run diagnostics",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        180
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "authentication": "privateKey",
+        "resource": "command",
+        "operation": "execute",
+        "command": "={{ $json.diagUnit }}",
+        "cwd": "/"
+      },
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "n8ndiagssh01",
+          "name": "n8n-diag"
+        }
+      }
+    },
+    {
+      "id": "assemble",
+      "name": "Assemble",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const plan = $('Plan').first().json;\nconst body = plan.body;\nlet diag = '';\ntry { diag = $('Run diagnostics').first().json.stdout || ''; } catch (e) { diag = ''; }\nconst redact = (value) => {\n  let r = String(value === undefined || value === null ? '' : value);\n  if (body.host) r = r.split(body.host).join('<host>');\n  return r.replace(/\\b[a-z0-9-]+(\\.[a-z0-9-]+)*\\.(de\\.int\\.)?wahlberger\\.dev\\b/gi, '<host>')\n          .replace(/\\b\\d{1,3}(\\.\\d{1,3}){3}\\b/g, '<ip>');\n};\nconst prompt = [\n  'Role: read-only incident triage for a homelab. Given the Hush event and the host diagnostics below, state the most likely cause class, the evidence, and one next check to run by hand. Do not propose changes to hosts. Answer in at most 12 lines. As the last line, write PROPOSED_ACTION: followed by the single change you would make on the host to fix it, or none. That line is recorded for review and is never executed.',\n  '',\n  `Event: kind=${redact(body.kind)} severity=${redact(body.severity)} status=${redact(body.status)} streak=${redact(body.streak)} source=${redact(body.source)}`,\n  `first_seen=${redact(body.first_seen)} last_seen=${redact(body.last_seen)}`,\n  `problem=${redact(body.problem_key)} service=${redact(body.service)} check=${redact(body.check)}`,\n  `Summary: ${redact(body.summary).slice(0, 4000)}`,\n  `Raw excerpt: ${redact(body.raw_excerpt).slice(0, 4000)}`,\n  '',\n  'Diagnostics:',\n  diag ? redact(diag).slice(0, 8192) : '(none: not available for this host or unit)'\n].join('\\n');\nconst claudeBody = { model: 'claude-haiku-5-5', max_tokens: 1024, messages: [{ role: 'user', content: prompt }] };\nreturn [{ json: { claudeBody, body } }];"
+      }
+    },
+    {
+      "id": "claude",
+      "name": "Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com') + '/v1/messages' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.claudeBody }}",
+        "options": {
+          "timeout": 60000
+        }
+      }
+    },
+    {
+      "id": "report",
+      "name": "Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst text = (resp.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('\\n');\nconst body = $('Plan').first().json.body;\n// The model's last line is the proposal. It is kept for the audit and never executed.\nconst match = text.match(/^PROPOSED_ACTION:\\s*(.*)$/m);\nconst proposed = match ? match[1].trim().slice(0, 500) : 'none (no PROPOSED_ACTION line)';\nreturn [{ json: { outcome: 'escalate', kind: body.kind, delivery_id: body.delivery_id || null, summary: text.slice(0, 4000), proposed_action: proposed, model: resp.model || null, usage: resp.usage || null } }];"
+      }
+    },
+    {
+      "id": "ok",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2420,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify": {
+      "main": [
+        [
+          {
+            "node": "Signed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signed?": {
+      "main": [
+        [
+          {
+            "node": "Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid?": {
+      "main": [
+        [
+          {
+            "node": "Alert?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Bad request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert?": {
+      "main": [
+        [
+          {
+            "node": "Alerts not handled",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan": {
+      "main": [
+        [
+          {
+            "node": "Diag?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Diag?": {
+      "main": [
+        [
+          {
+            "node": "Run diagnostics",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Assemble",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run diagnostics": {
+      "main": [
+        [
+          {
+            "node": "Assemble",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble": {
+      "main": [
+        [
+          {
+            "node": "Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude": {
+      "main": [
+        [
+          {
+            "node": "Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "versionId": "00000000-0000-4000-8000-000000000001"
+}

@@ -54,3 +54,14 @@ Deterministic classifier first, LLM second, merge last. The LLM never holds the 
 - Pi directory is excluded from Renovate; keep it so.
 - The NAS-hosted n8n holds the App private key and the Anthropic key. Same host-choice reasoning as `PLAN-n8n.md` §1.
 - Dependency on hush: if n8n is down, Renovate PRs wait. Nothing is merged while the gate is down. Fail closed.
+
+
+## Amendment 2026-11-24: merge without a human, within the gate
+
+Accepted by Erik. See `ai-incident-remediation-pipeline.md` (amendment 2026-11-24) for the decision. This section changes the design above in these places:
+
+- **Merge regardless of human review.** A Renovate PR that passes the gate is merged by n8n. Erik does not merge it.
+- **Fix, then merge, within bounds.** A PR that is `fixable` gets one Claude patch, limited to the allowlist, at most 6 files and 60 lines. After CI passes on the patched commit, the loop runs again.
+- **At most five loops per PR.** The loop counter is kept per PR in n8n. After the fifth poll without a merge, the PR is escalated and left open.
+- **Denylist and CI path guard unchanged.** Any hit on the denylist is escalated, whatever Claude says.
+- **Deploy is not triggered by merge.** Merged changes reach the hosts through the scheduled daily deploy in Semaphore.

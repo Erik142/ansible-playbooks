@@ -6,5 +6,8 @@
     "tmp_path": "/tmp/semaphore",
     "cookie_hash": {{ semaphore_cookie_hash | to_json }},
     "cookie_encryption": {{ semaphore_cookie_encryption | to_json }},
-    "access_key_encryption": {{ semaphore_access_key_encryption | to_json }}
+    "access_key_encryption": {{ semaphore_access_key_encryption | to_json }}{% if semaphore_gotify_url | length > 0 %},
+    "gotify_alert": true,
+    "gotify_url": {{ semaphore_gotify_url | to_json }},
+    "gotify_token": {{ semaphore_gotify_token | to_json }}{% endif %}
 }

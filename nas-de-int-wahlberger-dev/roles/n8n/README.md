@@ -61,6 +61,18 @@ Requirements, all enforced by the config above:
 
 Compatibility: `tests/n8n-hook/run.sh <image>` runs the hook against an n8n image with the same checks as the manual test (owner setup, header login, unknown user, cookie flow). CI runs it against the pinned `n8n_image`, so a Renovate bump that breaks the hook fails CI before merge. If the hook stops loading, the hook logs `disabled` or errors, and API calls without the cookie return 401. Nothing gets through by accident.
 
+## Triage workflow (phase 2a)
+
+Design: `architecture/n8n-triage-workflow.md`. The workflow is `files/triage-workflow.json`, deployed to `{{ n8n_data_dir }}/triage-workflow.json`. Import is manual, because n8n has no declarative import at boot.
+
+One-time setup on the NAS (after deploy):
+
+1. Create the SSH credential in n8n's CLI import, from the vault key `vault_n8n_diag_ssh_key`, with id `n8ndiagssh01`, name `n8n-diag`, host `nas.de.int.wahlberger.dev`, port 22, user `n8n-diag`, `sshAuthenticateWith: privateKey`. The public half is `n8n_diag_public_key` (vars.yml), already authorised with the forced command.
+2. Import and activate the workflow with the n8n CLI in a one-off container on the same volume, with n8n stopped (`import:credentials`, `import:workflow`, `update:workflow --id=n8ntriage01 --active=true`). The CI harness `tests/n8n-triage/run.sh` does these steps.
+3. Hush: the webhook secret in ops (`hush_n8n_webhook`) must equal `vault_n8n_hush_secret` here. Hush's `notifications.webhook` and `remediation` config are in the spec.
+
+The Anthropic key is `vault_n8n_anthropic_key`. It is a placeholder until replaced.
+
 ## Manual steps before the first deploy
 
 1. Register a Pocket ID client with redirect URI
@@ -73,7 +85,7 @@ Compatibility: `tests/n8n-hook/run.sh <image>` runs the hook against an n8n imag
 
 - `db_dump` coverage: not added. btrfs snapshots are crash-consistent, but a
   logical dump would be cleaner. Decide in phase 2.
-- Hush webhook secret, remediation reply secret, diag SSH key, GitHub token,
+- Hush remediation reply secret (phase 2b, alert handoffs): diag SSH key, GitHub token,
   Anthropic key: phase 2.
 - `N8N_PUBLIC_API_DISABLED`: not set. Its documented meaning contradicts its name; verify on 2.47.4 first.
 - `N8N_RESTRICT_FILE_ACCESS_TO`: set to the data dir. Verify on the running version (subdirectory handling is reported as fiddly).

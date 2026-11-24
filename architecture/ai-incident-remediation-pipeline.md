@@ -113,3 +113,33 @@ flowchart LR
 - **Secret leakage** to a third-party LLM through logs. This repo already had a secret-logging audit fix (610feda). Redact on the host, inside `diag-bundle`.
 - **Loops and cost.** Container restarts from handlers re-fire monitors. Mitigations: a per-monitor cooldown in n8n, ignoring alerts during or shortly after a Semaphore task, and retries on the Uptime Kuma side.
 - **Assumptions to verify:** which LLM you use (cloud API or local), whether your n8n edition supports OIDC (otherwise put it behind oauth2-proxy the way `uptime_kuma` is), whether your Uptime Kuma version supports custom webhook headers, and which Semaphore role can read task output without being able to run tasks.
+
+---
+
+## Amendment 2026-11-24: bounded autonomy for Renovate PRs and a scheduled deploy
+
+Status: accepted by Erik, 2026-11-24. Amends the option-4 rejection above for one class of change only.
+
+### What changes
+- **Renovate PRs may be merged without a human, and Claude may propose and push a fix commit first.** This replaces the "Erik merges" step for Renovate PRs only. Incident remediation on hosts is unchanged: n8n still never runs a playbook or changes a host.
+- **The merge is still gated.** It happens only when every one of these holds on the same commit SHA: the deterministic classifier passes, Claude's structured review returns `safe` (or `fixed` after one patch), CI is green, and the merge uses the SHA that was reviewed.
+- **Hard denylist, human only, whatever the review says:** `**/vault.yml`, `.github/**`, `**/ssh_authorized_keys/**`, `roles/security/**`, `roles/firewall/**`, `roles/caddy/**`, `roles/zerotier/**`, `roles/podman/**`, `roles/semaphore/**`, the `pi-*` directory, and any major version update.
+- **Claude's patches are bounded:** only paths on the allowlist (role `defaults/`, `templates/`, `requirements.yml`), at most 6 files and 60 changed lines in total. Anything beyond that is escalated, not patched.
+- **At most five loops per PR.** Each loop is one poll. A PR that is still not mergeable after five loops is escalated and left open.
+- **Scheduled deploy in Semaphore.** Once a day, the playbooks are deployed on a schedule, rather than after each merge. This needs a scoped template with `common_upgrade=false` first (phase 3 plan, precondition 5). Without it, a daily deploy would run a full `zypper`/`apt` upgrade every day, which is the failure mode from 26 September.
+
+### What does not change
+- Hush's decisions stay as they are. Its escalate-only phase is unchanged.
+- No merge is triggered by a deploy, and no deploy is triggered by a merge.
+- The kill switch is an n8n toggle, with `"enabled": false` in `renovate.json` as the fallback.
+- Every decision is recorded: verdict, SHA, classifier result, merge result, and the loop number.
+
+### Why this is acceptable now
+- The reason the ADR gave against auto-merge, no branch protection on `master`, no longer applies. Protection with required CI checks is in place (2026-11-23), and `n8n-hook` was added on 2026-11-24.
+- Remaining risks are bounded by the denylist and the diff budget. A wrong call on an allowlisted change still needs green CI on the same SHA and can be reverted by a normal PR.
+
+### Accepted residual risk
+A bad upgrade that passes CI and sits within the allowlist can reach the hosts at the next daily deploy. Mitigation: the daily deploy runs a `--check` pass first, and a failed run raises an alert with the failing host and task.
+
+### Review
+Re-decide after the monitor-only period (phase 3 plan, §5). Record the result here as a new amendment.
