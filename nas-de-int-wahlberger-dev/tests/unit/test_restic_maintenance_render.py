@@ -66,7 +66,7 @@ def test_two_entries_render_one_complete_execstart_each_cloud_first():
     blocks = exec_starts(unit)
     old = exec_starts(GOLDEN.read_text())
 
-    assert len(blocks) == 2
+    assert len(blocks) == len([CLOUD, OPS])  # one ExecStart= per repository entry
     assert blocks[0] == old[0]
     assert blocks[1] == old[0].replace("--repo cloud", "--repo ops")
     assert "--keep-daily 7" in blocks[1] and "--keep-weekly 4" in blocks[1] and "--keep-monthly 6" in blocks[1]
@@ -82,8 +82,13 @@ def test_no_password_in_the_unit():
 
 def test_env_file_has_one_variable_per_repository():
     env_file = render("restic-maintenance.env.j2", [CLOUD, OPS])
-    lines = [line for line in env_file.splitlines() if not line.startswith("#")]
-    assert lines == ['RESTIC_PASSWORD_CLOUD="cloud-pw-not-a-secret"', 'RESTIC_PASSWORD_OPS="ops-pw-not-a-secret"']
+    assigned = dict(
+        line.split("=", 1) for line in env_file.splitlines() if line.strip() and not line.startswith("#")
+    )
+    # Exactly one variable per entry, named after its repo, holding its password (quoted).
+    assert set(assigned) == {f"RESTIC_PASSWORD_{r['repo'].upper()}" for r in (CLOUD, OPS)}
+    for r in (CLOUD, OPS):
+        assert assigned[f"RESTIC_PASSWORD_{r['repo'].upper()}"] == f'"{r["password"]}"'
 
 
 def test_env_file_escapes_and_maps_repo_names():
