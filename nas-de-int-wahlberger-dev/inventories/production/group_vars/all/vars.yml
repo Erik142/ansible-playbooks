@@ -254,7 +254,7 @@ forgejo_oidc_client_id: "e49c8dc5-2a21-4735-bf3b-cc3c8dadbf2e"
 # https://n8n.de.int.wahlberger.dev/oauth2/callback.
 # Until n8n_oidc_client_id is set, the n8n role's assert fails loudly.
 n8n_url: "https://n8n.de.int.wahlberger.dev"
-n8n_oidc_client_id: ""
+n8n_oidc_client_id: "cc5ff956-e839-4cb9-a4e8-727bbf16d582"
 n8n_encryption_key: "{{ vault_n8n_encryption_key | default('') }}"
 n8n_oidc_client_secret: "{{ vault_n8n_oidc_client_secret | default('') }}"
 n8n_oauth2_cookie_secret: "{{ vault_n8n_oauth2_cookie_secret | default('') }}"

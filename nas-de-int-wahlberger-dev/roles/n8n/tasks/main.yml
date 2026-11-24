@@ -7,9 +7,14 @@
       - n8n_oidc_client_secret | length > 0
       - n8n_encryption_key | length > 0
       - n8n_oauth2_cookie_secret | length > 0
+      # vault.yml.example ships REPLACE-* placeholders; never deploy one.
+      - not (n8n_oidc_client_secret | string) is match('REPLACE')
+      - not (n8n_encryption_key | string) is match('REPLACE')
+      - not (n8n_oauth2_cookie_secret | string) is match('REPLACE')
     fail_msg: >-
-      n8n is not fully configured. Empty inputs among n8n_url, n8n_oidc_client_id,
-      n8n_oidc_client_secret, n8n_encryption_key and n8n_oauth2_cookie_secret. Set
+      n8n is not fully configured. Empty inputs or REPLACE-* placeholders among
+      n8n_url, n8n_oidc_client_id, n8n_oidc_client_secret, n8n_encryption_key and
+      n8n_oauth2_cookie_secret. Set
       n8n_url and n8n_oidc_client_id in group_vars and the matching vault_n8n_* secrets
       in Ansible Vault (see vault.yml.example). See roles/n8n/README.md.
     quiet: true
