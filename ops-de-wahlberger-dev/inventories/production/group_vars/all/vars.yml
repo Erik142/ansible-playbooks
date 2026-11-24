@@ -199,6 +199,7 @@ hush_secrets:
   hush_source_hooks_cloud: "{{ vault_hush_source_hooks_cloud | default('') }}"
   hush_source_hooks_netcup: "{{ vault_hush_source_hooks_netcup | default('') }}"
   hush_n8n_webhook: "{{ vault_hush_n8n_webhook_secret | default('') }}"
+  hush_remediation_secret: "{{ vault_hush_remediation_secret | default('') }}"
   hush_source_truenas: "{{ vault_hush_source_truenas | default('') }}"
   hush_source_backup_ops: "{{ vault_hush_source_backup_ops | default('') }}"
   hush_source_backup_cloud: "{{ vault_hush_source_backup_cloud | default('') }}"

@@ -65,6 +65,7 @@ hush_secret_names:
   - hush_break_glass_hash
   - hush_metrics_token
   - hush_n8n_webhook
+  - hush_remediation_secret
 
 # --- Config (rendered to config.yaml) -----------------------------------------
 hush_timezone: Europe/Berlin
@@ -259,7 +260,7 @@ hush_config:
     webhook:
       url: https://n8n.de.int.wahlberger.dev/webhook/hush
       secret: /run/secrets/hush_n8n_webhook
-      timeout: 10
+      timeout: 10s
       attempts: 3
     # Non-critical mails wait until 07:00 and go out as one batch (failsafe, always_notify
     # and critical events are never held).
@@ -285,6 +286,9 @@ hush_config:
   remediation:
     enabled: true
     routes: []
+    # Replies from n8n (phase 2b, alert handoffs). Required while enabled.
+    reply_url: https://hush.de.int.wahlberger.dev/ingest/remediation
+    secret: /run/secrets/hush_remediation_secret
   dashboard:
     public_url: "{{ hush_dashboard_base_url }}"
     login:

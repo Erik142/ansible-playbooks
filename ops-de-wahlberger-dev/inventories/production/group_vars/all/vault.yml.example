@@ -59,3 +59,5 @@ vault_hush_break_glass_hash: ""
 vault_hush_anthropic_key: ""
 vault_hush_resend_key: ""
 vault_hush_oidc_secret: ""
+# Reply secret for n8n's alert replies (phase 2b). Generate with: openssl rand -hex 32
+vault_hush_remediation_secret: ""
