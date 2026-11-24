@@ -14,7 +14,7 @@ lab_grab_registry_token: ""
 
 lab_grab_db_image: "docker.io/library/postgres:16-alpine"
 lab_grab_redis_image: "docker.io/library/redis:7-alpine"
-lab_grab_coordinator_image: "docker.io/labgrid/coordinator:v25.0.1"
+lab_grab_coordinator_image: "docker.io/labgrid/coordinator:v26.0.1"
 lab_grab_exporter_image: "docker.io/labgrid/exporter:v26.0.1"
 
 lab_grab_data_dir: /mnt/containers/lab-grab
