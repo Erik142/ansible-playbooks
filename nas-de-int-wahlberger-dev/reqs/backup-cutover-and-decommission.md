@@ -78,8 +78,8 @@ See [backup-overview.md](backup-overview.md#actors). Main actors here: the owner
 - BD-FR-135 [Must]: `site.yml` shall list `btrbk` after `db_dump` and `backup_disk`.
 - BD-FR-136 [Must]: Each `site.yml` entry for `backup_disk`, `btrbk`, `db_dump`, `restic_server` and `restic_backup_decommission` shall carry `tags: [<role name>]`.
 - BD-FR-137 [Must]: The encrypted `vault.yml` shall contain `vault_restic_server_cloud_htpasswd_password` and `vault_restic_server_cloud_repo_password`.
-- BD-FR-138 [Must]: `vars.yml` shall define `restic_server_clients` as the single entry `{username: cloud, password: "{{ vault_restic_server_cloud_htpasswd_password | default('') }}"}`.
-- BD-FR-139 [Must]: `vars.yml` shall define `restic_server_maintenance_repo_password: "{{ vault_restic_server_cloud_repo_password | default('') }}"`.
+- BD-FR-138 [Must]: `vars.yml` shall define `restic_server_clients` as two entries, in this order: `{username: cloud, password: "{{ vault_restic_server_cloud_htpasswd_password | default('') }}"}` and `{username: ops, password: "{{ vault_restic_server_ops_htpasswd_password | default('') }}"}`. The `ops` entry is added by SH-CC-02 (pull request B of the Semaphore migration).
+- BD-FR-139 [Must]: `vars.yml` shall define `restic_server_maintenance_repos` as a list of `{repo, password}` entries: `cloud` with `"{{ vault_restic_server_cloud_repo_password | default('') }}"` and `ops` with `"{{ vault_restic_server_ops_repo_password | default('') }}"`. This replaces the single `restic_server_maintenance_repo_password` and is set by SH-CC-01 (pull request B2 of the Semaphore migration). The singular variables shall not be defined.
 - BD-FR-140 [Must]: `vault.yml.example` shall contain a placeholder for each BD-FR-137 key, commented with the cloud-wahlberger-dev key whose value it must equal (BD-BR-09).
 - BD-FR-141 [Must]: `vars.yml` shall define `restic_server_allowed_sources: ["10.10.0.0/16", "10.243.0.0/16"]` and derive `firewall_rich_rules` from it, with a comment naming the home LAN and ZeroTier ranges and stating that the rule port must equal `restic_server_port`.
 - BD-FR-142 [Must]: Each new role (`backup_disk`, `btrbk`, `db_dump`, `restic_server`, `restic_backup_decommission`) shall declare every variable of its `defaults/main.yml` in `meta/argument_specs.yml`, with `type` and `description`.
@@ -170,7 +170,7 @@ Scenario BD-AC-09 [S]: Vars, vault and flag wiring (BD-FR-17, BD-FR-45, BD-FR-84
 - And `disk_space_paths` lists `/`, `/mnt/data`, `/mnt/containers` and `/mnt/backup/btrbk` (BD-FR-45)
 - And `grep -nE '^\s*restic_backup_' vars.yml` prints nothing (BD-FR-84)
 - And the NAS `vault.yml` has the two BD-FR-85 keys and the two BD-FR-137 keys, and `vault.yml.example` has placeholders for all four, with the BD-FR-86 and BD-FR-140 comments
-- And `vars.yml` defines `restic_server_clients` and `restic_server_maintenance_repo_password` exactly as BD-FR-138 and BD-FR-139 state
+- And `vars.yml` defines `restic_server_clients` and `restic_server_maintenance_repos` exactly as BD-FR-138 and BD-FR-139 state
 - And `restic_server_allowed_sources` is `["10.10.0.0/16", "10.243.0.0/16"]`, and `firewall_rich_rules` evaluates to one BD-FR-109 rule per entry, with the BD-FR-141 comment
 - And the decrypted values meet both BD-BR-09 equalities
 

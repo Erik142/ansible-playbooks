@@ -56,7 +56,7 @@ Terms:
   - `storage_mounts`;
   - `db_dump_postgres` (a single `fixture` entry) and `db_dump_forgejo_db_path`;
   - `restic_server_allowed_sources` (the VM network's CIDR plus a dedicated test Podman network CIDR);
-  - test values for `restic_server_clients`, `restic_server_maintenance_repo_password` and `notify_failure_resend_api_key`;
+  - test values for `restic_server_clients`, `restic_server_maintenance_repos` and `notify_failure_resend_api_key`;
   - `backup_disk_freshness_checks`;
   - both cut-over flags set to `true`, except where a scenario sets them.
 - **Alert raised**: on [V], the `notify-failure-immediate@<unit>.service` (or `notify-failure@`) instance for the failing unit ran (`journalctl`). On [H], the email arrives at `notify_failure_to_address`.
