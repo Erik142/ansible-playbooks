@@ -68,4 +68,8 @@ semaphore_oidc_client_secret: ""
 semaphore_admin_password: ""
 semaphore_access_key_encryption: ""
 semaphore_cookie_hash: ""
+# Gotify server channel (Semaphore alerts). Empty = not configured. Points at Hush's Gotify
+# receiver once it exists (architecture: n8n/hush Semaphore adapter).
+semaphore_gotify_url: ""
+semaphore_gotify_token: ""
 semaphore_cookie_encryption: ""
