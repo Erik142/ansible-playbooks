@@ -9,7 +9,7 @@
 
 # Pinned exact tag. Stable line per the n8n changelog (2.47.4, 2026-11-23).
 # Do not use `latest`. Renovate proposes minor/patch bumps; majors stay manual.
-n8n_image: docker.io/n8nio/n8n:2.47.4
+n8n_image: docker.io/n8nio/n8n:3.3.0
 
 # Host layout under /mnt/containers (restic/btrbk-covered like the other containers):
 #   <n8n_data_dir>/n8n.env            root-only env file (encryption key)
