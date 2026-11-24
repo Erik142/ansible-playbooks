@@ -64,6 +64,38 @@ def test_ac01_site_yml_defects(repo, old, new, needle):
     must_fail(repo, "SH-AC-01", needle)
 
 
+SPEC = "semaphore-migration/reqs/semaphore-to-hetzner.md"
+
+
+RESTIC_ENTRY = "    - role: restic_backup\n      tags: [restic_backup]\n"
+
+
+def test_ac01_role_missing_from_site_yml(repo):
+    repo.edit(V + "/site.yml", RESTIC_ENTRY, "")
+    must_fail(repo, "SH-AC-01", "only in spec ['restic_backup']")
+
+
+def test_ac01_role_added_to_site_yml_without_spec(repo):
+    repo.edit(V + "/site.yml", RESTIC_ENTRY, RESTIC_ENTRY + "    - role: extra_role\n      tags: [extra_role]\n")
+    must_fail(repo, "SH-AC-01", "only in site.yml ['extra_role']")
+
+
+def test_ac01_spec_is_the_source_new_role_in_spec(repo):
+    # The spec names a role that site.yml does not wire: the spec, not this script, decides.
+    repo.edit(SPEC, "`restic_backup`.\n  - Amendment 2026-10-24", "`restic_backup`, `extra_role`.\n  - Amendment 2026-10-24")
+    must_fail(repo, "SH-AC-01", "only in spec ['extra_role']")
+
+
+def test_ac01_spec_amendment_removed(repo):
+    repo.edit(SPEC, "  - Amendment 2026-11-24: `hush_recovery` added", "  - Amendment 2026-11-24: nothing")
+    must_fail(repo, "SH-AC-01", "only in site.yml ['hush_recovery']")
+
+
+def test_ac01_duplicate_role(repo):
+    repo.edit(V + "/site.yml", RESTIC_ENTRY, RESTIC_ENTRY + RESTIC_ENTRY)
+    must_fail(repo, "SH-AC-01", "more than once")
+
+
 def test_ac01_second_host(repo):
     repo.edit(V + "/inventories/production/hosts.yml", "        ops.de.wahlberger.dev:\n",
               "        ops.de.wahlberger.dev:\n        other.example.org:\n")
@@ -432,9 +464,9 @@ def test_regex_guard_catches_the_old_unanchored_regex(repo, d):
 # --- SH-AC-45 ------------------------------------------------------------------
 def test_ac45_validate_removed(repo):
     p = repo.ops / "roles/security/tasks/sshd.yml"
-    text = p.read_text()
-    assert "    validate:" in text
-    p.write_text(text.replace("    validate:", "    x_validate:", 1))
+    text, n = re.subn(r"^(\s*)validate:", r"\1x_validate:", p.read_text(), count=1, flags=re.M)
+    assert n == 1, "fixture drift: sshd.yml has no validate: key to remove"
+    p.write_text(text)
     must_fail(repo, "SH-AC-45", "without `validate")
 
 
@@ -540,18 +572,39 @@ def test_fr97_skipped_after_step7(repo):
 
 
 # --- SH-FR-205 -----------------------------------------------------------------
+FAKE_TOKEN = "Qz3vK9mP2xL7nR4tB8wY1cF6hJ0sD5gA"   # 32 URL-safe characters, token-shaped
+
+
 @pytest.mark.parametrize("rel,text", [
-    (V + "/roles/zerotier/defaults/main.yml", "zerotier_central_api_token: abc\n"),
-    (V + "/vars/x.yml", "ZT_TOKEN: abc\n"),
-    (V + "/README.md.extra.md", "ZT_TOKEN=abc\n"),
+    (V + "/roles/zerotier/defaults/main.yml", "zerotier_central_api_token: %s\n" % FAKE_TOKEN),
+    (V + "/vars/x.yml", "ZT_TOKEN: %s\n" % FAKE_TOKEN),
+    (V + "/config/zt.json", '{"zerotier_token": "%s"}\n' % FAKE_TOKEN),
+    (V + "/README.md.extra.md", "ZT_TOKEN=abc\n"),   # Markdown: caught by the assignment check
 ])
 def test_fr205_token_found(repo, rel, text):
     repo.write(rel, text)
     must_fail(repo, "SH-FR-205", rel.split("/")[-1] if rel.endswith(".md") else rel)
 
 
+# The false positive this check used to report: a Renovate denylist regex and an
+# unrelated word on one line. Neither is an assignment of a token value.
+RENOVATE_LIKE = '{"ignorePaths": ["zerotier.*"], "tokenRotation": "weekly"}\n'
+
+
+def test_fr205_renovate_json_is_not_matched(repo):
+    repo.write(V + "/renovate-extra.json", RENOVATE_LIKE)
+    rc, out = repo.static("SH-FR-205")
+    assert status(out, "SH-FR-205") == "PASS", out
+
+
 def test_fr205_prose_in_markdown_is_fine(repo):
     repo.write(V + "/roles/zerotier/README.md", "No API token is used: a deliberate ZeroTier design choice.\n")
+    rc, out = repo.static("SH-FR-205")
+    assert status(out, "SH-FR-205") == "PASS", out
+
+
+def test_fr205_prose_in_code_comment_is_fine(repo):
+    repo.write(V + "/roles/zerotier/tasks/main.yml", "# the zerotier token is set by hand in Central\n")
     rc, out = repo.static("SH-FR-205")
     assert status(out, "SH-FR-205") == "PASS", out
 
@@ -582,8 +635,11 @@ def test_br16_runs_boundary_check(repo):
 
 
 def test_exit_code_is_nonzero_on_any_fail_and_zero_when_only_skips(repo):
-    rc, out = repo.static("SH-AC-17v,SH-AC-43,SH-BR-16")
-    assert rc == 0 and sum(l.startswith("SKIPPED") for l in out.splitlines()) == 3, out
+    ids = ["SH-AC-17v", "SH-AC-43", "SH-BR-16"]
+    rc, out = repo.static(",".join(ids))
+    assert rc == 0, out
+    for ident in ids:
+        assert status(out, ident) == "SKIPPED", out
     repo.edit(OPS_VARS, "https://semaphore.de.int.wahlberger.dev", "https://wrong.example.org")
     rc, out = repo.static("SH-AC-17v,SH-AC-17")
     assert rc == 1, out
