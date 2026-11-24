@@ -36,7 +36,7 @@ See [backup-overview.md](backup-overview.md#actors). Main actors here: rest-serv
 - BD-FR-100 [Must]: The `restic_server` role shall install, with `community.general.zypper`, the passlib package that matches the Python interpreter Ansible uses on the host.
 - BD-FR-101 [Must]: If `restic_server_clients` is empty, then the `restic_server` role shall fail before any change, with a message naming `restic_server_clients` and `roles/restic_server/README.md`.
 - BD-FR-102 [Must]: If a `restic_server_clients` entry has an empty password, then the `restic_server` role shall fail before any change, with a message naming that entry's username.
-- BD-FR-103 [Must]: If `restic_server_maintenance_repo_password` is empty, then the `restic_server` role shall fail before any change, with a message naming that variable.
+- BD-FR-103 [Must]: If a `restic_server_maintenance_repos` entry has an empty password, then the `restic_server` role shall fail before any change, with a message naming that entry's repo.
 - BD-FR-104 [Must]: When a `restic_server_clients` password changes, the new password shall authenticate within 60 s after the applying run ends.
 - BD-FR-105 [Must]: When a `restic_server_clients` password changes, the old password shall get HTTP 401 within 60 s after the applying run ends.
 - BD-FR-106 [Must]: The `restic_server` role shall install the `restic` package on the host.
@@ -92,11 +92,10 @@ See [backup-overview.md](backup-overview.md#actors). Main actors here: rest-serv
 | `restic_server_port` | int | no | Default `8000` |
 | `restic_server_allowed_sources` | list of CIDR | yes | Production `["10.10.0.0/16", "10.243.0.0/16"]` (home LAN, ZeroTier; BD-A-04) |
 | `restic_server_user` | str | no | Default `restic-server` |
-| `restic_server_clients` | list of `{username, password}` | yes | Production: one entry, `cloud` (BD-FR-138) |
+| `restic_server_clients` | list of `{username, password}` | yes | Production: `cloud` and `ops` (BD-FR-138, SH-CC-02) |
 | `restic_server_private_repos` / `restic_server_append_only` | bool | no | Defaults `true` / `true` |
 | `restic_server_max_size_bytes` | int | no | Default `107374182400` |
-| `restic_server_maintenance_repo` | str | no | Default `cloud` |
-| `restic_server_maintenance_repo_password` | str | yes | From `vault_restic_server_cloud_repo_password` (BD-BR-09) |
+| `restic_server_maintenance_repos` | list of `{repo, password}` | yes | Production: `cloud` and `ops`, each password from its own Vault key (BD-FR-139, SH-CC-01, BD-BR-09). The former singular `restic_server_maintenance_repo` and `_password` are rejected |
 | `restic_server_maintenance_keep_daily` / `_keep_weekly` / `_keep_monthly` | int | no | Defaults `7` / `4` / `6` |
 | `restic_server_maintenance_check_read_data_subset` | str | no | Default `10%` |
 | `restic_server_maintenance_retry_lock` | str | no | Default `30m` |
@@ -159,7 +158,7 @@ Scenario BD-AC-40 [V]: Data directory, htpasswd, labels and secrets (BD-FR-94, B
 Scenario Outline BD-AC-41 [V]: Missing rest-server inputs fail before any change (BD-FR-101 to BD-FR-103)
 - When the operator runs `site.yml --tags restic_server -e '<override>'`
 - Then the play fails before any `restic_server` task reports `changed`, with a message naming `<named>`
-- Examples: `restic_server_clients=[]` names `restic_server_clients` and `roles/restic_server/README.md`; a `cloud` entry with an empty password names `cloud`; `restic_server_maintenance_repo_password=""` names that variable
+- Examples: `restic_server_clients=[]` names `restic_server_clients` and `roles/restic_server/README.md`; a `cloud` entry with an empty password names `cloud`; `restic_server_maintenance_repos=[{repo: cloud, password: ""}]` names `cloud`
 
 Scenario BD-AC-42 [V]: Authentication and repository isolation (BD-FR-89, BD-FR-98)
 - Given the VM's client has run `restic init` on `rest:http://cloud:<pw>@<VM IP>:8000/cloud/`
