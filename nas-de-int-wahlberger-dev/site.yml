@@ -95,6 +95,10 @@
     # before db_dump, which dumps its database.
     - role: forgejo
       tags: [forgejo]
+    # n8n editor behind oauth2-proxy + Caddy (phase 1, no workflows). After caddy
+    # (creates caddy.network) and forgejo. See roles/n8n/README.md.
+    - role: n8n
+      tags: [n8n]
     # Dashboard linking this NAS's and cloud-wahlberger-dev's services.
     - role: homepage
       tags: [homepage]

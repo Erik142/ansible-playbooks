@@ -1,0 +1,15 @@
+---
+# daemon_reload: true for the same reason as roles/forgejo/handlers/main.yml: on a
+# first-ever run this can execute before the container role's own restart handler,
+# and Quadlet units only exist for systemd after a daemon-reload.
+- name: Restart n8n
+  ansible.builtin.systemd:
+    name: n8n.service
+    state: restarted
+    daemon_reload: true
+
+- name: Restart oauth2-proxy
+  ansible.builtin.systemd:
+    name: oauth2-proxy.service
+    state: restarted
+    daemon_reload: true

@@ -1,0 +1,76 @@
+---
+argument_specs:
+  main:
+    short_description: n8n workflow automation (editor only) behind Caddy, with Pocket ID login via oauth2-proxy.
+    options:
+      n8n_image:
+        type: str
+        required: false
+        description: Pinned n8n container image (exact tag, not latest).
+      n8n_data_dir:
+        type: path
+        required: false
+        description: Host directory for the env files and the data volume.
+      n8n_volume_dir:
+        type: path
+        required: false
+        description: Host directory mounted at /home/node/.n8n.
+      n8n_uid:
+        type: int
+        required: false
+        description: uid the n8n image runs as; owner of n8n_volume_dir.
+      n8n_gid:
+        type: int
+        required: false
+        description: gid the n8n image runs as; group of n8n_volume_dir.
+      n8n_timezone:
+        type: str
+        required: false
+        description: Timezone for n8n (GENERIC_TIMEZONE and TZ).
+      n8n_port:
+        type: int
+        required: false
+        description: Port n8n listens on inside caddy.network.
+      n8n_url:
+        type: str
+        required: true
+        description: Public https URL of the editor (the Caddy vhost host).
+      n8n_memory_max:
+        type: str
+        required: false
+        description: systemd MemoryMax for the n8n unit.
+      n8n_cpu_quota:
+        type: str
+        required: false
+        description: systemd CPUQuota for the n8n unit.
+      n8n_nodes_exclude:
+        type: str
+        required: false
+        description: JSON array of node types n8n refuses to load (NODES_EXCLUDE).
+      n8n_encryption_key:
+        type: str
+        required: true
+        no_log: true
+        description: Encrypts every stored n8n credential. Losing it loses them all.
+      n8n_oauth2_proxy_image:
+        type: str
+        required: false
+        description: oauth2-proxy container image.
+      n8n_oauth2_proxy_port:
+        type: int
+        required: false
+        description: Port oauth2-proxy listens on inside caddy.network.
+      n8n_oidc_client_id:
+        type: str
+        required: true
+        description: Pocket ID OIDC client ID for the editor.
+      n8n_oidc_client_secret:
+        type: str
+        required: true
+        no_log: true
+        description: Pocket ID OIDC client secret for the editor.
+      n8n_oauth2_cookie_secret:
+        type: str
+        required: true
+        no_log: true
+        description: oauth2-proxy cookie secret (16, 24 or 32 bytes).

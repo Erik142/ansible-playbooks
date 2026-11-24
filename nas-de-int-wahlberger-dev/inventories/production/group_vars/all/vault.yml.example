@@ -118,3 +118,15 @@ vault_garage_admin_token: "REPLACE-with-a-generated-token"
 
 # --- Hush (notify_failure failure path) ----------------------------------------
 vault_hush_source_hooks_nas: ""
+
+# --- n8n (phase 1: editor only) -----------------------------------------------
+# Encryption key for n8n's stored credentials. Losing it loses every credential
+# n8n holds, so keep a second copy in 1Password. Generate once, never rotate
+# casually (rotating it orphans existing credentials).
+#     openssl rand -hex 32
+vault_n8n_encryption_key: "REPLACE-with-generated-hex-key"
+# Pocket ID OIDC client secret for the n8n editor (client_id lives in vars.yml).
+vault_n8n_oidc_client_secret: "REPLACE-with-pocket-id-client-secret"
+# oauth2-proxy cookie secret: exactly 16, 24 or 32 bytes.
+#     openssl rand -hex 16
+vault_n8n_oauth2_cookie_secret: "REPLACE-with-32-char-hex-string"
