@@ -25,11 +25,11 @@ PULLS = [
      "head": {"ref": "renovate/pending", "sha": "eee555"}},
 ]
 FILES = {
-    7: [{"filename": "roles/n8n/defaults/main.yml", "additions": 1, "deletions": 1,
+    7: [{"filename": "nas-de-int-wahlberger-dev/roles/n8n/defaults/main.yml", "additions": 1, "deletions": 1,
          "patch": "@@ -1 +1 @@\n-n8n_image: docker.io/n8nio/n8n:2.48.7\n+n8n_image: docker.io/n8nio/n8n:2.48.8"}],
     8: [{"filename": "roles/n8n/defaults/main.yml", "additions": 1, "deletions": 1, "patch": "major"}],
-    10: [{"filename": "roles/security/tasks/main.yml", "additions": 2, "deletions": 2, "patch": "x"}],
-    11: [{"filename": "roles/forgejo/defaults/main.yml", "additions": 1, "deletions": 1, "patch": "x"}],
+    10: [{"filename": "nas-de-int-wahlberger-dev/roles/security/tasks/main.yml", "additions": 2, "deletions": 2, "patch": "x"}],
+    11: [{"filename": "nas-de-int-wahlberger-dev/roles/forgejo/defaults/main.yml", "additions": 1, "deletions": 1, "patch": "x"}],
 }
 CHECKS = {
     "aaa111": [{"name": "validate", "status": "completed", "conclusion": "success"},

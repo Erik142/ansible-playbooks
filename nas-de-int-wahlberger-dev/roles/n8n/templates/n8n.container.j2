@@ -13,7 +13,7 @@ Network=caddy.network
 # No PublishPort: Caddy reaches n8n:{{ n8n_port }} over caddy.network.
 Volume={{ n8n_volume_dir }}:/home/node/.n8n:Z
 # The encryption key file, read through N8N_ENCRYPTION_KEY_FILE (see the n8n role's tasks).
-Volume={{ n8n_data_dir }}/encryption.key:/run/secrets/n8n_encryption_key:ro
+Volume={{ n8n_data_dir }}/encryption.key:/run/secrets/n8n_encryption_key:ro,Z
 Environment=TZ={{ n8n_timezone }}
 Environment=GENERIC_TIMEZONE={{ n8n_timezone }}
 Environment=N8N_HOST={{ n8n_url | urlsplit('hostname') }}

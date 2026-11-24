@@ -51,6 +51,11 @@
         description: Lab bench reservations and Labgrid coordinator
         # See the tandoor ping comment above — same hairpin, same fix.
         ping: "http://lab-grab:8000"
+    - n8n:
+        href: "{{ n8n_url }}"
+        description: Workflow automation (editor, behind Pocket ID)
+        # See the tandoor ping comment above. n8n shares caddy.network with homepage.
+        ping: "http://n8n:5678"
 
 - ops.de.wahlberger.dev:
     - Semaphore UI:
