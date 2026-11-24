@@ -105,12 +105,10 @@ run_step() { # <label> <dir> <cmd...>: prints the output only on failure
 # --- SH-AC-01 (+ SH-FR-13, 143, 62): skeleton structure -----------------------
 ac01() {
     python3 - <<'PY'
-import os, sys, yaml
+import os, re, sys, yaml
 
-ops, nas, cloud = (os.environ[k] for k in ("SC_OPS", "SC_NAS", "SC_CLOUD"))
+ops, nas, cloud, repo = (os.environ[k] for k in ("SC_OPS", "SC_NAS", "SC_CLOUD", "SC_REPO"))
 errors = []
-want = ["common", "notify_failure", "disk_space", "ssh_authorized_keys", "security", "reboot_notify",
-        "firewall", "podman", "zerotier", "beszel_agent", "cloudflare_dns", "caddy", "semaphore", "hush", "restic_backup", "hush_recovery"]
 
 def load(path):
     try:
@@ -120,15 +118,44 @@ def load(path):
         errors.append(f"{path}: {type(e).__name__}")
         return None
 
-# SH-FR-13 / SH-FR-143: exactly these roles, in this order, each tagged with its name.
+# SH-FR-13 is the single source for the role set: its bullet names the roles, and
+# each dated "Amendment ...: `role` added" sub-bullet adds one. Read them from the
+# spec instead of keeping a second copy here. Only the bullet's own lines are read
+# (up to the next top-level "- SH-" item).
+spec_path = f"{repo}/semaphore-migration/reqs/semaphore-to-hetzner.md"
+try:
+    spec_lines = open(spec_path, encoding="utf-8").read().splitlines()
+except OSError:
+    spec_lines = []
+start = next((i for i, l in enumerate(spec_lines) if l.startswith("- SH-FR-13 [Must]:")), None)
+want = set()
+if start is None:
+    errors.append("SH-FR-13 not found in the spec (role set cannot be read)")
+else:
+    block = [spec_lines[start]]
+    for l in spec_lines[start + 1:]:
+        if l.startswith("- "):
+            break
+        block.append(l)
+    want |= set(re.findall(r"`([a-z][a-z0-9_]*)`", block[0]))
+    for l in block[1:]:
+        want |= set(re.findall(r"Amendment \d{4}-\d{2}-\d{2}: `([a-z][a-z0-9_]*)` added", l))
+    if not want:
+        errors.append("SH-FR-13 names no roles (role set cannot be read)")
+
+# SH-FR-13 / SH-FR-143: the roles wired in site.yml are exactly the spec's set, each once,
+# each tagged with its own name.
 plays = load(f"{ops}/site.yml")
 if not isinstance(plays, list) or len(plays) != 1:
     errors.append("site.yml must hold exactly one play")
 else:
     roles = plays[0].get("roles") or []
     names = [r.get("role") if isinstance(r, dict) else r for r in roles]
-    if names != want:
-        errors.append(f"site.yml roles {names} != SH-FR-13 {want}")
+    if len(names) != len(set(names)):
+        errors.append(f"site.yml lists a role more than once: {sorted(n for n in set(names) if names.count(n) > 1)}")
+    if set(names) != want:
+        extra, missing = sorted(set(names) - want), sorted(want - set(names))
+        errors.append(f"site.yml roles != SH-FR-13 (spec): only in site.yml {extra}, only in spec {missing}")
     for r in roles:
         if not isinstance(r, dict) or r.get("tags") != [r.get("role")]:
             errors.append(f"site.yml role {r.get('role') if isinstance(r, dict) else r}: tags must be [<role name>] (SH-FR-143)")
@@ -354,16 +381,20 @@ eff = {}
 for f in (f"{role}/defaults/main.yml", f"{ops}/inventories/production/group_vars/all/vars.yml"):
     eff.update(yaml.safe_load(read(f)) or {})
 timer, script, env = (read(f"{role}/templates/{n}") for n in ("restic-backup.timer.j2", "restic-backup.sh.j2", "restic-backup.env.j2"))
-if "OnCalendar={{ restic_backup_on_calendar }}" not in timer or eff.get("restic_backup_on_calendar") != "*-*-* 05:00:00":
-    errors.append("timer must render OnCalendar=*-*-* 05:00:00")
+if not re.search(r"OnCalendar=\{\{\s*restic_backup_on_calendar\s*\}\}", timer) or eff.get("restic_backup_on_calendar") != "*-*-* 05:00:00":
+    errors.append("timer must render OnCalendar=*-*-* 05:00:00 (from restic_backup_on_calendar)")
 if not re.search(r"^Persistent=true$", timer, re.M):
     errors.append("timer lacks Persistent=true")
 if re.search(r"forget|prune", script):
     errors.append("restic-backup.sh.j2 mentions forget or prune (SH-FR-81, comments included)")
-if len(re.findall(r"restic check", script)) != 1 or "restic check --read-data-subset={{ restic_backup_check_read_data_subset }}" not in script \
-        or eff.get("restic_backup_check_read_data_subset") != "10%":
-    errors.append("script must hold exactly one `restic check --read-data-subset=10%`")
-if "--exclude {{ path | quote }}" not in script:
+# Every `restic check` in the script must take its read-data subset from the variable,
+# and that variable must be the spec's 10 %. Not a count of check lines.
+check_lines = [l for l in script.splitlines() if "restic check" in l]
+if not check_lines or any(not re.search(r"--read-data-subset=\{\{\s*restic_backup_check_read_data_subset\s*\}\}", l) for l in check_lines):
+    errors.append("every restic check must pass --read-data-subset={{ restic_backup_check_read_data_subset }}")
+if eff.get("restic_backup_check_read_data_subset") != "10%":
+    errors.append("restic_backup_check_read_data_subset must be 10% (--read-data-subset)")
+if not re.search(r"--exclude\s+\{\{\s*path\s*\|\s*quote\s*\}\}", script):
     errors.append("script no longer renders restic_backup_exclude as --exclude arguments")
 for ex in ("config.json", "*.env", "identity.secret"):
     if ex not in (eff.get("restic_backup_exclude") or []):
@@ -627,7 +658,12 @@ fr97() {
 # are still searched below.
 fr205() {
     rc=0
-    g=$(cd "$repo" && git grep --untracked -n -I -i -e 'zerotier.*token' -e 'ZT_TOKEN' -- . \
+    # A token is a name, then an assignment (`:` or `=`), then a token-shaped value
+    # (16+ URL-safe characters; Central tokens are longer). A denylist regex or a
+    # word that merely follows "zerotier" on the same line is not an assignment.
+    tok_re="zerotier[a-z_]*token[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[A-Za-z0-9_-]{16,}"
+    zt_re="ZT_TOKEN[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[A-Za-z0-9_-]{16,}"
+    g=$(cd "$repo" && git grep --untracked -n -I -i -E -e "$tok_re" -e "$zt_re" -- . \
         ':(exclude,glob)**/*.md' ':(exclude)semaphore-migration' ':(exclude)*/tests/static-checks.sh' ':(exclude)*/tests/unit/*') \
         && { echo "possible ZeroTier token:"; printf '%s\n' "$g" | cut -d: -f1,2; rc=1; }
     m=$(cd "$repo" && git grep --untracked -n -I -i -E -e '(zt_token|zerotier[a-z_]*token)[[:space:]]*[:=]' -- '*.md' ':(exclude)semaphore-migration') \

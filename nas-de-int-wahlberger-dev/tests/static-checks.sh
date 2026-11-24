@@ -285,9 +285,12 @@ m = re.search(re.sub(r"\(\?<(\w+)>", r"(?P<\1>", pattern),
               open("roles/restic_server/defaults/main.yml").read())
 if not m:
     sys.exit("restic_server_image line does not match the first renovate.json custom manager")
-if (m["depName"], m["currentValue"]) != ("docker.io/restic/rest-server", "0.14.0"):
-    sys.exit(f"matched depName={m['depName']} currentValue={m['currentValue']}; "
-             "expected docker.io/restic/rest-server 0.14.0")
+# The invariant: the pin is detected as rest-server and carries a version. The
+# version itself is Renovate's to change, so it is not compared to a fixed value.
+if m["depName"] != "docker.io/restic/rest-server":
+    sys.exit(f"matched depName={m['depName']}; expected docker.io/restic/rest-server")
+if not re.fullmatch(r"\d+\.\d+\.\d+", m["currentValue"]):
+    sys.exit(f"currentValue={m['currentValue']} is not an x.y.z version")
 PY
 }
 
