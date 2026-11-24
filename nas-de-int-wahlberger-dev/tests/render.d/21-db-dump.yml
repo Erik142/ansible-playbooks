@@ -26,6 +26,8 @@ render_items:
       - "^TIMEOUT_SECONDS=1800$"
       - "^dump_postgres fixture fixture-postgres fixture fixture$"
       - "^dump_sqlite forgejo /mnt/containers/forgejo/volume/data/forgejo\\.db$"
+      - "^dump_sqlite n8n /mnt/containers/n8n/data/database\\.sqlite 1000$"
+      - 'install -m 0644 -o "\$app_uid" -g "\$app_uid" /dev/null'
       - '(?s)\A(?!.*fixture-postgres-not-a-secret)'
   - role: db_dump
     src: db-dump.sh.j2

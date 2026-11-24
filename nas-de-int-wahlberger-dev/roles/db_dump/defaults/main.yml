@@ -45,6 +45,11 @@ db_dump_postgres:
 # sqlite3 into db_dump_dir/forgejo.db. Must match Forgejo's [database] PATH.
 db_dump_forgejo_db_path: "{{ forgejo_volume_dir }}/data/forgejo.db"
 
+# n8n's SQLite file (WAL mode) on the host, and its uid (roles/n8n, n8n_uid). The dump
+# pre-creates the -wal/-shm files owned by that uid; see the template.
+db_dump_n8n_db_path: "/mnt/containers/n8n/data/database.sqlite"
+db_dump_n8n_uid: 1000
+
 # Upper limit for EACH dump command; a dump that runs longer is stopped and
 # counts as failed (BD-FR-73). Format: <integer><s|sec|m|min|h>.
 db_dump_timeout: 30min
