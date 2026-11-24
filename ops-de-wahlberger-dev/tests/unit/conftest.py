@@ -121,6 +121,8 @@ def template_repo(tmp_path_factory):
     for d in (N, C):
         for rel in COPY_OTHER:
             _copy(REAL / d, root / d, rel)
+    # SH-AC-01 reads the role set from the spec (SH-FR-13), so the fixture needs it too.
+    _copy(REAL, root, "semaphore-migration/reqs/semaphore-to-hetzner.md")
     # The baseline is "stage A": the three ZeroTier values empty, whatever the real
     # tree ships today (pull request A2 sets them). The tests below edit these lines.
     ops_vars = root / V / "inventories/production/group_vars/all/vars.yml"
