@@ -61,6 +61,31 @@
         label: "{{ item.dest }}"
       tags: [render]
 
+    # Assert patterns may name production variables ({{ semaphore_url | regex_escape }}).
+    # Data read from a file is not re-templated, so the patterns are written out, one per
+    # line, as one template source and rendered in a single task with the production
+    # variables loaded. The assert stage reads line N for assert N (same order).
+    - name: Load the production variables for the assert patterns
+      ansible.builtin.include_vars:
+        file: "{{ render_check_ops_dir }}/inventories/production/group_vars/all/vars.yml"
+      tags: [render]
+
+    - name: Write the assert patterns as one template source
+      ansible.builtin.copy:
+        content: "{{ render_check_patterns | join('\n') }}\n"
+        dest: "{{ render_check_workdir }}/patterns.j2"
+        mode: "0644"
+      vars:
+        render_check_patterns: "{{ render_check_items | subelements('asserts', skip_missing=True) | map(attribute=1) | list }}"
+      tags: [render]
+
+    - name: Expand the production variables in the assert patterns
+      ansible.builtin.template:
+        src: "{{ render_check_workdir }}/patterns.j2"
+        dest: "{{ render_check_workdir }}/patterns.txt"
+        mode: "0644"
+      tags: [render]
+
     - name: Write manifest for the container stage
       ansible.builtin.copy:
         content: "{% for i in render_check_items %}{{ i.kind }}\t{{ i.dest }}\n{% endfor %}"
@@ -68,13 +93,25 @@
         mode: "0644"
       tags: [render]
 
+    - name: The expanded pattern file holds exactly one line per assert
+      ansible.builtin.assert:
+        that: >-
+          lookup('ansible.builtin.file', render_check_workdir ~ '/patterns.txt').splitlines() | length
+          == render_check_items | subelements('asserts', skip_missing=True) | list | length
+        fail_msg: "an assert pattern contains a line break; the one-line-per-pattern layout is broken"
+        quiet: true
+      tags: [assert]
+
     - name: Assert patterns in rendered files
       ansible.builtin.assert:
-        that: lookup('ansible.builtin.file', render_check_workdir ~ '/out/' ~ item.0.dest) is search(item.1, multiline=True)
+        that: >-
+          lookup('ansible.builtin.file', render_check_workdir ~ '/out/' ~ item.0.dest)
+          is search(lookup('ansible.builtin.file', render_check_workdir ~ '/patterns.txt').split('\n')[pidx], multiline=True)
         fail_msg: "{{ item.0.dest }}: rendered file does not match /{{ item.1 }}/"
         quiet: true
       when: item.0.skip_asserts_when_extra is not defined or item.0.skip_asserts_when_extra not in vars
       loop: "{{ render_check_items | subelements('asserts', skip_missing=True) }}"
       loop_control:
+        index_var: pidx
         label: "{{ item.0.dest }}: {{ item.1 }}"
       tags: [assert]

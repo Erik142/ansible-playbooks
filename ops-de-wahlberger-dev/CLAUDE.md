@@ -36,7 +36,7 @@ operator runbook for the Pi-to-VM migration: do not duplicate it here.
 - **Never run tests, tools or `ansible-vault` with the cwd inside a playbook
   directory without `ANSIBLE_CONFIG` pointing elsewhere**: `ansible.cfg` calls
   `.vault_pass.sh`, which runs `op read` against the real 1Password item. The
-  `tests/` and `tools/` helpers do this isolation themselves.
+  `tests/` helpers do this isolation themselves.
 - Requirements and plan live outside this directory: `../semaphore-migration/reqs/`
   (IDs `SH-`) and `../semaphore-migration/PLAN.md`.
 
@@ -83,7 +83,7 @@ Deviations from the NAS copies (spec contract changes):
 
 - Persistent data under `/opt/podman` on the root filesystem (`caddy/`, `semaphore/`, ZeroTier identity). No separate data disk.
 - Secrets: encrypted `inventories/production/group_vars/all/vault.yml`, exposed via `{{ vault_* | default('') }}` indirection in `vars.yml`; `vault.yml.example` is the key scaffold (9 keys). Never commit plaintext secrets, and never print them.
-- Seven values are **copied verbatim from the Pi's Vault** because the migrated state depends on them: `vault_semaphore_access_key_encryption` (a different value makes every stored Key Store entry undecryptable, SH-C-05), `vault_semaphore_cookie_hash`, `vault_semaphore_cookie_encryption`, `vault_semaphore_oidc_client_secret` (the Pocket ID client does not change), `vault_semaphore_admin_password`, `vault_cloudflare_dns_api_token`, `vault_notify_failure_resend_api_key`. Two are **generated** (32 alphanumeric characters, URL-safe because the REST password sits in a `rest:http://user:PASSWORD@host` URL): `vault_restic_backup_repo_password`, `vault_restic_backup_rest_server_password`; they must equal the NAS's `vault_restic_server_ops_*` values (SH-BR-09). Build the Vault with `tools/populate-vault.sh`; compare with `tools/vault-hash-compare.sh` (hashes only).
+- Seven values are **copied verbatim from the Pi's Vault** because the migrated state depends on them: `vault_semaphore_access_key_encryption` (a different value makes every stored Key Store entry undecryptable, SH-C-05), `vault_semaphore_cookie_hash`, `vault_semaphore_cookie_encryption`, `vault_semaphore_oidc_client_secret` (the Pocket ID client does not change), `vault_semaphore_admin_password`, `vault_cloudflare_dns_api_token`, `vault_notify_failure_resend_api_key`. Two are **generated** (32 alphanumeric characters, URL-safe because the REST password sits in a `rest:http://user:PASSWORD@host` URL): `vault_restic_backup_repo_password`, `vault_restic_backup_rest_server_password`; they must equal the NAS's `vault_restic_server_ops_*` values (SH-BR-09). The migration helpers that built the Vault (under `tools/`, removed; see git history) are no longer in the tree.
 - Never in the repository: the automation key's private half, any ZeroTier Central API token (SH-FR-205), `access_key_encryption` on the NAS (SH-BR-11), the ZeroTier identity in a backup (SH-FR-171).
 - Values that exist only after a live step stay empty on purpose, and the roles that need them fail naming the variable: `vm_zt_ip` and `vm_zt_iface` (pull request A2), `cloud_zt_ip` (read from Central at OP-02, set together with `vm_zt_iface` in A2 because the `firewall` role fails otherwise; the spec Inputs table says "PR A", a documented deviation, see PLAN.md carry-over), `semaphore_uid` (pull request A3, now `1001`).
 - `restic_backup_sqlite_required` is not set in `vars.yml` (the stopgap `false` was deleted by pull request A3), so the role default `true` applies from the step-5 apply; `tests/guards.d/vm_vars.yml` accepts the variable absent or false.
@@ -119,7 +119,6 @@ Add `meta/argument_specs.yml` and a `README.md` for the role.
 - `docs/zerotier-flow-rules.md`: dated "before" and "in force" flow rules.
 - `docs/spikes/`: measured facts (Semaphore image, `authorized_keys` `from=`, Caddy global options). Evidence is container-level, not the VM.
 - `docs/security-review.md`: the pre-merge security review (written by its own task).
-- `tools/README.md`: operator tooling for steps 4 and 6.
 
 ## Hush recovery lists (mandatory)
 

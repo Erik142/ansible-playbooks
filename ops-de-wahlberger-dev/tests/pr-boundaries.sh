@@ -8,8 +8,6 @@
 # Environment:
 #   PR_BOUNDARIES_BASE=master  ref to diff against (falls back to origin/<ref>);
 #                              the merge-base with HEAD is used
-#   STEP7_DONE=1               PR E only: lets it touch pi-de-int-wahlberger-dev/
-#                              (SH-FR-97: no commit changes it until step 7 ends)
 # The changed set = committed + staged + unstaged changes against the merge-base
 # plus untracked, non-ignored files. Renames count as delete + add.
 # Exit 0 = inside the boundary; 1 = file outside it (listed) or empty diff;
@@ -23,7 +21,6 @@ repo=$(git -C "$(dirname "$0")" rev-parse --show-toplevel) || { echo "pr-boundar
 V=ops-de-wahlberger-dev
 N=nas-de-int-wahlberger-dev
 C=cloud-wahlberger-dev
-PI=pi-de-int-wahlberger-dev
 
 base=${PR_BOUNDARIES_BASE:-master}
 if ! git -C "$repo" rev-parse --verify --quiet "$base^{commit}" >/dev/null; then
@@ -46,14 +43,13 @@ B)
 B2)
     allowed="$N/inventories/production/group_vars/all/* $N/inventories/vm/* $N/roles/restic_server/* $N/tests/* $docs_any" ;;
 C | C2 | C-R)
-    allowed="$keys_vars $V/tests/unit/conftest.py $V/tools/check_from_list.py $V/tests/tools/test_check_from_list.py" ;;
+    allowed="$keys_vars $V/tests/unit/conftest.py" ;;
 D)
     allowed="$V/inventories/production/group_vars/all/vars.yml $N/roles/homepage/* renovate.json $docs_any" ;;
 E)
     allowed="$N/inventories/production/group_vars/all/vars.yml $C/inventories/production/group_vars/all/vars.yml \
         $N/roles/ssh_authorized_keys/* $C/roles/ssh_authorized_keys/* $V/inventories/production/group_vars/all/vars.yml \
-        renovate.json .github/* $docs_any"
-    [ "${STEP7_DONE:-0}" = 1 ] && allowed="$allowed $PI/*" ;;
+        renovate.json .github/* $docs_any" ;;
 *)
     echo "usage: $0 <A|A2|A3|B|B2|C|C2|C-R|D|E>   (got '$pr')" >&2
     exit 2 ;;
@@ -67,16 +63,6 @@ changed=$( {
 
 bad=""
 while IFS= read -r f; do
-    # SH-FR-97: the Pi directory is frozen for every PR; E may touch it only
-    # after step 7 (STEP7_DONE=1, handled in `allowed`). Checked before the
-    # *.md allowance so a Pi README cannot slip through as documentation.
-    case "$f" in
-    "$PI"/*)
-        if [ "$pr" = E ] && [ "${STEP7_DONE:-0}" = 1 ]; then continue; fi
-        bad="$bad$f  (pi directory is frozen until step 7 ends, SH-FR-97)
-"
-        continue ;;
-    esac
     ok=0
     for pat in $allowed; do
         # shellcheck disable=SC2254  # the unquoted pattern is the point

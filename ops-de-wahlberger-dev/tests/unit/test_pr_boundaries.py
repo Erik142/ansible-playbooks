@@ -1,9 +1,11 @@
 """Negative tests for tests/pr-boundaries.sh (SH-BR-16, SH-FR-97, SH-AC-63)."""
 import pytest
 
-from conftest import C, N, PI, V, VARS, git
+from conftest import C, N, V, VARS, git
 
 OPS_VARS = V + "/" + VARS
+# A directory no PR may touch (any path outside the boundary is rejected).
+OTHER = "some-other-host"
 
 
 def branch(repo, files):
@@ -35,7 +37,7 @@ def test_a_allows_its_file_classes(repo):
 
 
 @pytest.mark.parametrize("rel", [
-    PI + "/site.yml",
+    OTHER + "/site.yml",
     N + "/inventories/production/group_vars/all/vars.yml",
     C + "/inventories/production/group_vars/all/vars.yml",
     N + "/roles/restic_server/defaults/main.yml",
@@ -47,28 +49,28 @@ def test_a_rejects_other_classes(repo, rel):
     assert rc == 1 and rel in out, out
 
 
-def test_a_rejects_pi_dir_even_for_a_markdown_file(repo):
-    branch(repo, dict(A_FILES, **{PI + "/README.md": "x"}))
+def test_a_rejects_other_dir_even_for_a_markdown_file(repo):
+    branch(repo, dict(A_FILES, **{OTHER + "/README.md": "x"}))
     rc, out = pr(repo, "A")
-    assert rc == 1 and "frozen" in out, out
+    assert rc == 1 and OTHER + "/README.md" in out, out
 
 
-def test_a_rejects_pi_dir_when_untracked_only(repo):
-    repo.write(PI + "/x", "x")
+def test_a_rejects_other_dir_when_untracked_only(repo):
+    repo.write(OTHER + "/x", "x")
     rc, out = pr(repo, "A")
-    assert rc == 1 and PI in out, out
+    assert rc == 1 and OTHER in out, out
 
 
-def test_a_rejects_pi_dir_deletion(repo):
-    # A deleted tracked file counts as a change too (SH-FR-97).
-    repo.write(PI + "/x", "x")
-    repo.commit_all("pi exists on master")
+def test_a_rejects_other_dir_deletion(repo):
+    # A deleted tracked file counts as a change too.
+    repo.write(OTHER + "/x", "x")
+    repo.commit_all("file exists on master")
     git(repo.root, "checkout", "-q", "-b", "pr")
-    (repo.path(PI + "/x")).unlink()
+    (repo.path(OTHER + "/x")).unlink()
     repo.write(V + "/a.yml", "x")
     repo.commit_all()
     rc, out = pr(repo, "A")
-    assert rc == 1 and PI + "/x" in out, out
+    assert rc == 1 and OTHER + "/x" in out, out
 
 
 @pytest.mark.parametrize("name", ["A2", "A3"])
@@ -133,25 +135,6 @@ def test_d_allows_homepage_flag_and_renovate(repo):
     repo.write(N + "/roles/security/tasks/main.yml", "x")
     repo.commit_all()
     assert pr(repo, "D")[0] == 1
-
-
-def test_e_pi_dir_only_with_step7_done(repo):
-    repo.write(PI + "/x", "x")
-    repo.commit_all("pi on master")
-    git(repo.root, "checkout", "-q", "-b", "pr")
-    repo.path(PI + "/x").unlink()
-    repo.write("renovate.json", "{}")
-    repo.commit_all()
-    rc, out = pr(repo, "E")
-    assert rc == 1 and PI + "/x" in out, out
-    rc, out = pr(repo, "E", STEP7_DONE="1")
-    assert rc == 0, out
-
-
-def test_step7_done_does_not_unlock_other_prs(repo):
-    branch(repo, {PI + "/x": "x", V + "/a": "x"})
-    rc, out = pr(repo, "A", STEP7_DONE="1")
-    assert rc == 1 and "frozen" in out, out
 
 
 def test_empty_diff_fails(repo):

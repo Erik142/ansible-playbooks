@@ -24,7 +24,6 @@ REAL = OPS_REAL.parent
 V = "ops-de-wahlberger-dev"
 N = "nas-de-int-wahlberger-dev"
 C = "cloud-wahlberger-dev"
-PI = "pi-de-int-wahlberger-dev"
 
 VARS = "inventories/production/group_vars/all/vars.yml"
 EXAMPLE = "inventories/production/group_vars/all/vault.yml.example"
@@ -35,7 +34,7 @@ COPY_OPS = [
     "roles/security/handlers/main.yml", "roles/security/tasks/sshd.yml",
     "roles/security/templates/zypper-dup-request-reboot.sh.j2",
     "roles/security/templates/zypper-dup.service.j2",
-    "roles/restic_backup/defaults/main.yml", "roles/restic_backup/templates",
+    "roles/caddy/defaults/main.yml", "roles/restic_backup/defaults/main.yml", "roles/restic_backup/templates",
     "roles/firewall/tasks", "roles/firewall/defaults",
     "roles/ssh_authorized_keys/meta/argument_specs.yml", "roles/ssh_authorized_keys/defaults/main.yml",
     "roles/ssh_authorized_keys/tasks", "roles/ssh_authorized_keys/vars",
@@ -90,7 +89,6 @@ README = textwrap.dedent("""\
 
 RENOVATE = {
     "packageRules": [
-        {"matchFileNames": ["pi-de-int-wahlberger-dev/**"], "enabled": False},
         {"matchFileNames": ["ops-de-wahlberger-dev/roles/semaphore/defaults/main.yml"], "enabled": False},
     ]
 }
@@ -195,7 +193,7 @@ class Repo:
         p.write_text(text)
 
     def env(self, **extra):
-        env = {k: v for k, v in os.environ.items() if not k.startswith(("STATIC_CHECKS_", "PR_BOUNDARIES_", "STEP7_"))}
+        env = {k: v for k, v in os.environ.items() if not k.startswith(("STATIC_CHECKS_", "PR_BOUNDARIES_"))}
         cfg = self.tmp / "empty-ansible.cfg"
         cfg.write_text("")
         env.update(

@@ -13,13 +13,10 @@ secrets. No shared/external roles repo on purpose — see
 |----------|------|---------------|
 | [`cloud-wahlberger-dev`](cloud-wahlberger-dev) | `cloud.wahlberger.dev` (Hetzner Cloud VM, Debian) | **Reference design** for this repo. Pocket ID (passkey OIDC) + FreshRSS behind Caddy (HTTP-01). |
 | [`nas-de-int-wahlberger-dev`](nas-de-int-wahlberger-dev) | `nas.de.int.wahlberger.dev` (home NAS, openSUSE Tumbleweed) | Native Samba file share, Tandoor + Paperless-ngx + Immich behind Caddy (DNS-01), a Homepage dashboard. |
-| [`pi-de-int-wahlberger-dev`](pi-de-int-wahlberger-dev) | `pi.de.int.wahlberger.dev` (Raspberry Pi at home, Raspberry Pi OS) | Semaphore UI — runs all the playbooks in this repo (see [Automated runs](#automated-runs)). Retires at PR E. |
 | [`ops-de-wahlberger-dev`](ops-de-wahlberger-dev) | `ops.de.wahlberger.dev` (Hetzner CX23, openSUSE Tumbleweed) | Semaphore UI (over ZeroTier only), Caddy, Pocket ID login; runs all the playbooks in this repo (see [Automated runs](#automated-runs)). |
-| [`rpi-boras`](rpi-boras) | Raspberry Pi in Borås | Legacy: bind9 + isc-kea DHCP with dynamic DNS updates. No CI lint config yet. |
-| [`dns-server`](dns-server) | — | Skeleton/in-progress: bind9 + Pi-hole. No CI lint config yet. |
 
 `cloud-wahlberger-dev`, `nas-de-int-wahlberger-dev`, and
-`pi-de-int-wahlberger-dev` each have their own `README.md` and `CLAUDE.md`
+`ops-de-wahlberger-dev` each have their own `README.md` and `CLAUDE.md`
 with the full picture: layout, role variables, secrets, and the reasoning
 behind non-obvious decisions.
 
@@ -50,7 +47,7 @@ Each playbook is fully self-contained — `cd` into it and follow its own
 `README.md`. In short:
 
 ```sh
-cd cloud-wahlberger-dev  # or nas-de-int-wahlberger-dev, pi-de-int-wahlberger-dev
+cd cloud-wahlberger-dev  # or nas-de-int-wahlberger-dev, ops-de-wahlberger-dev
 ansible-galaxy collection install -r requirements.yml
 ansible-galaxy role install -r requirements.yml
 ansible-playbook site.yml --ask-vault-pass

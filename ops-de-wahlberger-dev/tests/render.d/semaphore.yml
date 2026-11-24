@@ -73,15 +73,15 @@ render_items:
     src: semaphore.env.j2
     dest: semaphore.env
     kind: text
+    # semaphore_url and semaphore_oidc_client_id come from the production vars (render-item.yml);
+    # the asserts read them back through the same variables, so no value is copied here.
     vars:
-      semaphore_oidc_client_id: 63093482-d2cc-4c77-89df-9f6ff78b160e
       semaphore_oidc_client_secret: 'dummy"secret\with-specials'
-      semaphore_url: https://semaphore.de.int.wahlberger.dev
     asserts:
       - '^SEMAPHORE_OIDC_PROVIDERS=\{"pocketid": \{'
-      - '"client_id": "63093482-d2cc-4c77-89df-9f6ff78b160e"'
+      - '"client_id": "{{ semaphore_oidc_client_id }}"'
       - '"provider_url": "https://id\.wahlberger\.dev"'
-      - '"redirect_url": "https://semaphore\.de\.int\.wahlberger\.dev/api/auth/oidc/pocketid/redirect/"'
+      - '"redirect_url": "{{ semaphore_url | regex_escape }}/api/auth/oidc/pocketid/redirect/"'
       # Special characters in a secret are JSON-escaped, not injected.
       - '"client_secret": "dummy\\"secret\\\\with-specials"'
       # Only the OIDC variable lives in the env file.
