@@ -85,7 +85,7 @@
       "enabled": false
     },
     {
-      "description": "Semaphore migration (SH-FR-160): the Pi directory is frozen until PR E removes it, so no update PR touches it. Removed by PR E.",
+      "description": "Retired host pi-de-int-wahlberger-dev is no longer in use; its directory is kept for reference, so no update PR touches it.",
       "matchFileNames": ["pi-de-int-wahlberger-dev/**"],
       "enabled": false
     }

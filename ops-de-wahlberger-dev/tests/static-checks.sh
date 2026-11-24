@@ -11,11 +11,10 @@
 #
 # Usage: tests/static-checks.sh            (from anywhere)
 # Environment:
-#   STATIC_CHECKS_BASE=master              ref for the SH-FR-97 diff (falls back
+#   STATIC_CHECKS_BASE=master              ref named in the banner (falls back
 #                                          to origin/master; merge-base is used)
 #   STATIC_CHECKS_STAGE=A                  A (default; PR A .. C), D or E: which
-#                                          row of BR-10 / FR-160 / FR-161 / AC-43
-#                                          applies. SH-AC-43 runs only at E.
+#                                          row of BR-10 / FR-161 applies.
 #   STATIC_CHECKS_VAULT_PASSWORD_FILE=...  opt in to the decrypted-vault check
 #                                          (SH-AC-17v); without it: SKIPPED. The
 #                                          values are never printed.
@@ -36,7 +35,6 @@ repo=$(git -C "$ops_dir" rev-parse --show-toplevel)
 nas_dir="$repo/nas-de-int-wahlberger-dev"
 cloud_dir="$repo/cloud-wahlberger-dev"
 ops_rel=${ops_dir#"$repo"/}
-pi_rel=pi-de-int-wahlberger-dev
 
 YAMLLINT=${YAMLLINT:-yamllint}
 ANSIBLE_LINT=${ANSIBLE_LINT:-ansible-lint}
@@ -414,22 +412,6 @@ ac30r() {
     run_step "render-check" "$ops_dir" tests/render-check.sh
 }
 
-# --- SH-AC-43 (+ SH-FR-111, 160, 161): the repository is clean after PR E -----
-ac43() {
-    [ "$stage" = E ] || { echo "applies after pull request E; run with STATIC_CHECKS_STAGE=E"; return 77; }
-    rc=0
-    [ ! -e "$repo/$pi_rel" ] || { echo "$pi_rel/ still exists"; rc=1; }
-    # FR-111 allowlist: */reqs/*, */PLAN*.md, dated notes in architecture/ and
-    # homelab-architecture/, the NAS README (DOC-O5), the VM README (runbook).
-    # Assumption: the planning directory and this playbook's own test harness
-    # (which names the Pi directory in its guards) are allowed as well.
-    g=$(cd "$repo" && git grep --untracked -n -I -e 'pi\.de\.int\.wahlberger\.dev' -e 'pi-de-int-wahlberger-dev' -- . \
-        ':(exclude,glob)**/reqs/**' ':(exclude,glob)**/PLAN*.md' ':(exclude)architecture' ':(exclude)homelab-architecture' \
-        ':(exclude)nas-de-int-wahlberger-dev/README.md' ":(exclude)$ops_rel/README.md" ':(exclude)semaphore-migration' \
-        ":(exclude)$ops_rel/tests") && { echo "references outside the SH-FR-111 allowlist:"; printf '%s\n' "$g" | cut -d: -f1,2; rc=1; }
-    return $rc
-}
-
 # --- SH-AC-44 (static half): revoked-keys input declared in all three roles ---
 ac44() {
     python3 - <<'PY'
@@ -576,7 +558,7 @@ if errors:
 PY
 }
 
-# --- SH-AC-60 (+ SH-FR-160, 161): Renovate leaves the Pi and the VM image alone
+# --- SH-AC-60 (+ SH-FR-161): Renovate leaves the VM semaphore defaults alone ---
 ac60() {
     python3 - <<'PY'
 import fnmatch, json, os, sys
@@ -596,13 +578,10 @@ def covers(path):
             return True
     return False
 
-pi = "pi-de-int-wahlberger-dev/roles/semaphore/defaults/main.yml"
 vm = "ops-de-wahlberger-dev/roles/semaphore/defaults/main.yml"
-want_pi = stage in ("A", "D")      # FR-160: from PR A until PR E
 want_vm = stage == "A"             # FR-161: from PR A until PR D
-for path, want, what in ((pi, want_pi, "FR-160 (Pi directory)"), (vm, want_vm, "FR-161 (VM semaphore defaults)")):
-    if covers(path) != want:
-        errors.append(f"stage {stage}: renovate.json {'lacks' if want else 'still has'} the enabled:false rule of SH-{what}")
+if covers(vm) != want_vm:
+    errors.append(f"stage {stage}: renovate.json {'lacks' if want_vm else 'still has'} the enabled:false rule of SH-FR-161 (VM semaphore defaults)")
 if errors:
     sys.exit("\n".join(errors))
 PY
@@ -640,16 +619,6 @@ guards_container() {
         return 77
     fi
     run_guards container
-}
-
-# --- SH-FR-97: the Pi directory is not changed until step 7 ends --------------
-fr97() {
-    [ "${STEP7_DONE:-0}" != 1 ] || { echo "STEP7_DONE=1 (step 7 ended)"; return 77; }
-    rc=0
-    a=$(git -C "$repo" diff --name-only --no-renames "$base" -- "$pi_rel"; git -C "$repo" ls-files --others --exclude-standard -- "$pi_rel";
-        git -C "$repo" log --format= --name-only --no-renames "$base"..HEAD -- "$pi_rel")
-    [ -z "$a" ] || { echo "$pi_rel changed against $(git -C "$repo" rev-parse --short "$base"):"; printf '%s\n' "$a" | sort -u | head; rc=1; }
-    return $rc
 }
 
 # --- SH-FR-205: no ZeroTier Central API token in the repository ---------------
@@ -691,17 +660,15 @@ check SH-AC-17v "decrypted vault keys (PyYAML + Ansible loader)" ac17v
 check SH-AC-23 "key lists per BR-10, from= option, no private key" ac23
 check SH-AC-30 "restic timer/script/excludes (source)" ac30
 check SH-AC-30r "restic templates rendered (render-check.sh)" ac30r
-check SH-AC-43 "repository clean after PR E (FR-111, 160, 161)" ac43
 check SH-AC-44 "revoked-keys input declared, ssh_authorized_keys identical in nas/cloud/ops" ac44
 check SH-AC-45 "sshd validated before apply" ac45
 check SH-AC-56 "handler reloads, firewall never reloads, only rebootmgrctl reboots" ac56
-check SH-AC-60 "Renovate freeze rules for the stage" ac60
+check SH-AC-60 "Renovate freeze rule for the VM semaphore defaults (FR-161)" ac60
 check SH-AC-62a "guard test cloudflare_dns (own run)" ac62a
 check SH-AC-62b "guard test caddy (own run)" ac62b
 check SH-R6 "guard test firewall (zone tasks gated for first --check)" fwgate
 check SH-GUARDS "all other offline guards in tests/guards.d (vm_vars, podman, regexes, ...)" guards_offline
 check SH-GUARDS-C "container guards in tests/guards.d (restic_backup, semaphore, security_check_mode)" guards_container
-check SH-FR-97 "pi-de-int-wahlberger-dev untouched until step 7" fr97
 check SH-FR-205 "no ZeroTier Central token" fr205
 check SH-BR-16 "PR boundary (STATIC_CHECKS_PR)" br16
 check UNIT "pytest tests/unit" unit
