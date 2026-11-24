@@ -7,9 +7,11 @@
     name: n8n.service
     state: restarted
     daemon_reload: true
+  when: not ansible_check_mode
 
 - name: Restart oauth2-proxy
   ansible.builtin.systemd:
     name: oauth2-proxy.service
     state: restarted
     daemon_reload: true
+  when: not ansible_check_mode

@@ -17,6 +17,8 @@ immich_redis_image: docker.io/valkey/valkey:9
 
 immich_data_dir: /mnt/containers/immich
 immich_db_data_dir: "{{ immich_data_dir }}/postgres"
+# uid the official postgres image runs as. Owns the 0700 data dir (live state 2026-11-24).
+immich_db_uid: 999
 immich_ml_cache_dir: "{{ immich_data_dir }}/model-cache"
 
 # Immich's ENTIRE UPLOAD_LOCATION (its own "library", "thumbs",

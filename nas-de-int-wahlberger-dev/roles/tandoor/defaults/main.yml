@@ -10,6 +10,8 @@ tandoor_db_image: "docker.io/library/postgres:16"
 tandoor_data_dir: /mnt/containers/tandoor
 tandoor_db_data_dir_root: /mnt/containers/tandoor-db
 tandoor_db_data_dir: "{{ tandoor_db_data_dir_root }}/pgdata"
+# uid the official postgres image runs as. Owns the 0700 pgdata dir (live state 2026-11-24).
+tandoor_db_uid: 999
 
 tandoor_timezone: Europe/Berlin
 

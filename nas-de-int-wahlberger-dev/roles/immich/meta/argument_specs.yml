@@ -84,3 +84,7 @@ argument_specs:
         type: bool
         required: false
         description: Disable the username/password login form entirely.
+      immich_db_uid:
+        type: int
+        required: false
+        description: uid of the Immich Postgres container; owns the 0700 data dir.
