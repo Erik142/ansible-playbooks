@@ -131,6 +131,28 @@ caddy_sites_base:
   # image layer uploads pass through unchanged.
   - host: git.de.int.wahlberger.dev
     upstream: "forgejo:3000"
+  # n8n editor (phase 1). Only /webhook/hush bypasses Pocket ID (HMAC-checked by
+  # the workflow); everything else, including the editor, needs an oauth2-proxy
+  # session. Full Caddy site body, so the forward_auth block can sit inside it.
+  - host: n8n.de.int.wahlberger.dev
+    body: |
+      @hush_webhook path /webhook/hush
+      handle @hush_webhook {
+        reverse_proxy n8n:5678
+      }
+      handle /oauth2/* {
+        reverse_proxy oauth2-proxy:4180
+      }
+      handle {
+        forward_auth oauth2-proxy:4180 {
+          uri /oauth2/auth
+          @error status 401
+          handle_response @error {
+            redir * /oauth2/sign_in?rd={scheme}://{host}{uri}
+          }
+        }
+        reverse_proxy n8n:5678
+      }
   - host: www.de.int.wahlberger.dev
     upstream: "homepage:3000"
 # Caddy joins the dedicated garage.network only while Garage is enabled (the
@@ -225,6 +247,17 @@ forgejo_url: "https://git.de.int.wahlberger.dev"
 forgejo_ssh_port: 2222
 forgejo_oidc_provider_name: "pocket-id"
 forgejo_oidc_client_id: "e49c8dc5-2a21-4735-bf3b-cc3c8dadbf2e"
+
+# --- n8n (phase 1: editor only, no workflows) -------------------------------
+# Decision record: nas-de-int-wahlberger-dev/PLAN-n8n.md. Register the Pocket ID
+# client first, with redirect URI
+# https://n8n.de.int.wahlberger.dev/oauth2/callback.
+# Until n8n_oidc_client_id is set, the n8n role's assert fails loudly.
+n8n_url: "https://n8n.de.int.wahlberger.dev"
+n8n_oidc_client_id: "cc5ff956-e839-4cb9-a4e8-727bbf16d582"
+n8n_encryption_key: "{{ vault_n8n_encryption_key | default('') }}"
+n8n_oidc_client_secret: "{{ vault_n8n_oidc_client_secret | default('') }}"
+n8n_oauth2_cookie_secret: "{{ vault_n8n_oauth2_cookie_secret | default('') }}"
 
 # --- Beszel agent ---------------------------------------------------------------
 # REQUIRED, but can't be set until roles/beszel_hub has booted once and

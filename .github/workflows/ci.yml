@@ -319,9 +319,13 @@ jobs:
       - name: Install collections
         if: steps.galaxy-cache.outputs.cache-hit != 'true'
         working-directory: ops-de-wahlberger-dev
-        run: |
-          ansible-galaxy collection install -r requirements.yml
-          ansible-galaxy collection install "community.docker:>=5.4.0"
+        run: ansible-galaxy collection install -r requirements.yml
+
+      # Outside the cache gate: a cache hit can restore ~/.ansible/collections
+      # from an entry written without this collection.
+      - name: Install test-only Docker collection
+        working-directory: ops-de-wahlberger-dev
+        run: ansible-galaxy collection install "community.docker:>=5.4.0"
 
       - name: Container guards (SH-GUARDS-C)
         working-directory: ops-de-wahlberger-dev

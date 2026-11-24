@@ -1,0 +1,74 @@
+---
+- name: Validate n8n URL, OIDC and secret inputs are present
+  ansible.builtin.assert:
+    that:
+      - n8n_url | length > 0
+      - n8n_oidc_client_id | length > 0
+      - n8n_oidc_client_secret | length > 0
+      - n8n_encryption_key | length > 0
+      - n8n_oauth2_cookie_secret | length > 0
+      # vault.yml.example ships REPLACE-* placeholders; never deploy one.
+      - not (n8n_oidc_client_secret | string) is match('REPLACE')
+      - not (n8n_encryption_key | string) is match('REPLACE')
+      - not (n8n_oauth2_cookie_secret | string) is match('REPLACE')
+    fail_msg: >-
+      n8n is not fully configured. Empty inputs or REPLACE-* placeholders among
+      n8n_url, n8n_oidc_client_id, n8n_oidc_client_secret, n8n_encryption_key and
+      n8n_oauth2_cookie_secret. Set
+      n8n_url and n8n_oidc_client_id in group_vars and the matching vault_n8n_* secrets
+      in Ansible Vault (see vault.yml.example). See roles/n8n/README.md.
+    quiet: true
+
+- name: Create the n8n base directory
+  ansible.builtin.file:
+    path: "{{ n8n_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# The image runs as node (uid/gid 1000) and rootful Podman does no ID remapping.
+- name: Create the n8n data volume directory
+  ansible.builtin.file:
+    path: "{{ n8n_volume_dir }}"
+    state: directory
+    owner: "{{ n8n_uid }}"
+    group: "{{ n8n_gid }}"
+    mode: "0750"
+
+# Root-only env files. Secrets stay out of the world-readable Quadlet units.
+# Each is rendered immediately before its container include, for the same
+# first-run daemon-reload ordering reason as roles/forgejo/tasks/main.yml.
+- name: Render the n8n environment file
+  ansible.builtin.template:
+    src: n8n.env.j2
+    dest: "{{ n8n_data_dir }}/n8n.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Restart n8n
+
+- name: Deploy the n8n container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: n8n
+    container_quadlet_src: n8n.container.j2
+
+- name: Render the oauth2-proxy environment file
+  ansible.builtin.template:
+    src: oauth2-proxy.env.j2
+    dest: "{{ n8n_data_dir }}/oauth2-proxy.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Restart oauth2-proxy
+
+- name: Deploy the oauth2-proxy container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: oauth2-proxy
+    container_quadlet_src: oauth2-proxy.container.j2
