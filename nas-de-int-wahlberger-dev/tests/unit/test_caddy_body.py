@@ -90,7 +90,10 @@ def test_body_renders_block_without_generated_reverse_proxy(tmp_path):
     """GS-FR-95, GS-AC-57 first bullet."""
     text = render(tmp_path, [{"host": "a.example.test", "body": O6_BODY}])
     block = text[text.index("a.example.test {"):]
-    assert block.count("reverse_proxy") == 2
+    # The body's own directives are the only reverse_proxy lines; the count comes
+    # from the body fixture, not from a fixed number.
+    assert O6_BODY.count("reverse_proxy") >= 1
+    assert block.count("reverse_proxy") == O6_BODY.count("reverse_proxy")
     assert "".join(block.split()) == "a.example.test{" + "".join(O6_BODY.split()) + "}"
 
 
