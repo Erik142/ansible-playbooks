@@ -335,3 +335,20 @@ jobs:
           STATIC_CHECKS_SKIP_UNIT: "1"
           STATIC_CHECKS_STAGE: "D"
         run: tests/static-checks.sh
+
+  # n8n trusted-header hook (nas n8n role): the manual NAS test, run in CI against the image
+  # pinned in roles/n8n/defaults/main.yml. A Renovate bump of that pin runs this job, so an
+  # n8n release that breaks the hook fails here before the PR can merge.
+  n8n-hook:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Test the trusted-header hook against the pinned n8n image
+        run: |
+          image=$(sed -n 's/^n8n_image: *//p' nas-de-int-wahlberger-dev/roles/n8n/defaults/main.yml)
+          test -n "$image"
+          echo "image: $image"
+          nas-de-int-wahlberger-dev/tests/n8n-hook/run.sh "$image"

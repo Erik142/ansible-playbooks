@@ -31,6 +31,11 @@ argument_specs:
         type: int
         required: false
         description: Port n8n listens on inside caddy.network.
+      n8n_allowed_emails:
+        type: list
+        elements: str
+        required: true
+        description: Emails allowed through the editor gate (oauth2-proxy) and logged in by the trusted-header hook. Must match the n8n owner's email.
       n8n_url:
         type: str
         required: true

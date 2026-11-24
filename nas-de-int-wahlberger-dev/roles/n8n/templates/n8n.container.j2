@@ -32,6 +32,10 @@ Environment=NODES_EXCLUDE={{ n8n_nodes_exclude }}
 # verify on the running version before relying on it.
 Environment=N8N_RESTRICT_FILE_ACCESS_TO=/home/node/.n8n
 Environment=N8N_BLOCK_FILE_ACCESS_TO_N8N_FILES=true
+# Trusted-header login: hooks.js reads this header (set by Caddy from the oauth2-proxy
+# session; Caddy strips any client copy) and issues n8n's own session cookie.
+Environment=EXTERNAL_HOOK_FILES=/home/node/.n8n/hooks.js
+Environment=N8N_TRUSTED_EMAIL_HEADER=x-auth-request-email
 # N8N_ENCRYPTION_KEY: root-only env file, same EnvironmentFile= pattern as roles/forgejo.
 EnvironmentFile={{ n8n_data_dir }}/n8n.env
 
