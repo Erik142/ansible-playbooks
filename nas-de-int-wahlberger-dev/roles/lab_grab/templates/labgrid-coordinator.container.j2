@@ -1,0 +1,20 @@
+[Unit]
+Description=Labgrid coordinator
+After=network-online.target
+Wants=network-online.target
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=labgrid-coordinator
+Image={{ lab_grab_coordinator_image }}
+# Host networking: exporters on this host and the Lab-Grab app reach it on 20408.
+# The app uses host.containers.internal, verified on the NAS to resolve and reach
+# the host from a container. Podman bridges are in firewalld's trusted zone.
+Network=host
+Exec=labgrid-coordinator
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

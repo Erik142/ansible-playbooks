@@ -1,0 +1,30 @@
+[Unit]
+Description=Lab-Grab web UI and API
+After=network-online.target caddy-network.service lab-grab-db.service lab-grab-redis.service
+Wants=network-online.target lab-grab-db.service lab-grab-redis.service
+Requires=caddy-network.service
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=lab-grab
+Image={{ lab_grab_image }}
+Network=caddy.network
+Network=lab-grab
+# Place sync does NOT run here: lab-grab-sync is the single reconciler (it also
+# does the ARP exporter config). Two reconcilers would apply every write twice.
+Environment=SYNC_ENABLED=false
+Environment=REDIS_URL=redis://lab-grab-redis:6379/0
+Environment=LAB_GRAB_CONFIG=config.yaml
+Environment=TZ={{ lab_grab_timezone }}
+# DATABASE_URL carries the DB password, so it lives in the root-only env file.
+EnvironmentFile={{ lab_grab_config_dir }}/lab-grab.env
+# config.yaml holds the JWT secret and the admin hash: root-only on the host.
+Volume={{ lab_grab_config_dir }}/config.yaml:/app/backend/config.yaml:ro,Z
+DropCapability=ALL
+NoNewPrivileges=true
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

@@ -119,7 +119,7 @@ def test_send_reports_a_problem_through_hush_post(mod, monkeypatch):
     monkeypatch.setattr(mod.subprocess, "run", fake_run)
     payload = {"from": "f", "to": ["t"], "subject": "s", "text": "x", "html": "<p>x</p>"}
     mod.send(payload, {"HUSH_TOKEN_FILE": "/etc/hush/systemd.token", "HUSH_URL": "https://h/ingest/hooks-ops"})
-    assert seen["argv"] == [mod.HUSH_POST, "problem", mod.socket.getfqdn(), "ssh-login"]
+    assert seen["argv"] == [mod.HUSH_POST, "problem", mod.socket.gethostname(), "ssh-login"]
     assert seen["input"] == "x" and seen["check"] is True
     assert seen["env"]["HUSH_MESSAGE"] == "s"
 

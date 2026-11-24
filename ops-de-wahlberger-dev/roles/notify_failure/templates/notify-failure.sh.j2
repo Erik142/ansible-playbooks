@@ -3,4 +3,9 @@
 # Usage: notify-failure.sh <failed-unit-name>
 # Reports the unit's problem to hush. Whether an e-mail goes out is decided by hush.
 set -eu
-exec /usr/local/bin/hush-systemd-event problem "${1:?usage: notify-failure.sh <unit-name>}"
+# OnFailure=notify-failure@%n.service passes "<unit>.service.service". Strip the doubled
+# suffix, so the problem has the same check key as the unit's ok events (the drop-in
+# passes %n, "<unit>.service").
+name=${1:?usage: notify-failure.sh <unit-name>}
+case $name in *.service.service) name=${name%.service} ;; esac
+exec /usr/local/bin/hush-systemd-event problem "$name"

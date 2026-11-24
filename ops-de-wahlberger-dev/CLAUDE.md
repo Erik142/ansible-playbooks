@@ -10,7 +10,7 @@ operator runbook for the Pi-to-VM migration: do not duplicate it here.
 ## Entry point & commands
 
 - Playbook: `site.yml` (top-level). Default inventory is set in `ansible.cfg`.
-  `site.yml` holds exactly the 15 roles of SH-FR-13, in that order, each tagged
+  `site.yml` holds exactly the 16 roles of SH-FR-13, in that order, each tagged
   with its role name (SH-FR-143).
 - Run: `ansible-playbook site.yml` (add `--check --diff` first, always). The vault
   password comes from 1Password via `.vault_pass.sh` (`ansible.cfg`'s
@@ -21,7 +21,11 @@ operator runbook for the Pi-to-VM migration: do not duplicate it here.
 - Roles a self-run excludes (`semaphore`, `zerotier`) are applied from the
   workstation only; see README "Roles a self-run excludes".
 - Install deps first: `ansible-galaxy collection install -r requirements.yml`.
-- Validate: `yamllint .`, `ansible-lint`, `ansible-playbook site.yml --syntax-check`.
+- Validate: `yamllint .`, `ansible-lint --profile production`, `ansible-playbook site.yml --syntax-check`.
+  Lint with the pyenv `ansible-latest` env, not the 2.16 venv or `pipx run`: prepend
+  `$HOME/.pyenv/versions/ansible-latest/bin` to `PATH` so `ansible` and `ansible-lint` match
+  (`-p` is the pep8 format flag now; the profile is `--profile`). Run it with
+  `ANSIBLE_CONFIG` pointing at a config without `vault_password_file`.
 - Idempotency: `molecule test` converges `common`, `notify_failure`, `disk_space`,
   `ssh_authorized_keys`, `security` twice on openSUSE Tumbleweed and fails on any
   change the second time.

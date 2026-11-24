@@ -1,0 +1,65 @@
+---
+# Default variables for the `lab_grab` role: Lab-Grab web UI + place sync,
+# and the Labgrid coordinator and two exporters it drives, as rootful Podman
+# Quadlets. Secrets come from group_vars (vault indirection), never from here.
+
+# Lab-Grab release. The app and the sync run the same image. Bump this one value
+# (set in group_vars) to roll out a new release.
+lab_grab_version: "1.1.0-737341f6f299"
+lab_grab_image: "git.de.int.wahlberger.dev/erikwahlberger/lab-grab:{{ lab_grab_version }}"
+lab_grab_registry: "git.de.int.wahlberger.dev"
+# REQUIRED (group_vars): Forgejo user + token with read:package for the image pull.
+lab_grab_registry_username: ""
+lab_grab_registry_token: ""
+
+lab_grab_db_image: "docker.io/library/postgres:16-alpine"
+lab_grab_redis_image: "docker.io/library/redis:7-alpine"
+lab_grab_coordinator_image: "docker.io/labgrid/coordinator:v25.0.1"
+lab_grab_exporter_image: "docker.io/labgrid/exporter:v25.0.1"
+
+lab_grab_data_dir: /mnt/containers/lab-grab
+lab_grab_db_data_dir: "{{ lab_grab_data_dir }}/pgdata"
+lab_grab_redis_data_dir: "{{ lab_grab_data_dir }}/redis"
+lab_grab_config_dir: "{{ lab_grab_data_dir }}/config"
+# Directory (not a single file) so the sync's replace-on-write stays visible
+# to the exporter container. Holds exporter.yaml written by the sync (ARP).
+lab_grab_exporter_arp_dir: "{{ lab_grab_data_dir }}/exporter-arp"
+# Static exporter config for the USB serial adapter (hand-written, not generated).
+lab_grab_exporter_serial_dir: "{{ lab_grab_data_dir }}/exporter-serial"
+
+lab_grab_timezone: Europe/Berlin
+
+# REQUIRED (group_vars): public https URL and matching caddy_sites entry.
+lab_grab_url: ""
+
+# Labgrid coordinator, host networking, listens on 20408 on the host.
+lab_grab_coordinator_port: 20408
+# Coordinator address for the app. Clients see the same value in the UI's CLI snippet,
+# so it must be the name they can resolve. Containers resolve it to the NAS too.
+lab_grab_coordinator_host_for_app: "nas.de.int.wahlberger.dev:{{ lab_grab_coordinator_port }}"
+
+# Loopback Redis for the sync (host network); the app uses the container network.
+lab_grab_redis_loopback_port: 6380
+
+# REQUIRED (group_vars): home LAN subnet the sync ARP-scans for network_services.
+lab_grab_arp_subnet: ""
+
+# Login is OIDC via Pocket ID only (auth.mode: oauth2). The issuer is the public
+# Pocket ID URL; the client is registered by hand in Pocket ID, and its UUID and
+# secret come from group_vars.
+lab_grab_oidc_issuer: "{{ pocket_id_app_url }}"
+lab_grab_oidc_client_id: ""
+lab_grab_oidc_client_secret: ""
+lab_grab_oidc_redirect_uri: "{{ lab_grab_url }}/auth/callback/oauth2"
+# Pocket ID group whose members get the Lab-Grab admin role.
+lab_grab_admin_group: lab_grab_admins
+
+# Secrets, REQUIRED (group_vars via vault): non-empty checks in tasks/main.yml.
+lab_grab_db_password: ""
+lab_grab_jwt_secret: ""
+
+# Sync spec (places.yaml), rendered from group_vars.
+lab_grab_places: []
+# Static exporter resources for the USB serial adapter, dict form of exporter.yaml
+# (set in group_vars). Hand-maintained; lab-grab-sync never touches it.
+lab_grab_serial_resources: {}

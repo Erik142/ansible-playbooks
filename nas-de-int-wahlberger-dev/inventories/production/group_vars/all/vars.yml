@@ -106,10 +106,30 @@ restic_server_allowed_sources:
   - "10.10.0.0/16"
   - "10.243.0.0/16"
 # Ungated on purpose (BD-D-06): the rules exist before anything listens.
+# Labgrid coordinator (gRPC over raw TCP, not HTTP, so it is not behind Caddy).
+# Opened only for the home LAN and ZeroTier; it stays closed to the public zone.
+lab_grab_coordinator_allowed_sources:
+  - "10.10.0.0/16"
+  - "10.243.0.0/16"
+# Labgrid's exporter serves each serial console (RFC2217) on a random port from the
+# kernel's ephemeral range (32768-60999 on this host), so open that range to the same sources.
+lab_grab_console_port_range: "32768-60999"
+# BD-FR-141: firewall_rich_rules is derived from restic_server_allowed_sources (the
+# home LAN 10.10.0.0/16 and ZeroTier 10.243.0.0/16). The restic rule port must equal
+# restic_server_port.
 firewall_rich_rules: >-
   {{ restic_server_allowed_sources
   | map('regex_replace', '^(.*)$', 'rule family="ipv4" source address="\1" port port="' ~ restic_server_port ~ '" protocol="tcp" accept')
   | list }}
+# Lab-Grab rules, applied by the firewall role next to firewall_rich_rules: the Labgrid
+# coordinator port and the serial console range, from the same sources.
+firewall_extra_rich_rules: >-
+  {{ (lab_grab_coordinator_allowed_sources
+  | map('regex_replace', '^(.*)$', 'rule family="ipv4" source address="\1" port port="20408" protocol="tcp" accept')
+  | list)
+  + (lab_grab_coordinator_allowed_sources
+  | map('regex_replace', '^(.*)$', 'rule family="ipv4" source address="\1" port port="' ~ lab_grab_console_port_range ~ '" protocol="tcp" accept')
+  | list) }}
 
 # --- Reverse proxy (caddy role) ----------------------------------------------
 # DNS-01 via Cloudflare (not HTTP-01): this host has no public inbound port,
@@ -131,6 +151,9 @@ caddy_sites_base:
   # image layer uploads pass through unchanged.
   - host: git.de.int.wahlberger.dev
     upstream: "forgejo:3000"
+  # Lab-Grab web UI + API (lab_grab role). The app joins caddy.network.
+  - host: lab-grab.de.int.wahlberger.dev
+    upstream: "lab-grab:8000"
   # n8n editor (phase 1). Only /webhook/hush bypasses Pocket ID (HMAC-checked by
   # the workflow); everything else, including the editor, needs an oauth2-proxy
   # session. Full Caddy site body, so the forward_auth block can sit inside it.
@@ -357,3 +380,48 @@ notify_failure_hush_source: hooks-nas
 # roles/garage/README.md); the role fails before any change while one is empty.
 garage_rpc_secret: "{{ vault_garage_rpc_secret | default('') }}"
 garage_admin_token: "{{ vault_garage_admin_token | default('') }}"
+
+# --- Lab-Grab + Labgrid (lab_grab role) --------------------------------------
+lab_grab_url: "https://lab-grab.de.int.wahlberger.dev"
+# Home LAN subnet for the ARP scan (the NAS's enp4s0 is 10.10.0.100/24).
+lab_grab_arp_subnet: "10.10.0.0/24"
+# Forgejo account and read:package token used by `podman login` on the NAS.
+lab_grab_registry_username: "erikwahlberger"
+lab_grab_registry_token: "{{ vault_lab_grab_registry_token | default('') }}"
+lab_grab_db_password: "{{ vault_lab_grab_db_password | default('') }}"
+lab_grab_jwt_secret: "{{ vault_lab_grab_jwt_secret | default('') }}"
+# Pocket ID client for Lab-Grab (login is OIDC only). Register it in Pocket ID
+# with redirect URI https://lab-grab.de.int.wahlberger.dev/auth/callback/oauth2
+# and fill in the UUID below. Its secret goes in the vault.
+lab_grab_oidc_client_id: "5e982e4f-4a81-4cb5-993e-5e7b5123618b"
+lab_grab_oidc_client_secret: "{{ vault_lab_grab_oidc_client_secret | default('') }}"
+# One place: the i.MX8M demo kit. ARP resolves its MAC to the NetworkService address.
+# SSH user on the device (confirmed root).
+lab_grab_places:
+  - name: imx8m-demo-kit
+    comment: "i.MX8M demo kit (home)"
+    tags:
+      board: imx8m
+      unit_type: devkit
+      site: home
+    matches:
+      - exporter: "*"
+        group: imx8m-demo-kit
+        cls: "*"
+    network_services:
+      - name: ssh
+        group: imx8m-demo-kit
+        mac_address: "00:30:d6:2c:7f:51"
+        username: root
+        # The device's root password, from vault. `none` omits the field (key auth).
+        password: "{{ vault_lab_grab_demo_kit_ssh_password | default(none) }}"
+# USB serial adapter (Raspberry Pi Debug Probe, UART interface if01) on the NAS.
+# Match keys are udev properties; verify with `udevadm info` on the NAS.
+lab_grab_serial_resources:
+  imx8m-demo-kit:
+    uart:
+      cls: USBSerialPort
+      # Labgrid's USBSerialPort takes its udev match fields directly (no params wrapper).
+      match:
+        ID_SERIAL_SHORT: "E6633861A3352838"
+        ID_USB_INTERFACE_NUM: "01"

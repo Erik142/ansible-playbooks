@@ -1,0 +1,9 @@
+[Unit]
+Description=Restart the ARP labgrid exporter when lab-grab-sync rewrites its config
+
+[Path]
+PathModified={{ lab_grab_exporter_arp_dir }}
+Unit=labgrid-exporter-arp-reload.service
+
+[Install]
+WantedBy=multi-user.target

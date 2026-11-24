@@ -1,0 +1,21 @@
+[Unit]
+Description=Labgrid exporter (NetworkService via ARP-resolved IPs)
+After=network-online.target labgrid-coordinator.service
+Wants=network-online.target labgrid-coordinator.service
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=labgrid-exporter-arp
+Image={{ lab_grab_exporter_image }}
+HostName=nas-arp
+Network=host
+Environment=LG_COORDINATOR=127.0.0.1:{{ lab_grab_coordinator_port }}
+# exporter.yaml is written by lab-grab-sync; the path unit restarts this unit on change.
+# Shared label (z), matching lab-grab-sync: both containers use this directory.
+Volume={{ lab_grab_exporter_arp_dir }}:/opt/conf:ro,z
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

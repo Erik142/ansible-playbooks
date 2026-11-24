@@ -28,3 +28,8 @@ argument_specs:
         description: >-
           firewalld rich rules (full rule strings) applied to firewall_zone,
           permanent and immediate. Default is an empty list.
+      firewall_extra_rich_rules:
+        type: list
+        elements: str
+        required: false
+        description: Further firewalld rich rules, applied after firewall_rich_rules (for roles that add their own).

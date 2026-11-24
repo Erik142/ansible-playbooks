@@ -29,3 +29,28 @@ notify_failure_log_lines: 50
 # before reaching the threshold. See notify-failure.sh.j2.
 notify_failure_crash_threshold: 5
 notify_failure_crash_window_seconds: 600
+
+# Units reported to hush by hush-unit-state every 5 minutes (HUSH_STATE_UNITS).
+notify_failure_state_units:
+  - beszel-agent.service
+  - caddy.service
+  - forgejo.service
+  - garage.service
+  - homepage.service
+  - immich-machine-learning.service
+  - immich-postgres.service
+  - immich-redis.service
+  - immich-server.service
+  - lab-grab-db.service
+  - lab-grab-redis.service
+  - lab-grab-sync.service
+  - lab-grab.service
+  - labgrid-coordinator.service
+  - labgrid-exporter-arp.service
+  - labgrid-exporter-serial.service
+  - paperless-db.service
+  - paperless-ngx.service
+  - paperless-redis.service
+  - restic-server.service
+  - tandoor-db.service
+  - tandoor.service

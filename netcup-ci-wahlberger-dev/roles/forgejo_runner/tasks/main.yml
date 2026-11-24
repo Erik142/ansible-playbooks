@@ -99,6 +99,14 @@
     group: "{{ forgejo_runner_user }}"
     mode: "0750"
 
+- name: Create the actions cache directory
+  ansible.builtin.file:
+    path: "{{ forgejo_runner_actions_cache_dir }}"
+    state: directory
+    owner: "{{ forgejo_runner_user }}"
+    group: "{{ forgejo_runner_user }}"
+    mode: "0750"
+
 - name: Render the runner configuration
   ansible.builtin.template:
     src: config.yaml.j2
@@ -182,10 +190,50 @@
     - not forgejo_runner_skip_runtime | bool
   changed_when: true
 
+- name: Render the hosted-style Ubuntu job image Containerfile
+  ansible.builtin.template:
+    src: Containerfile.ubuntu-hosted.j2
+    dest: "{{ forgejo_runner_images_dir }}/Containerfile.ubuntu-hosted"
+    owner: "{{ forgejo_runner_user }}"
+    group: "{{ forgejo_runner_user }}"
+    mode: "0644"
+  register: forgejo_runner_hosted_containerfile
+
+# Slow (downloads Python, Node, Go). Rebuilt only when the Containerfile changes.
+- name: Build the hosted-style Ubuntu job image as forgejo-runner
+  ansible.builtin.command:
+    argv: ["podman", "build", "--quiet", "--tag={{ forgejo_runner_hosted_image }}", "--file=Containerfile.ubuntu-hosted", "."]
+    chdir: "{{ forgejo_runner_images_dir }}"
+  become: true
+  become_user: "{{ forgejo_runner_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ forgejo_runner_uid }}"
+  when:
+    - forgejo_runner_hosted_containerfile is changed
+    - not ansible_check_mode
+    - not forgejo_runner_skip_runtime | bool
+  changed_when: true
+
 - name: Create the systemd user directory for forgejo-runner
   ansible.builtin.file:
     path: "{{ forgejo_runner_home }}/.config/systemd/user"
     state: directory
+    owner: "{{ forgejo_runner_user }}"
+    group: "{{ forgejo_runner_user }}"
+    mode: "0755"
+
+- name: Create the bin directory for forgejo-runner helper scripts
+  ansible.builtin.file:
+    path: "{{ forgejo_runner_bin_dir }}"
+    state: directory
+    owner: "{{ forgejo_runner_user }}"
+    group: "{{ forgejo_runner_user }}"
+    mode: "0755"
+
+- name: Deploy the image prune script
+  ansible.builtin.copy:
+    src: forgejo-runner-image-prune.sh
+    dest: "{{ forgejo_runner_bin_dir }}/forgejo-runner-image-prune.sh"
     owner: "{{ forgejo_runner_user }}"
     group: "{{ forgejo_runner_user }}"
     mode: "0755"

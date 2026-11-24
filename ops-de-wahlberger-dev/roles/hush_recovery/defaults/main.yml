@@ -1,0 +1,7 @@
+---
+# Long-running units with OnFailure=notify-failure@ (see the role README). caddy and
+# semaphore already have their own hush drop-ins (the hush role); zerotier is left out
+# (its restart drops the overlay the event travels over).
+hush_recovery_units:
+  - beszel-agent.service
+  - ssh-login-notify.service

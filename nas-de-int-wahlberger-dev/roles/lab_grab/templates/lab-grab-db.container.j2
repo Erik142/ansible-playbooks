@@ -1,0 +1,22 @@
+[Unit]
+Description=PostgreSQL (Lab-Grab database)
+After=network-online.target
+Wants=network-online.target
+# Emails via Resend after 5 consecutive failures, see the notify_failure role.
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=lab-grab-db
+Image={{ lab_grab_db_image }}
+Network=lab-grab
+Volume={{ lab_grab_db_data_dir }}:/var/lib/postgresql/data:Z
+Environment=POSTGRES_DB=labgrab
+Environment=POSTGRES_USER=labgrab
+# POSTGRES_PASSWORD, root-only env file rendered by the lab_grab role.
+EnvironmentFile={{ lab_grab_config_dir }}/lab-grab-db.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

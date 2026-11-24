@@ -21,3 +21,7 @@ firewall_allowed_ports: []
 # which admits every source. Example:
 #   rule family="ipv4" source address="10.10.0.0/16" port port="8000" protocol="tcp" accept
 firewall_rich_rules: []
+
+# Second list of the same kind, for roles that add rules of their own (for example lab_grab).
+# Applied after firewall_rich_rules.
+firewall_extra_rich_rules: []

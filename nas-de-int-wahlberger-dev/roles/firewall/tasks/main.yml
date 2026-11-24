@@ -39,7 +39,7 @@
     permanent: true
     immediate: true
     state: enabled
-  loop: "{{ firewall_rich_rules }}"
+  loop: "{{ firewall_rich_rules + firewall_extra_rich_rules }}"
 
 # Rootful Podman publishes container ports (e.g. Caddy's 80/443) via DNAT.
 # Masquerading on this zone is required for that forwarded/NATed traffic to be

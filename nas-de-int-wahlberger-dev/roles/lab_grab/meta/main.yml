@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: lab_grab
+  author: Erik Wahlberger
+  description: Lab-Grab web UI and place sync, with a Labgrid coordinator and exporters, as Podman Quadlets behind Caddy.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: opensuse
+      versions:
+        - "all"
+  galaxy_tags:
+    - labgrab
+    - labgrid
+    - podman
+
+dependencies: []

@@ -1,9 +1,11 @@
 # Rendered by Ansible (roles/forgejo_runner). Runs in forgejo-runner's user
 # manager, so it prunes the runner's own rootless image store only.
 [Unit]
-Description=Prune dangling images in the forgejo-runner Podman store
+Description=Prune unused images in the forgejo-runner Podman store
 
 [Service]
 Type=oneshot
-# Dangling only (no --all): tagged images stay, so the podman label image is safe.
-ExecStart=/usr/bin/podman image prune --force --filter until={{ forgejo_runner_prune_until }}
+Environment=PRUNE_UNTIL={{ forgejo_runner_prune_until }}
+Environment=PRUNE_MAX_AGE_DAYS={{ forgejo_runner_prune_max_age_days }}
+Environment="PRUNE_KEEP_REFS={{ forgejo_runner_keep_images | join(' ') }}"
+ExecStart={{ forgejo_runner_bin_dir }}/forgejo-runner-image-prune.sh

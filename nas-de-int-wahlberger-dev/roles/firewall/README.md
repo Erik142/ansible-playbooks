@@ -12,6 +12,7 @@ masquerading for Podman's published container ports.
 | `firewall_allowed_services` | `[ssh, samba, http, https]` | Predefined firewalld services to allow. |
 | `firewall_allowed_ports` | `[]` | Extra `"port/proto"` entries with no predefined firewalld service. |
 | `firewall_rich_rules` | `[]` | firewalld rich rule strings applied to `firewall_zone` (permanent + immediate), after services/ports. |
+| `firewall_extra_rich_rules` | `[]` | Further rich rules, applied after `firewall_rich_rules` (for roles that add their own, e.g. lab_grab). |
 
 Source-restricted ports belong in `firewall_rich_rules`, never in `firewall_allowed_ports`, which allows every source.
 Example: `rule family="ipv4" source address="10.10.0.0/16" port port="8000" protocol="tcp" accept`.

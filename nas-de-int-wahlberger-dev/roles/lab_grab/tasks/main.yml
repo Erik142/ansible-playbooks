@@ -1,0 +1,182 @@
+---
+- name: Validate Lab-Grab inputs are present
+  ansible.builtin.assert:
+    that:
+      - lab_grab_url | length > 0
+      - lab_grab_arp_subnet | length > 0
+      - lab_grab_db_password | length > 0
+      - lab_grab_jwt_secret | length > 0
+      - lab_grab_oidc_client_id | length > 0
+      - lab_grab_oidc_client_secret | length > 0
+      - lab_grab_registry_username | length > 0
+      - lab_grab_registry_token | length > 0
+      - lab_grab_serial_resources | length > 0
+    fail_msg: >-
+      Lab-Grab is not fully configured. Set lab_grab_url, lab_grab_arp_subnet,
+      lab_grab_registry_username, lab_grab_oidc_client_id (the Pocket ID client
+      UUID) and the vault secrets vault_lab_grab_db_password,
+      vault_lab_grab_jwt_secret, vault_lab_grab_oidc_client_secret and
+      vault_lab_grab_registry_token.
+    quiet: true
+
+# Data dirs follow roles/tandoor: pgdata and redis are written by container UIDs
+# this host cannot map, so they are world-writable like the other Podman data dirs.
+- name: Create Lab-Grab data directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ lab_grab_data_dir }}", mode: "0750" }
+    - { path: "{{ lab_grab_config_dir }}", mode: "0750" }
+    - { path: "{{ lab_grab_db_data_dir }}", mode: "0777" }
+    - { path: "{{ lab_grab_redis_data_dir }}", mode: "0777" }
+    # Written by lab-grab-sync, which runs as the non-root `app` user. The parent
+    # lab-grab dir is 0750, so other host users cannot reach this directory.
+    - { path: "{{ lab_grab_exporter_arp_dir }}", mode: "0777" }
+    - { path: "{{ lab_grab_exporter_serial_dir }}", mode: "0750" }
+
+- name: Create the Lab-Grab Podman network
+  containers.podman.podman_network:
+    name: lab-grab
+
+- name: Log in to the Forgejo registry that hosts the Lab-Grab image
+  containers.podman.podman_login:
+    registry: "{{ lab_grab_registry }}"
+    username: "{{ lab_grab_registry_username }}"
+    password: "{{ lab_grab_registry_token }}"
+  no_log: true
+
+# Config files holding secrets are rendered root-only (0600) and never end up
+# in a world-readable Quadlet unit. Each render notifies the restart of the
+# unit that reads it.
+- name: Render the Lab-Grab database environment file
+  ansible.builtin.template:
+    src: lab-grab-db.env.j2
+    dest: "{{ lab_grab_config_dir }}/lab-grab-db.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: restart lab-grab-db
+
+- name: Render the Lab-Grab app environment file
+  ansible.builtin.template:
+    src: lab-grab.env.j2
+    dest: "{{ lab_grab_config_dir }}/lab-grab.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: restart lab-grab
+
+- name: Render the Lab-Grab config.yaml
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ lab_grab_config_dir }}/config.yaml"
+    owner: root
+    group: root
+    # The image runs as the non-root user `app`, so 0600 root would be unreadable
+    # inside the container. The file is only reachable through the 0750 config dir.
+    mode: "0644"
+  no_log: true
+  notify: restart lab-grab
+
+- name: Render the place spec read by lab-grab-sync
+  ansible.builtin.template:
+    src: places.yaml.j2
+    dest: "{{ lab_grab_config_dir }}/places.yaml"
+    owner: root
+    group: root
+    # Carries the device SSH password. The sync runs as the non-root `app` user, so
+    # 0644 is needed inside the container; the 0750 config dir keeps it off-limits
+    # to other host users. Kept out of the diff by no_log.
+    mode: "0644"
+  no_log: true
+  notify: restart lab-grab-sync
+
+- name: Render the static serial exporter config
+  ansible.builtin.template:
+    src: exporter-serial.yaml.j2
+    dest: "{{ lab_grab_exporter_serial_dir }}/exporter.yaml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart labgrid-exporter-serial
+
+- name: Deploy the Labgrid coordinator container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: labgrid-coordinator
+    container_quadlet_src: labgrid-coordinator.container.j2
+
+- name: Deploy the Lab-Grab database container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: lab-grab-db
+    container_quadlet_src: lab-grab-db.container.j2
+
+- name: Deploy the Lab-Grab Redis container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: lab-grab-redis
+    container_quadlet_src: lab-grab-redis.container.j2
+
+- name: Deploy the Lab-Grab app container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: lab-grab
+    container_quadlet_src: lab-grab.container.j2
+
+- name: Deploy the Lab-Grab place sync (ARP) container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: lab-grab-sync
+    container_quadlet_src: lab-grab-sync.container.j2
+
+- name: Deploy the serial Labgrid exporter container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: labgrid-exporter-serial
+    container_quadlet_src: labgrid-exporter-serial.container.j2
+
+- name: Deploy the ARP Labgrid exporter container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: labgrid-exporter-arp
+    container_quadlet_src: labgrid-exporter-arp.container.j2
+
+# Restart the ARP exporter whenever lab-grab-sync rewrites exporter.yaml.
+- name: Deploy the unit that restarts the ARP exporter after a config change
+  ansible.builtin.template:
+    src: labgrid-exporter-arp-reload.service.j2
+    dest: /etc/systemd/system/labgrid-exporter-arp-reload.service
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy the path unit that restarts the ARP exporter on config change
+  ansible.builtin.template:
+    src: labgrid-exporter-arp.path.j2
+    dest: /etc/systemd/system/labgrid-exporter-arp.path
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enable the ARP exporter restart path unit
+  ansible.builtin.systemd:
+    name: labgrid-exporter-arp.path
+    state: started
+    enabled: true
+    daemon_reload: true
+  # The unit file is not written in check mode, so there is nothing to enable yet.
+  when: not ansible_check_mode

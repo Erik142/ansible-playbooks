@@ -1,0 +1,20 @@
+[Unit]
+Description=Redis (Lab-Grab cache and event bus)
+After=network-online.target
+Wants=network-online.target
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=lab-grab-redis
+Image={{ lab_grab_redis_image }}
+Network=lab-grab
+# Loopback only: Redis has no auth. The sync (host network) reaches it here.
+PublishPort=127.0.0.1:{{ lab_grab_redis_loopback_port }}:6379
+Volume={{ lab_grab_redis_data_dir }}:/data:Z
+Exec=redis-server --appendonly yes --notify-keyspace-events Ex
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,25 @@
+---
+# Long-running units with OnFailure=notify-failure@ (see the role README).
+hush_recovery_units:
+  - beszel-agent.service
+  - caddy.service
+  - forgejo.service
+  - garage.service
+  - homepage.service
+  - immich-machine-learning.service
+  - immich-postgres.service
+  - immich-redis.service
+  - immich-server.service
+  - lab-grab-db.service
+  - lab-grab-redis.service
+  - lab-grab-sync.service
+  - lab-grab.service
+  - labgrid-coordinator.service
+  - labgrid-exporter-arp.service
+  - labgrid-exporter-serial.service
+  - paperless-db.service
+  - paperless-ngx.service
+  - paperless-redis.service
+  - restic-server.service
+  - tandoor-db.service
+  - tandoor.service

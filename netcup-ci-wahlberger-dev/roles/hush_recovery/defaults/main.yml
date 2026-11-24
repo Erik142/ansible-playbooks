@@ -1,0 +1,6 @@
+---
+# Long-running units with OnFailure=notify-failure@ (see the role README).
+# zerotier is left out: its restart drops the overlay the event must travel over.
+hush_recovery_units:
+  - beszel-agent.service
+  - ssh-login-notify.service

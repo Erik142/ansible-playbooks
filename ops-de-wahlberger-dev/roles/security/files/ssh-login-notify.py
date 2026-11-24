@@ -138,7 +138,7 @@ def send(payload, env):
     if not env.get("HUSH_TOKEN_FILE", ""):
         raise RuntimeError("HUSH_TOKEN_FILE is empty")
     subprocess.run(
-        [HUSH_POST, "problem", socket.getfqdn(), "ssh-login"],
+        [HUSH_POST, "problem", socket.gethostname(), "ssh-login"],
         input=payload["text"],
         text=True,
         env={**env, "HUSH_MESSAGE": payload["subject"]},
@@ -151,7 +151,7 @@ def send(payload, env):
 def process(lines, env, networks):
     """Handle journal lines; returns the number of mails sent successfully."""
     sent = 0
-    host = socket.getfqdn()
+    host = socket.gethostname()
     template = load_template(env)
     for line in lines:
         login = parse_login(line)

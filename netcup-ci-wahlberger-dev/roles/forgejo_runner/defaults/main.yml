@@ -14,10 +14,11 @@ forgejo_runner_name: "netcup-ci"
 # (vars.yml passes it through).
 forgejo_runner_registration_token: ""
 
-# One job at a time. A single bitbake build takes the whole host, and job
-# containers are created through the socket, so the unit's MemoryMax/CPUQuota do
-# not cover them. Jobs are uncapped; see the README for the decision.
-forgejo_runner_capacity: 1
+# Up to 3 jobs at once. Job containers are created through the socket, so the
+# unit's MemoryMax/CPUQuota do not cover them; jobs are uncapped. A single bitbake
+# build can take most of the host, so 3 is the ceiling the role asserts. See the
+# README for the decision.
+forgejo_runner_capacity: 3
 
 # systemd limits for the runner daemon itself (12 vCPU, 32 GB host).
 forgejo_runner_memory_max: 4G
@@ -32,10 +33,17 @@ forgejo_runner_python_image: "docker.io/nikolaik/python-nodejs:python3.12-nodejs
 forgejo_runner_node_image: "docker.io/library/node:26-bookworm@sha256:fa52d1669505e29b58c042875b1d65c229e0787a3610fd52869b22b68e480853"
 forgejo_runner_podman_base_image: "quay.io/podman/stable@sha256:2fb39ca923dd9e0ee33f9e319c3a107a2bfde022a6a31560cbd56a862821e7d3"
 forgejo_runner_podman_image: "localhost/ci-podman-node:1"
+# GitHub-hosted look-alike: Ubuntu with a populated tool cache (see
+# templates/Containerfile.ubuntu-hosted.j2). Built on the host, like the podman
+# image. TODO: pin the base by digest, as the other base images are.
+forgejo_runner_hosted_base_image: "docker.io/library/ubuntu:24.04"
+forgejo_runner_hosted_image: "localhost/ci-ubuntu-hosted:1"
 
 # Labels offered to workflows: `<label>:<image>`.
 forgejo_runner_labels:
-  - "ubuntu-latest:docker://{{ forgejo_runner_ubuntu_image }}"
+  - "ubuntu-latest:docker://{{ forgejo_runner_hosted_image }}"
+  - "ubuntu-24.04:docker://{{ forgejo_runner_hosted_image }}"
+  - "ubuntu-node:docker://{{ forgejo_runner_ubuntu_image }}"
   - "python:docker://{{ forgejo_runner_python_image }}"
   - "node:docker://{{ forgejo_runner_node_image }}"
   - "podman:docker://{{ forgejo_runner_podman_image }}"
@@ -51,6 +59,13 @@ forgejo_runner_state_dir: "{{ forgejo_runner_home }}/state"
 forgejo_runner_quadlet_dir: "{{ forgejo_runner_home }}/.config/containers/systemd"
 forgejo_runner_images_dir: "{{ forgejo_runner_home }}/images"
 
+# Job containers and the runner share this network (see the Quadlet). The default
+# network has no DNS, so the runner gets a fixed address for the cache proxy.
+forgejo_runner_job_network: "podman"
+forgejo_runner_static_ip: "10.88.0.250"
+forgejo_runner_cache_proxy_port: 8088
+forgejo_runner_actions_cache_dir: "{{ forgejo_runner_cache_dir }}/actions"
+
 # Persistent build cache (bitbake sstate + downloads). Outside the job
 # workspace, so job cleanup does not touch it. A nested btrfs subvolume of @/srv,
 # which snapper does not snapshot. Not in restic.
@@ -61,9 +76,24 @@ forgejo_runner_cache_subvolume: true
 # public CA. Empty means the system trust store (public CA only).
 forgejo_runner_ca_file: ""
 
-# Unused images: dangling layers older than this are pruned weekly by the
-# runner's own user timer. Tagged images stay until their tag moves.
+# Weekly prune by the runner's user timer (see tasks/main.yml and files/).
+# Dangling layers older than prune_until are removed. Tagged images are removed
+# when they are not used by any container, are not in keep_images, and were
+# created more than prune_max_age_days ago.
 forgejo_runner_prune_until: "168h"
+forgejo_runner_prune_max_age_days: 14
+forgejo_runner_bin_dir: "{{ forgejo_runner_home }}/bin"
+# Never pruned. ci-podman-node is built on the host and cannot be re-pulled.
+# The base image is kept so that the build can be redone.
+forgejo_runner_keep_images:
+  - "{{ forgejo_runner_image }}"
+  - "{{ forgejo_runner_podman_base_image }}"
+  - "{{ forgejo_runner_podman_image }}"
+  - "{{ forgejo_runner_hosted_base_image }}"
+  - "{{ forgejo_runner_hosted_image }}"
+  - "{{ forgejo_runner_ubuntu_image }}"
+  - "{{ forgejo_runner_python_image }}"
+  - "{{ forgejo_runner_node_image }}"
 
 # Molecule only: skip everything that needs a real user manager, lingering, the
 # rootless socket or btrfs. Rendering (account files, config, Quadlet) still runs.
