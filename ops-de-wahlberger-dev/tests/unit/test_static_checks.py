@@ -7,12 +7,12 @@ import subprocess
 
 import pytest
 
-from conftest import C, EXAMPLE, N, OPS_REAL, PI, V, VARS, git, line_for, status
+from conftest import C, EXAMPLE, N, OPS_REAL, PI, V, VARS, line_for, status
 
 OPS_VARS = V + "/" + VARS
 NAS_VARS = N + "/" + VARS
 CLOUD_VARS = C + "/" + VARS
-FAST = ("SH-AC-01,SH-AC-17,SH-AC-23,SH-AC-30,SH-AC-44,SH-AC-45,SH-AC-56,SH-AC-60,SH-FR-97,SH-FR-205")
+FAST = ("SH-AC-01,SH-AC-17,SH-AC-23,SH-AC-30,SH-AC-44,SH-AC-45,SH-AC-56,SH-AC-60,SH-FR-205")
 
 NEW_KEY = ("from=\"203.0.113.9,10.243.1.5,172.29.30.0/24\" ssh-ed25519 "
            "AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXA semaphore-automation@ops.de.wahlberger.dev")
@@ -310,47 +310,6 @@ def test_ac30r_skipped_when_render_skipped(repo):
     assert status(out, "SH-AC-30r") == "SKIPPED" and rc == 0, out
 
 
-# --- SH-AC-43 (stage E only) ---------------------------------------------------
-def test_ac43_skipped_before_stage_e(repo):
-    rc, out = repo.static("SH-AC-43")
-    assert status(out, "SH-AC-43") == "SKIPPED", out
-
-
-def to_stage_e(repo):
-    """What PR E leaves behind: no Pi references in nas/cloud vars, no Renovate rules."""
-    for rel in (NAS_VARS, CLOUD_VARS):
-        p = repo.path(rel)
-        p.write_text(p.read_text().replace("pi.de.int.wahlberger.dev", "retired.example")
-                     .replace("pi-de-int-wahlberger-dev", "retired-example"))
-    repo.write("renovate.json", json.dumps({"packageRules": []}))
-
-
-def test_ac43_clean_at_stage_e(repo):
-    to_stage_e(repo)
-    rc, out = repo.static("SH-AC-43", STATIC_CHECKS_STAGE="E")
-    assert status(out, "SH-AC-43") == "PASS", out
-
-
-def test_ac43_pi_dir_exists(repo):
-    to_stage_e(repo)
-    repo.write(PI + "/site.yml", "---\n")
-    must_fail(repo, "SH-AC-43", "still exists", STATIC_CHECKS_STAGE="E")
-
-
-def test_ac43_stray_reference(repo):
-    to_stage_e(repo)
-    repo.write(N + "/roles/x/tasks/main.yml", "# talks to pi.de.int.wahlberger.dev\n")
-    must_fail(repo, "SH-AC-43", "outside the SH-FR-111 allowlist", STATIC_CHECKS_STAGE="E")
-
-
-def test_ac43_allowlisted_reference_passes(repo):
-    to_stage_e(repo)
-    repo.write("architecture/note.md", "pi.de.int.wahlberger.dev retired\n")
-    repo.write(N + "/reqs/x.md", "pi-de-int-wahlberger-dev\n")
-    rc, out = repo.static("SH-AC-43", STATIC_CHECKS_STAGE="E")
-    assert status(out, "SH-AC-43") == "PASS", out
-
-
 # --- SH-AC-44 ------------------------------------------------------------------
 @pytest.mark.parametrize("d", [N, C, V])
 def test_ac44_default_not_empty_list(repo, d):
@@ -523,11 +482,6 @@ def _renovate(repo, drop):
     p.write_text(json.dumps(cfg))
 
 
-def test_ac60_missing_pi_rule(repo):
-    _renovate(repo, "pi-de-int")
-    must_fail(repo, "SH-AC-60", "FR-160")
-
-
 def test_ac60_missing_vm_rule(repo):
     _renovate(repo, "ops-de-wahlberger-dev")
     must_fail(repo, "SH-AC-60", "FR-161")
@@ -539,36 +493,18 @@ def test_ac60_rule_not_disabled(repo):
     must_fail(repo, "SH-AC-60", "lacks")
 
 
-def test_ac60_stage_d_drops_vm_rule_only(repo):
+def test_ac60_stage_d_passes_without_vm_rule(repo):
     _renovate(repo, "ops-de-wahlberger-dev")
     rc, out = repo.static("SH-AC-60", STATIC_CHECKS_STAGE="D")
     assert status(out, "SH-AC-60") == "PASS", out
-    # ...and fails when the VM rule is still there at D.
-    repo2_out = repo.static("SH-AC-60", STATIC_CHECKS_STAGE="E")[1]
-    assert status(repo2_out, "SH-AC-60") == "FAIL" and "still has" in repo2_out
 
 
-def test_ac60_stage_e_needs_both_gone(repo):
+def test_ac60_stage_d_needs_vm_rule_gone(repo):
+    must_fail(repo, "SH-AC-60", "still has", STATIC_CHECKS_STAGE="D")
+
+
+def test_ac60_stage_e_needs_vm_rule_gone(repo):
     must_fail(repo, "SH-AC-60", "still has", STATIC_CHECKS_STAGE="E")
-
-
-# --- SH-FR-97 ------------------------------------------------------------------
-def test_fr97_untracked_pi_file(repo):
-    repo.write(PI + "/new.txt", "x")
-    must_fail(repo, "SH-FR-97", PI)
-
-
-def test_fr97_committed_pi_change(repo):
-    git(repo.root, "checkout", "-q", "-b", "feature")
-    repo.write(PI + "/new.txt", "x")
-    repo.commit_all()
-    must_fail(repo, "SH-FR-97", PI)
-
-
-def test_fr97_skipped_after_step7(repo):
-    repo.write(PI + "/new.txt", "x")
-    rc, out = repo.static("SH-FR-97", STEP7_DONE="1")
-    assert status(out, "SH-FR-97") == "SKIPPED", out
 
 
 # --- SH-FR-205 -----------------------------------------------------------------
@@ -635,7 +571,7 @@ def test_br16_runs_boundary_check(repo):
 
 
 def test_exit_code_is_nonzero_on_any_fail_and_zero_when_only_skips(repo):
-    ids = ["SH-AC-17v", "SH-AC-43", "SH-BR-16"]
+    ids = ["SH-AC-17v", "SH-AC-30r", "SH-BR-16"]
     rc, out = repo.static(",".join(ids))
     assert rc == 0, out
     for ident in ids:

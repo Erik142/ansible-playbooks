@@ -1,8 +1,10 @@
 ---
 # CI for pull requests: validates every playbook directory (anything with an
-# ansible.cfg) without touching real infrastructure — GitHub-hosted runners
-# can't reach the LAN-only hosts anyway (see pi-de-int-wahlberger-dev's
-# semaphore role for why runs happen there instead). Playbooks opt into
+# ansible.cfg, unless it contains a `.ci-retired` marker file: retired
+# directories are kept in the repo for reference but are no longer checked)
+# without touching real infrastructure — GitHub-hosted runners can't reach the
+# LAN-only hosts anyway (the Semaphore on the ops host runs the real playbooks
+# instead). Playbooks opt into
 # yamllint/ansible-lint by having a .yamllint/.ansible-lint file; syntax-check
 # and the vault-encryption check always run.
 name: CI
@@ -22,7 +24,8 @@ jobs:
       - id: find
         run: |
           dirs=$(find . -maxdepth 1 -mindepth 1 -type d \
-            -exec test -e '{}/ansible.cfg' \; -print \
+            -exec test -e '{}/ansible.cfg' \; \
+            -exec test ! -e '{}/.ci-retired' \; -print \
             | sed 's|^\./||' | sort | jq -R -s -c 'split("\n")[:-1]')
           echo "dirs=$dirs" >> "$GITHUB_OUTPUT"
 
@@ -41,8 +44,8 @@ jobs:
           python-version: "3.14"
 
       # Pinned to 2.20.8 — Semaphore's own actual bundled Ansible version
-      # (confirmed via `podman exec semaphore ansible --version` on
-      # pi-de-int-wahlberger-dev), not the older 2.16 the local pyenv venv
+      # (confirmed via `podman exec semaphore ansible --version` on the
+      # Semaphore host), not the older 2.16 the local pyenv venv
       # happens to run. Syntax-check itself doesn't care much either way,
       # but matching this here keeps this job's stated target honest.
       - name: Install Ansible tooling
@@ -115,7 +118,7 @@ jobs:
 
       # Pinned to 2.20.8 — Semaphore's own actual bundled Ansible version
       # (confirmed via `podman exec semaphore ansible --version` on
-      # pi-de-int-wahlberger-dev). Testing against anything else would
+      # Semaphore host). Testing against anything else would
       # validate a version nothing actually deploys with.
       - name: Install Molecule tooling
         if: steps.has_molecule.outputs.present == 'true'

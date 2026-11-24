@@ -7,7 +7,7 @@
 #
 # Usage: tests/static-checks.sh            (from anywhere)
 # Environment:
-#   STATIC_CHECKS_BASE=master              ref for the AC-02/11/15 diffs
+#   STATIC_CHECKS_BASE=master              ref for the AC-02 and AC-06 diffs
 #                                          (falls back to origin/master; the
 #                                          merge-base with HEAD is used)
 #   STATIC_CHECKS_VAULT_PASSWORD_FILE=...  opt in to the decrypted-vault checks
@@ -480,18 +480,6 @@ if errors:
 PY
 }
 
-# --- BD-AC-11: the Pi is untouched and never contacted -----------------------
-ac11() {
-    rc=0
-    a=$(git -C "$repo" diff "$base" --stat -- pi-de-int-wahlberger-dev)
-    [ -z "$a" ] || { echo "pi-de-int-wahlberger-dev changed:"; echo "$a"; rc=1; }
-    # Only cloud's pre-cut-over default restic_backup_rest_server_host may match.
-    b=$(git -C "$repo" diff "$base" -- "$nas_rel" "$cloud_rel" ':(exclude)*.md' \
-        | grep -E '^\+.*pi\.de\.int\.wahlberger\.dev' | grep -v 'restic_backup_rest_server_host')
-    [ -z "$b" ] || { echo "added references to the Pi:"; echo "$b"; rc=1; }
-    return $rc
-}
-
 ac16_vault() {
     vault_pw || { echo "no vault access"; return 77; }
     python3 - "$STATIC_CHECKS_VAULT_PASSWORD_FILE" "$nas_dir" <<'PY'
@@ -528,7 +516,6 @@ check AC-07 "render check (default and spindown 120)" ac07
 check AC-08 "rest-server image Renovate-detectable" ac08
 check AC-09 "vars, flags and vault.yml.example wiring" ac09
 check AC-09v "decrypted vault keys and BD-BR-09 equalities" ac09_vault
-check AC-11 "Pi untouched and never contacted" ac11
 check AC-16v "no production vault value in inventories/vm" ac16_vault
 check UNIT "pytest tests/unit" unit
 
