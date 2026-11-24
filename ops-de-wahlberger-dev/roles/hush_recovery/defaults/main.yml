@@ -5,3 +5,4 @@
 hush_recovery_units:
   - beszel-agent.service
   - ssh-login-notify.service
+  - zerotier.service
