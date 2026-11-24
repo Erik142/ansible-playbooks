@@ -375,12 +375,23 @@
             - "{{ gt_ops_dir }}/roles/cloudflare_dns"
             - "{{ gt_tmp.path }}/control"
 
+        # find on a missing directory reports matched=0 without an error, so the
+        # zero-match check below is only meaningful when the role directory exists.
+        - name: Check the role directory exists
+          ansible.builtin.stat:
+            path: "{{ gt_ops_dir }}/roles/cloudflare_dns"
+          register: gt_role_dir
+
         - name: Assert the role never deletes and the scan can see a deletion
           ansible.builtin.assert:
             that:
+              - gt_role_dir.stat.isdir | default(false)
               - gt_scan.results[0].matched == 0
               - gt_scan.results[1].matched == 1
-            fail_msg: "role matches={{ gt_scan.results[0].matched }} (want 0), control matches={{ gt_scan.results[1].matched }} (want 1)"
+            fail_msg: >-
+              role dir exists={{ gt_role_dir.stat.exists | default(false) }}
+              role matches={{ gt_scan.results[0].matched }} (want 0),
+              control matches={{ gt_scan.results[1].matched }} (want 1)
             quiet: true
       always:
         - name: Remove the scratch directory
