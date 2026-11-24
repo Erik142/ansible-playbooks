@@ -46,12 +46,21 @@ dump_postgres() { # <name> <container> <database> <user>
 }
 
 # Online-backup API: a consistent snapshot of the live file (a plain cp of a DB
-# mid-write is not restorable). -readonly plus Forgejo's rollback-journal mode
-# means this never creates root-owned -wal/-shm files beside the live DB.
-dump_sqlite() { # <name> <source db path>
-    local name=$1 source=$2
+# mid-write is not restorable). Forgejo's DB is in rollback-journal mode, so the
+# dump creates no sidecar files. A WAL database (n8n) can get missing -wal/-shm
+# files created by root, which the app (its uid) cannot reopen. For those, the
+# files are created first, owned by the app uid.
+dump_sqlite() { # <name> <source db path> [<app uid, WAL databases only>]
+    local name=$1 source=$2 app_uid=${3:-}
     local tmp="$DUMP_DIR/$name.db.tmp" final="$DUMP_DIR/$name.db"
     rm -f -- "$tmp"
+    if [ -n "$app_uid" ]; then
+        for suffix in -wal -shm; do
+            if [ ! -e "$source$suffix" ]; then
+                install -m 0644 -o "$app_uid" -g "$app_uid" /dev/null "$source$suffix"
+            fi
+        done
+    fi
     timeout --kill-after="$KILL_AFTER_SECONDS" "$TIMEOUT_SECONDS" \
         sqlite3 -readonly -cmd ".timeout 30000" "$source" ".backup '$tmp'"
     finish "$name" "$final" "$tmp" "$?"
@@ -61,5 +70,6 @@ dump_sqlite() { # <name> <source db path>
 dump_postgres {{ entry.name | quote }} {{ entry.container | quote }} {{ entry.database | quote }} {{ entry.user | quote }}
 {% endfor %}
 dump_sqlite forgejo {{ db_dump_forgejo_db_path | quote }}
+dump_sqlite n8n {{ db_dump_n8n_db_path | quote }} {{ db_dump_n8n_uid | quote }}
 
 exit "$failed"

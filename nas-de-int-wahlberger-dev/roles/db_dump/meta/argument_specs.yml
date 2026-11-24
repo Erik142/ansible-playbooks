@@ -42,6 +42,14 @@ argument_specs:
         type: path
         required: false
         description: Host path of Forgejo's SQLite database, copied with sqlite3 .backup.
+      db_dump_n8n_db_path:
+        type: path
+        required: false
+        description: Host path of n8n's SQLite database (WAL mode), copied with sqlite3 .backup.
+      db_dump_n8n_uid:
+        type: int
+        required: false
+        description: uid n8n runs as; owns the -wal/-shm files the dump may create.
       db_dump_timeout:
         type: str
         required: false
