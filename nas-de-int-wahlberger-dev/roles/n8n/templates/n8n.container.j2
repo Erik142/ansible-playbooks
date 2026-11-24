@@ -43,6 +43,10 @@ Environment=N8N_TRUSTED_EMAIL_HEADER=x-auth-request-email
 Environment=N8N_ENCRYPTION_KEY_FILE=/run/secrets/n8n_encryption_key
 Environment=N8N_BLOCK_ENV_ACCESS_IN_NODE=false
 Environment=NODE_FUNCTION_ALLOW_BUILTIN=crypto
+# Audit: every triage run is kept in n8n's execution history for 30 days (hours; default 14 days).
+# The record includes the report and the PROPOSED_ACTION line. Nothing is executed from it.
+Environment=EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
+Environment=EXECUTIONS_DATA_MAX_AGE=720
 # Root-only env file with the triage secrets, same EnvironmentFile= pattern as roles/forgejo.
 EnvironmentFile={{ n8n_data_dir }}/n8n.env
 

@@ -8,7 +8,9 @@ import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 RECORDED = []
-REPLY = "Likely cause: caddy restarted after a config change. Next check: journalctl -u caddy --since -1h."
+REPLY = ("Likely cause: caddy restarted after a config change.\n"
+         "Next check: journalctl -u caddy --since -1h.\n"
+         "PROPOSED_ACTION: restart caddy.service")
 
 
 class Handler(BaseHTTPRequestHandler):

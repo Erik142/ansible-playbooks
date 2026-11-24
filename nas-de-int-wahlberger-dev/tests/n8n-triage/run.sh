@@ -137,6 +137,11 @@ body=$(handoff info "$HOST" n8n http)
 ts=$(now); resp=$(post "$body" "$(sign "$ts" "$body")" "$ts")
 check "valid info handoff accepted" 200 "$(tail -1 <<<"$resp")"
 if grep -q '"outcome":"escalate"' <<<"$resp"; then echo "PASS reply is outcome escalate"; else echo "FAIL reply is not escalate: $resp"; fail=1; fi
+if grep -q '"proposed_action":"restart caddy.service"' <<<"$resp"; then
+  echo "PASS PROPOSED_ACTION is recorded in the reply"
+else
+  echo "FAIL PROPOSED_ACTION not in the reply: $resp"; fail=1
+fi
 reqs=$(claude_requests)
 python3 - "$reqs" "$HOST" <<'PY' || fail=1
 import json, sys
