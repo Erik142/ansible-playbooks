@@ -14,6 +14,8 @@ hush_recovery_units:
   - lab-grab-redis.service
   - lab-grab-sync.service
   - lab-grab.service
+  - n8n.service
+  - oauth2-proxy.service
   - labgrid-coordinator.service
   - labgrid-exporter-arp.service
   - labgrid-exporter-serial.service
