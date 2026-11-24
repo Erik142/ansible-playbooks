@@ -120,3 +120,12 @@ Add `meta/argument_specs.yml` and a `README.md` for the role.
 - `docs/spikes/`: measured facts (Semaphore image, `authorized_keys` `from=`, Caddy global options). Evidence is container-level, not the VM.
 - `docs/security-review.md`: the pre-merge security review (written by its own task).
 - `tools/README.md`: operator tooling for steps 4 and 6.
+
+## Hush recovery lists (mandatory)
+
+`roles/hush_recovery/defaults/main.yml` (`hush_recovery_units`) must list every long-running unit that has `OnFailure=notify-failure@%n.service`. Without the entry, Hush gets the failure but never the recovery, so the problem stays open and escalates on every cycle.
+
+- **Whenever a service is added, removed, renamed or its unit name changes**, update this list in the same change. Check with `grep -rl "OnFailure=notify-failure" roles` against the list.
+- One-shot units (timers, backup and check jobs) are not listed. A drop-in restarts the unit, which is wrong for them.
+- On ops, `caddy.service` and `semaphore.service` are covered by `hush_systemd_watched_units` in the `hush` role. Do not duplicate them here.
+- Deploying a changed list restarts the listed units whose drop-in changed. For `zerotier.service`, that briefly drops ZeroTier connectivity, so run it in a window where that is acceptable.

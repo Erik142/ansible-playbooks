@@ -8,3 +8,4 @@ hush_recovery_units:
   - oauth2-proxy.service
   - pocket-id.service
   - uptime-kuma.service
+  - zerotier.service
