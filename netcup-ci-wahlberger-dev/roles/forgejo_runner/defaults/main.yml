@@ -36,7 +36,7 @@ forgejo_runner_podman_image: "localhost/ci-podman-node:1"
 # GitHub-hosted look-alike: Ubuntu with a populated tool cache (see
 # templates/Containerfile.ubuntu-hosted.j2). Built on the host, like the podman
 # image. TODO: pin the base by digest, as the other base images are.
-forgejo_runner_hosted_base_image: "docker.io/library/ubuntu:24.04"
+forgejo_runner_hosted_base_image: "docker.io/library/ubuntu:26.10"
 forgejo_runner_hosted_image: "localhost/ci-ubuntu-hosted:1"
 
 # Labels offered to workflows: `<label>:<image>`.
