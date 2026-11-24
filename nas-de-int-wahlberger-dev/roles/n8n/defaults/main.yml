@@ -10,7 +10,7 @@
 # Pinned exact tag: the stable channel (2.48.8, docs.n8n.io/changelog). v3.x is
 # early access in the docs and a prerelease on GitHub, so it stays out until stable.
 # Do not use `latest`. Renovate proposes minor/patch bumps; majors stay manual.
-n8n_image: docker.io/n8nio/n8n:2.48.8
+n8n_image: docker.io/n8nio/n8n:2.50.0
 
 # Host layout under /mnt/containers (restic/btrbk-covered like the other containers):
 #   <n8n_data_dir>/n8n.env            root-only env file (encryption key)
@@ -40,7 +40,7 @@ n8n_cpu_quota: 200%
 n8n_nodes_exclude: '["n8n-nodes-base.executeCommand"]'
 
 # --- oauth2-proxy (editor auth gate, same pattern as cloud-wahlberger-dev/uptime_kuma)
-n8n_oauth2_proxy_image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.5
+n8n_oauth2_proxy_image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.6
 n8n_oauth2_proxy_port: 4180
 
 # Emails allowed through the editor gate (oauth2-proxy). The trusted-header hook logs in
