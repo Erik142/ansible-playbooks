@@ -10,6 +10,7 @@ ContainerName=oauth2-proxy
 Image={{ n8n_oauth2_proxy_image }}
 Network=caddy.network
 EnvironmentFile={{ n8n_data_dir }}/oauth2-proxy.env
+Volume={{ n8n_data_dir }}/oauth2-proxy-emails.txt:/etc/oauth2-proxy/emails.txt:ro,Z
 
 [Service]
 Restart=always

@@ -45,6 +45,22 @@ Vault keys (see `vault.yml.example`):
 The owner account is created in the first-run UI, behind Pocket ID. No owner
 password is stored in the vault.
 
+## Trusted-header login (one login, not two)
+
+Editor login is Pocket ID, then n8n's own session. The trusted-header hook removes the second login:
+
+1. oauth2-proxy admits only the emails in `n8n_allowed_emails` (vars.yml, currently one owner) and sets `X-Auth-Request-Email` on the `/oauth2/auth` response.
+2. Caddy (`caddy_sites` entry for n8n) strips any client-supplied `X-Auth-Request-Email`, then copies the value from the oauth2-proxy response into the request.
+3. `files/hooks.js` (loaded by `EXTERNAL_HOOK_FILES`) reads that header, finds the n8n user with the same email, and issues n8n's `n8n-auth` cookie. Unknown emails get 401.
+
+Requirements, all enforced by the config above:
+
+- The n8n owner's email must equal `n8n_allowed_emails` and the Pocket ID email. The hook does not create users.
+- n8n must not be reachable except through Caddy. It has no published port. Anyone who can send the header directly can log in as that user.
+- The hook uses n8n internals (cookie-parser layer, `AuthService.issueJWT/issueCookie`, the `n8n-auth` cookie). It is not a supported n8n feature.
+
+Compatibility: `tests/n8n-hook/run.sh <image>` runs the hook against an n8n image with the same checks as the manual test (owner setup, header login, unknown user, cookie flow). CI runs it against the pinned `n8n_image`, so a Renovate bump that breaks the hook fails CI before merge. If the hook stops loading, the hook logs `disabled` or errors, and API calls without the cookie return 401. Nothing gets through by accident.
+
 ## Manual steps before the first deploy
 
 1. Register a Pocket ID client with redirect URI

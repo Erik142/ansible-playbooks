@@ -43,6 +43,10 @@ n8n_nodes_exclude: '["n8n-nodes-base.executeCommand"]'
 n8n_oauth2_proxy_image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.5
 n8n_oauth2_proxy_port: 4180
 
+# Emails allowed through the editor gate (oauth2-proxy). The trusted-header hook logs in
+# only as the n8n user with the same email, so this list must stay short: one owner.
+n8n_allowed_emails: []
+
 # Pocket ID OIDC client for the editor. Not secret (a UUID). Create it in Pocket ID
 # with redirect URI "{{ n8n_url }}/oauth2/callback", then set it in group_vars.
 n8n_oidc_client_id: ""

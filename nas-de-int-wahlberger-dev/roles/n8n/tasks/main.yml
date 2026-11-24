@@ -28,6 +28,13 @@
     mode: "0755"
 
 # The image runs as node (uid/gid 1000) and rootful Podman does no ID remapping.
+- name: Validate the editor allowlist
+  ansible.builtin.assert:
+    that:
+      - n8n_allowed_emails | length > 0
+    fail_msg: n8n_allowed_emails is empty. Without it oauth2-proxy admits nobody. See roles/n8n/README.md.
+    quiet: true
+
 - name: Create the n8n data volume directory
   ansible.builtin.file:
     path: "{{ n8n_volume_dir }}"
@@ -35,6 +42,27 @@
     owner: "{{ n8n_uid }}"
     group: "{{ n8n_gid }}"
     mode: "0750"
+
+# The trusted-header hook (files/hooks.js), loaded via EXTERNAL_HOOK_FILES. Root-owned so
+# n8n (uid 1000) can read it but cannot change it. Tested per image in tests/n8n-hook/.
+- name: Deploy the n8n trusted-header hook
+  ansible.builtin.copy:
+    src: hooks.js
+    dest: "{{ n8n_volume_dir }}/hooks.js"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart n8n
+
+# The editor gate's allowlist. Mounted read-only into the oauth2-proxy container.
+- name: Render the oauth2-proxy allowlist of editor users
+  ansible.builtin.copy:
+    content: "{{ n8n_allowed_emails | join('\n') }}\n"
+    dest: "{{ n8n_data_dir }}/oauth2-proxy-emails.txt"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart oauth2-proxy
 
 # Root-only env files. Secrets stay out of the world-readable Quadlet units.
 # Each is rendered immediately before its container include, for the same
