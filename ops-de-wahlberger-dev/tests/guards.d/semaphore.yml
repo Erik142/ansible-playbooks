@@ -266,9 +266,21 @@
             - "{{ gt_ops_dir }}/roles/semaphore/templates"
             - "{{ gt_ctl.path }}"
 
+        # find on a missing directory reports matched=0 without an error, so the
+        # zero-match checks are only meaningful when both role directories exist.
+        - name: Check the role task and template directories exist
+          ansible.builtin.stat:
+            path: "{{ item }}"
+          register: gt_role_dirs
+          loop:
+            - "{{ gt_ops_dir }}/roles/semaphore/tasks"
+            - "{{ gt_ops_dir }}/roles/semaphore/templates"
+
         - name: Assert the role never names them and the scan can see one
           ansible.builtin.assert:
             that:
+              - gt_role_dirs.results[0].stat.isdir | default(false)
+              - gt_role_dirs.results[1].stat.isdir | default(false)
               - gt_scan.results[0].matched == 0
               - gt_scan.results[1].matched == 0
               - gt_scan.results[2].matched == 1

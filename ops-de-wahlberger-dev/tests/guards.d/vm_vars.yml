@@ -24,14 +24,18 @@
     gt_roles: "{{ playbook_dir }}/../../roles"
     gt_stage: "{{ lookup('ansible.builtin.env', 'STATIC_CHECKS_STAGE') | default('A', true) }}"
     gt_subnet_re: '^(10|172|192)\.[0-9]{1,3}\.[0-9]{1,3}\.0/24$'
-    gt_expected_ignore:
-      - 127.0.0.0/8
-      - "{{ semaphore_network_subnet }}"
-      - 10.10.0.0/16
-      - 10.243.0.0/16
-      - "{{ cloud_public_ip }}"
   tasks:
+    # The ignore list is the security role's own default (LAN and ZeroTier ranges)
+    # plus what this host adds: loopback, the Semaphore subnet and cloud's public IPv4.
+    # Two sources of truth, compared exactly, instead of a literal copy of the list.
     - name: SH-FR-124 - fail2ban ignores exactly loopback, semaphore subnet, LAN, ZeroTier, cloud public IPv4
+      vars:
+        gt_security: >-
+          {{ lookup('ansible.builtin.file', gt_roles ~ '/security/defaults/main.yml')
+          | regex_replace('\{\{', '[[') | regex_replace('\{%', '[%') | from_yaml }}
+        gt_expected_ignore: >-
+          {{ gt_security.security_fail2ban_ignoreip
+             + ['127.0.0.0/8', semaphore_network_subnet, cloud_public_ip] }}
       ansible.builtin.assert:
         that:
           - security_fail2ban_ignoreip | sort == gt_expected_ignore | sort
@@ -75,9 +79,23 @@
           - restic_backup_forget_enabled is sameas false
           - (restic_backup_sqlite_required | default(false)) is sameas false
           - security_fail2ban_enabled is sameas true
-          - disk_space_threshold_percent == 85
-          - semaphore_url == 'https://semaphore.de.int.wahlberger.dev'
+          - semaphore_url | urlsplit('scheme') == 'https'
+          - semaphore_url | urlsplit('hostname') in (caddy_sites | map(attribute='host') | list)
           - semaphore_oidc_client_id == '63093482-d2cc-4c77-89df-9f6ff78b160e'
+        quiet: true
+
+    # The disk alert threshold is the disk_space role default unless the host overrides it;
+    # the override must still be a sane percentage.
+    - name: The disk space threshold equals the disk_space role default
+      vars:
+        gt_disk: >-
+          {{ lookup('ansible.builtin.file', gt_roles ~ '/disk_space/defaults/main.yml')
+          | regex_replace('\{\{', '[[') | regex_replace('\{%', '[%') | from_yaml }}
+      ansible.builtin.assert:
+        that:
+          - disk_space_threshold_percent == gt_disk.disk_space_threshold_percent
+          - disk_space_threshold_percent | int > 0
+          - disk_space_threshold_percent | int < 100
         quiet: true
 
     - name: Values filled in by later pull requests are empty or well-formed

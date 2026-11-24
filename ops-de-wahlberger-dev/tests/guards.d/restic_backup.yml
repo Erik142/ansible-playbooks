@@ -47,6 +47,10 @@
           - gt_s.env is search('^RESTIC_PASSWORD=repo-pw-sentinel$', multiline=True)
           - gt_s.env is search('^RESTIC_REPOSITORY=rest:http://ops:rest-pw-sentinel@nas\.de\.int\.wahlberger\.dev:8000/ops/$', multiline=True)
           - gt_s.logs[1] is search('changed=0\s')
+          # Positive control for the "zypper == [] / systemctl == []" checks below:
+          # an empty log only means "nothing was called" if the stubs log at all.
+          - gt_s.zypper | length > 0
+          - gt_s.systemctl | length > 0
       - name: restic_backup_forget_enabled true -> refused naming the variable, nothing created, no package installed (SH-FR-81)
         vars: { restic_backup_forget_enabled: true }
         that:

@@ -200,11 +200,15 @@
           loop_control:
             label: "{{ item.1.name }}"
 
+        # "failed=0" alone also holds when --tags caddy_guard selects nothing, so the
+        # control must also show that both guard tasks ran (their TASK headers appear).
         - name: Assert valid inputs pass the guard tasks in both designs
           ansible.builtin.assert:
             that:
               - item.rc == 0
               - "'failed=0' in item.stdout"
+              - "'TASK [caddy : Require the ZeroTier bind address' in item.stdout"
+              - "'TASK [caddy : Require a known design' in item.stdout"
             fail_msg: "{{ item.item.name }}: {{ item.stdout }}{{ item.stderr }}"
             quiet: true
           loop: "{{ cg_pass_runs.results }}"

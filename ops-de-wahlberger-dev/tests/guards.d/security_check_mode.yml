@@ -45,6 +45,21 @@
       ansible.builtin.set_fact:
         gc_cname: "t06b-check-mode-{{ 99999 | random }}"
 
+    # The absence checks below are only meaningful for paths the roles really
+    # deploy: a stale path in gc_must_stay_absent would pass `test -e` forever.
+    - name: Every must-stay-absent path is a destination of the disk_space or security role
+      ansible.builtin.assert:
+        that: gc_must_stay_absent | difference(gc_role_dests) | list == []
+        fail_msg: "not deployed by roles/disk_space or roles/security (stale path?): {{ gc_must_stay_absent | difference(gc_role_dests) | list }}"
+        quiet: true
+      vars:
+        gc_role_files: >-
+          {{ query('ansible.builtin.fileglob', gc_ops_dir ~ '/roles/disk_space/tasks/*.yml')
+             + query('ansible.builtin.fileglob', gc_ops_dir ~ '/roles/security/tasks/*.yml') }}
+        gc_role_dests: >-
+          {{ query('ansible.builtin.file', *gc_role_files) | join('\n')
+             | regex_findall('(?m)^\s*(?:dest|path):\s*"?(/[^"\s{}]+)"?\s*$') | unique | list }}
+
     - name: Require Docker
       ansible.builtin.command: docker info
       register: gc_docker
@@ -171,12 +186,22 @@
           changed_when: false
           failed_when: false
 
+        # `docker exec` into a stopped container exits 1, the same code `test -e`
+        # uses for "absent". So the container must still be running when it is read.
+        - name: The container is still running when the checks read it
+          ansible.builtin.command:
+            argv: [docker, ps, -q, --filter, "name=^{{ gc_cname }}$", --filter, status=running]
+          register: gc_running
+          changed_when: false
+          failed_when: false
+
         - name: Look for each file the roles would create
           ansible.builtin.command:
             argv: [docker, exec, "{{ gc_cname }}", test, -e, "{{ item }}"]
           register: gc_exists
           changed_when: false
-          failed_when: false
+          # 0 = present, 1 = absent; anything else is docker failing, not an answer.
+          failed_when: gc_exists.rc not in [0, 1]
           loop: "{{ gc_must_stay_absent }}"
 
         - name: Is fail2ban installed in the container?
@@ -184,7 +209,8 @@
             argv: [docker, exec, "{{ gc_cname }}", rpm, -q, fail2ban]
           register: gc_f2b
           changed_when: false
-          failed_when: false
+          # rpm -q: 0 = installed, 1 = not installed; other codes are docker failing.
+          failed_when: gc_f2b.rc not in [0, 1]
 
         - name: Assert --check passed, simulated changes, and changed nothing
           ansible.builtin.assert:
@@ -196,8 +222,9 @@
               - gc_run.stdout is not regex('changed=0\s')
               - "'TASK [security : Enable and start sshd]' in gc_run.stdout"
               - "'TASK [disk_space : Enable and start the disk space check timer]' in gc_run.stdout"
+              - gc_running.stdout | length > 0
               - gc_exists.results | selectattr('rc', 'equalto', 0) | map(attribute='item') | list == []
-              - gc_f2b.rc != 0
+              - gc_f2b.rc == 1
             fail_msg: >-
               --check on a fresh host: rc={{ gc_run.rc }}; files that exist afterwards:
               {{ gc_exists.results | selectattr('rc', 'equalto', 0) | map(attribute='item') | list }};
