@@ -5,7 +5,7 @@ Proposed loop: Uptime Kuma alert -> webhook -> n8n LLM agent investigates -> if 
 playbook/role, the agent opens a GitHub PR -> human merges -> Semaphore re-runs the playbook.
 
 Current state (verified in this repo):
-- Uptime Kuma runs on `cloud-wahlberger-dev` (Hetzner) and reaches `nas`/`pi` over ZeroTier (`roles/zerotier`).
+- Uptime Kuma runs on `playbooks/cloud-wahlberger-dev` (Hetzner) and reaches `nas`/`pi` over ZeroTier (`roles/zerotier`).
   `nas` has no public inbound port, so a webhook to n8n on the NAS travels cloud -> ZeroTier -> NAS Caddy. No port forward is needed.
 - Semaphore on `ops-de-wahlberger-dev` (Hetzner VM, ZeroTier-only UI) is the only holder of the automation SSH key, which has passwordless sudo on all three hosts.
   Semaphore polls GitHub; there is no inbound webhook.
@@ -66,7 +66,7 @@ Two prerequisites are worth doing even if no AI is ever built:
 ### Diagram
 ```mermaid
 flowchart LR
-  subgraph cloud["cloud-wahlberger-dev"]
+  subgraph cloud["playbooks/cloud-wahlberger-dev"]
     UK[Uptime Kuma]
   end
   subgraph nas["nas-de-int-wahlberger-dev"]

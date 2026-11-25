@@ -2,7 +2,7 @@
 
 This file covers rules for the whole repo. Host details live in the collection
 README (`collections/homelab/README.md`) and the inventory's `group_vars`.
-`cloud-wahlberger-dev/` keeps its own `CLAUDE.md`.
+`playbooks/cloud-wahlberger-dev/` keeps its own `CLAUDE.md`.
 
 ## Layout
 
@@ -14,7 +14,7 @@ README (`collections/homelab/README.md`) and the inventory's `group_vars`.
   `.vault_pass_ops.sh`: shared config at the root. Vault ids: `ci` and `ops`
   have their own password script (`vault_identity_list`); unlabelled files use
   `.vault_pass.sh` (the NAS password).
-- `cloud-wahlberger-dev/`: the one host not yet in the collection, with its own
+- `playbooks/cloud-wahlberger-dev/`: the one host not yet in the collection, with its own
   playbook and `CLAUDE.md`.
 - `docs/`: architecture notes (flat, no subdirectories).
 

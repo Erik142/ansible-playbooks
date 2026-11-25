@@ -13,7 +13,7 @@ inventory layout, and linting wired up.
 ## Layout
 
 ```text
-cloud-wahlberger-dev/
+playbooks/cloud-wahlberger-dev/
 ├── ansible.cfg                  # project-local Ansible settings
 ├── site.yml                     # top-level playbook (entry point)
 ├── requirements.yml             # Galaxy collections + roles to install

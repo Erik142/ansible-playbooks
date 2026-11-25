@@ -11,13 +11,13 @@ still has its own self-contained playbook.
 
 | Playbook | Host | What it runs |
 |----------|------|---------------|
-| [`cloud-wahlberger-dev`](cloud-wahlberger-dev) | `cloud.wahlberger.dev` (Hetzner Cloud VM, Debian) | Pocket ID (passkey OIDC) + FreshRSS behind Caddy (HTTP-01). Not yet migrated to the collection. |
+| [`cloud-wahlberger-dev`](playbooks/cloud-wahlberger-dev) | `cloud.wahlberger.dev` (Hetzner Cloud VM, Debian) | Pocket ID (passkey OIDC) + FreshRSS behind Caddy (HTTP-01). Not yet migrated to the collection. |
 | `wahlberger.homelab.nas` | `nas.de.int.wahlberger.dev` (home NAS, openSUSE Tumbleweed) | Native Samba file share, Tandoor + Paperless-ngx + Immich behind Caddy (DNS-01), a Homepage dashboard. Inventory `inventories/nas/`. |
 | `wahlberger.homelab.ops` | `ops.de.wahlberger.dev` (Hetzner CX23, openSUSE Tumbleweed) | Semaphore UI (over ZeroTier only), Caddy, Hush alerting; runs the other playbooks (see [Automated runs](#automated-runs)). Inventory `inventories/ops/`. |
 | `wahlberger.homelab.ci` | `ci.de.wahlberger.dev` (netcup VPS, openSUSE) | Forgejo Actions runner for the NAS Forgejo, over ZeroTier. Inventory `inventories/ci/`. |
 
 The collection's README is [`collections/homelab/README.md`](collections/homelab/README.md),
-and the repo-wide rules are in [`CLAUDE.md`](CLAUDE.md). `cloud-wahlberger-dev`
+and the repo-wide rules are in [`CLAUDE.md`](CLAUDE.md). `playbooks/cloud-wahlberger-dev`
 has its own `README.md` and `CLAUDE.md`.
 
 ## Automated runs
@@ -55,7 +55,7 @@ see `inventories/ci/`).
 The cloud host runs from its own directory:
 
 ```sh
-cd cloud-wahlberger-dev
+cd playbooks/cloud-wahlberger-dev
 ansible-galaxy collection install -r requirements.yml
 ansible-galaxy role install -r requirements.yml
 ansible-playbook site.yml --ask-vault-pass
