@@ -1,0 +1,102 @@
+---
+argument_specs:
+  main:
+    short_description: Semaphore UI behind Caddy on the ops VM, Pocket ID login, migrated SQLite database.
+    options:
+      semaphore_image:
+        type: str
+        required: false
+        description: Semaphore container image (same tag as on the Pi at migration, SH-FR-50).
+      semaphore_data_dir:
+        type: path
+        required: false
+        description: Host directory for config.json, semaphore.env and the data/ directory holding database.sqlite.
+      semaphore_quadlet_dir:
+        type: path
+        required: false
+        description: Directory the network Quadlet is written to.
+      semaphore_design:
+        type: str
+        required: false
+        choices: [primary, bridge_fallback]
+        description: >-
+          primary joins semaphore.network and publishes 127.0.0.1:3000;
+          bridge_fallback joins caddy.network and publishes nothing. Wired from vm_proxy_design.
+      semaphore_network_subnet:
+        type: str
+        required: false
+        description: IPv4 subnet of semaphore.network. Required (non-empty) in the primary design.
+      semaphore_uid:
+        type: raw
+        required: false
+        description: >-
+          UID of the Semaphore process in the image. Empty by default; the role then fails
+          before any change naming this variable (SH-FR-210). Owner of config.json, the data
+          directory and database.sqlite.
+      semaphore_require_existing_db:
+        type: bool
+        required: false
+        description: Fail before any container task if data/database.sqlite is absent (SH-FR-52).
+      semaphore_dns_servers:
+        type: list
+        elements: str
+        required: false
+        description: Resolvers of the container and of semaphore.network.
+      semaphore_getent_names:
+        type: list
+        elements: str
+        required: false
+        description: Names whose in-container resolution must equal dig @1.1.1.1 (documented in the Quadlet, SH-AC-16).
+      semaphore_url:
+        type: str
+        required: true
+        description: Public https:// URL Semaphore is served on.
+      semaphore_admin_username:
+        type: str
+        required: false
+        description: Break-glass local admin username, created only if absent.
+      semaphore_admin_name:
+        type: str
+        required: false
+        description: Break-glass local admin display name.
+      semaphore_admin_email:
+        type: str
+        required: false
+        description: Break-glass local admin email.
+      semaphore_oidc_provider_name:
+        type: str
+        required: false
+        description: Label shown on the Semaphore login button.
+      semaphore_oidc_provider_url:
+        type: str
+        required: false
+        description: Pocket ID issuer URL.
+      semaphore_oidc_client_id:
+        type: str
+        required: true
+        description: OAuth2 client ID issued by Pocket ID.
+      semaphore_oidc_client_secret:
+        type: str
+        required: false
+        no_log: true
+        description: OAuth2 client secret (Vault, copied verbatim from the Pi).
+      semaphore_admin_password:
+        type: str
+        required: false
+        no_log: true
+        description: Break-glass admin password (Vault, copied verbatim from the Pi).
+      semaphore_access_key_encryption:
+        type: str
+        required: false
+        no_log: true
+        description: access_key_encryption (Vault); must equal the Pi's or stored keys cannot be decrypted.
+      semaphore_cookie_hash:
+        type: str
+        required: false
+        no_log: true
+        description: cookie_hash (Vault, copied verbatim from the Pi).
+      semaphore_cookie_encryption:
+        type: str
+        required: false
+        no_log: true
+        description: cookie_encryption (Vault, copied verbatim from the Pi).

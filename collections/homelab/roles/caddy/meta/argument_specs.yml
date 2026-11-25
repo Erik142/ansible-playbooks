@@ -32,6 +32,23 @@ argument_specs:
         elements: str
         required: false
         description: Quadlet network units (for example garage.network) the Caddy container joins in addition to caddy.network.
+      caddy_host_network:
+        type: bool
+        required: false
+        description: Run Caddy on the host network (client addresses visible, bind via caddy_bind_address). No caddy.network, no published ports.
+      caddy_bind_address:
+        type: str
+        required: false
+        description: IPv4 address Caddy listens on (default_bind). Empty leaves the default bind.
+      caddy_allowed_sources:
+        type: list
+        elements: str
+        required: false
+        description: IPv4 CIDR ranges allowed to reach the sites; others get 403. Empty disables the gate.
+      caddy_no_http_redirect:
+        type: bool
+        required: false
+        description: Turn the admin endpoint off and disable the port-80 redirect listener.
       caddy_sites:
         type: list
         elements: dict

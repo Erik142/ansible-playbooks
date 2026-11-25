@@ -27,6 +27,14 @@ argument_specs:
         type: str
         required: false
         description: Primary group of beszel_agent_user.
+      beszel_agent_account_uid:
+        type: int
+        required: false
+        description: "Pinned UID of beszel_agent_user (ops: 476). Unset lets useradd choose."
+      beszel_agent_account_gid:
+        type: int
+        required: false
+        description: "Pinned GID of beszel_agent_group (ops: 476). Unset lets groupadd choose."
       beszel_agent_port:
         type: int
         required: false

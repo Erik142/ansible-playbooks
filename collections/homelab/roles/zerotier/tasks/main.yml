@@ -13,8 +13,8 @@
   ansible.builtin.file:
     path: "{{ zerotier_data_dir }}"
     state: directory
-    owner: root
-    group: root
+    owner: "{{ zerotier_data_uid }}"
+    group: "{{ zerotier_data_gid }}"
     mode: "0700"
 
 # The container opens /dev/net/tun, a static device node whose driver is the

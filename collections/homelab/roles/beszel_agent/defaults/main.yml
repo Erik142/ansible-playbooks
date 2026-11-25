@@ -18,6 +18,10 @@ beszel_agent_bin_path: "{{ beszel_agent_install_dir }}/beszel-agent"
 # Dedicated, unprivileged system account (matches Beszel's own installer).
 beszel_agent_user: beszel
 beszel_agent_group: beszel
+# Optional UID/GID pin for the account (ops: 476, read from the live host). Unset
+# lets useradd choose.
+beszel_agent_account_uid: null
+beszel_agent_account_gid: null
 
 # The hub (cloud-wahlberger-dev) connects OUT to this agent, over the
 # ZeroTier-routed home LAN — see roles/beszel_hub/README.md for why the hub

@@ -38,6 +38,10 @@ argument_specs:
         type: bool
         required: false
         description: Email when an SSH login succeeds from a source outside the ignore list.
+      security_login_hush_html:
+        type: bool
+        required: false
+        description: Send the login mail's HTML part to hush and use the hush-style template. Off on the NAS and ci.
       security_ssh_login_notify_ignore:
         type: list
         elements: str

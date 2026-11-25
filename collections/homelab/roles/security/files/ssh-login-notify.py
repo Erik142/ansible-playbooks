@@ -131,6 +131,13 @@ def build_payload(login, env, host, now, template=None):
     return payload
 
 
+def hush_html_env(payload):
+    """HUSH_HTML for hush-post when the unit opts in (SSH_LOGIN_NOTIFY_HUSH_HTML=1); else nothing."""
+    if os.environ.get("SSH_LOGIN_NOTIFY_HUSH_HTML") != "1":
+        return {}
+    return {"HUSH_HTML": payload.get("html", "")}
+
+
 def send(payload, env):
     """Report the login to hush as a problem event (hush sends the mail). Raises on any failure.
 
@@ -141,7 +148,7 @@ def send(payload, env):
         [HUSH_POST, "problem", socket.gethostname(), "ssh-login"],
         input=payload["text"],
         text=True,
-        env={**env, "HUSH_MESSAGE": payload["subject"]},
+        env={**env, "HUSH_MESSAGE": payload["subject"], **hush_html_env(payload)},
         stdout=subprocess.DEVNULL,
         check=True,
         timeout=SEND_TIMEOUT_SECONDS,

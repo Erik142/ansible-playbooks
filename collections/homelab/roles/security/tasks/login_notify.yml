@@ -33,7 +33,7 @@
 # the service, which read it at start; a change restarts the watcher.
 - name: Deploy the login email template
   ansible.builtin.template:
-    src: login-email-template.html.j2
+    src: "{{ 'login-email-template-hush.html.j2' if security_login_hush_html | bool else 'login-email-template.html.j2' }}"
     dest: /etc/ssh-login-notify/email-template.html
     owner: root
     group: root

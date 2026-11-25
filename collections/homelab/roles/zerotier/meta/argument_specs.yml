@@ -11,6 +11,14 @@ argument_specs:
         type: path
         required: false
         description: Host directory persisting ZeroTier's identity keys across restarts.
+      zerotier_data_uid:
+        type: int
+        required: false
+        description: Owner uid of zerotier_data_dir and its files, the uid the container writes them as.
+      zerotier_data_gid:
+        type: int
+        required: false
+        description: Group gid of zerotier_data_dir and its files, the gid the container writes them as.
       zerotier_network_id:
         type: str
         required: true

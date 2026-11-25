@@ -1,0 +1,14 @@
+{# Rendered by the security role to /etc/ssh-login-notify/email-template.html. Hush keeps only text-structure tags and drops every attribute (HUSH-NOTIFY-115), so this template uses no attributes and no style; Hush's card supplies the look. @@NAME@@ placeholders are filled by ssh-login-notify.py, which HTML-escapes every value and substitutes in one pass. #}
+<div>
+<span>SSH LOGIN</span>
+<h1>SSH login on @@HOST@@ from @@ADDR@@</h1>
+<p>A public-source SSH login succeeded. <strong>If this was not you, treat the key as stolen:</strong> see the README incident note.</p>
+<ul>
+<li><strong>Host:</strong> @@HOST@@</li>
+<li><strong>Time:</strong> @@TIME@@</li>
+<li><strong>User:</strong> @@USER@@</li>
+<li><strong>Source:</strong> @@ADDR@@ (port @@PORT@@)</li>
+<li><strong>Key:</strong> @@ALG@@ @@FINGERPRINT@@</li>
+</ul>
+<p>Sent by ssh-login-notify on @@HOST@@ when the login was logged by sshd.</p>
+</div>

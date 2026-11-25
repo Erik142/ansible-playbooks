@@ -1,0 +1,334 @@
+---
+# Defaults for the `hush` role (ops VM: intelligent alerting). The config
+# rendered from `hush_config` below follows the Hush v2 schema.
+#
+# Runs as a rootful Quadlet under /etc/containers/systemd, like Caddy and
+# Semaphore. The container image comes from the Forgejo registry on the NAS.
+
+# --- Image --------------------------------------------------------------------
+hush_image: git.de.int.wahlberger.dev/erikwahlberger/hush:1.3.0
+# Registry login user. The token is the Forgejo token with read:package only,
+# passed in as hush_forgejo_pull_token (vault_hush_forgejo_pull_token).
+hush_registry: git.de.int.wahlberger.dev
+hush_registry_user: erikwahlberger
+
+# --- Host paths ---------------------------------------------------------------
+hush_data_dir: /opt/podman/hush
+hush_data_path: "{{ hush_data_dir }}/data"        # SQLite database and the nightly backups (hush storage.backup_dir): back this up
+hush_config_path: "{{ hush_data_dir }}/config.yaml"
+hush_secrets_dir: "{{ hush_data_dir }}/secrets"   # mounted at /run/secrets, read-only
+
+# The container runs as uid 10001 (Containerfile). Data and secrets must be
+# writable or readable by it.
+hush_container_uid: 10001
+
+# --- Network ------------------------------------------------------------------
+# Loopback only. Caddy (host network) proxies to it; the hook scripts on ops
+# post to it directly. Never publish on a public or ZeroTier address.
+hush_publish_address: 127.0.0.1
+hush_port: 8080
+# Caddy is the only proxy. It runs with host networking and connects to the
+# published port on 127.0.0.1; hush's container sees that traffic from the
+# Podman bridge gateway (10.88.0.1). Both must be trusted, or X-Forwarded-Proto
+# is ignored and login refuses the request as plain HTTP.
+hush_trusted_proxies:
+  - 127.0.0.1/32
+  - 10.88.0.1/32
+
+# Public name of the dashboard and ingest (DNS and Caddy site are in group_vars).
+hush_public_host: hush.de.int.wahlberger.dev
+
+# --- Placeholders that must be replaced before the role runs -------------------
+# The role fails while any of these still contains REPLACE (see tasks/main.yml).
+hush_heartbeat_url: https://hc-ping.com/REPLACE-WITH-YOUR-UUID
+# Pocket ID groups whose members may log in to the dashboard: the `groups` claim
+# (hush 0.3.0 `auth.authorization.claims`). Set in group_vars. Empty is refused by hush at start.
+hush_allowed_groups: []
+
+# --- Secrets ------------------------------------------------------------------
+# Friendly-name dict, filled from Vault in group_vars (vars.yml). Keys are the
+# secret file names that the hush_config paths refer to under /run/secrets/.
+# Every value must be non-empty; the role refuses to run otherwise.
+hush_secret_names:
+  - hush_source_kuma
+  - hush_source_hooks_ops
+  - hush_source_hooks_nas
+  - hush_source_hooks_cloud
+  - hush_source_hooks_netcup
+  - hush_source_truenas
+  - hush_source_backup_ops
+  - hush_source_backup_cloud
+  - hush_maintenance_ansible
+  - hush_anthropic_key
+  - hush_resend_key
+  - hush_oidc_secret
+  - hush_break_glass_hash
+  - hush_metrics_token
+  - hush_n8n_webhook
+  - hush_remediation_secret
+
+# --- Config (rendered to config.yaml) -----------------------------------------
+hush_timezone: Europe/Berlin
+hush_shadow_mode: false  # shadow mode ended 2026-10-30 after 5 days of decision logs
+hush_dashboard_base_url: "https://{{ hush_public_host }}"
+
+# Long-running ops services Hush watches. Each gets an ExecStartPost drop-in that
+# reports its start as ok (ExecStartPost=/usr/local/bin/hush-systemd-event ok %n).
+# Excluded: hush.service (it cannot report its own start: nothing listens yet),
+# restic-backup (Type=oneshot, keeps OnSuccess=), and any unit with OnFailure= only.
+hush_systemd_watched_units:
+  - caddy.service
+  - semaphore.service
+
+hush_config:
+  schema_version: 2
+  timezone: "{{ hush_timezone }}"
+  mode: "{{ 'observe' if hush_shadow_mode else 'live' }}"
+  logging: {level: info}
+  server:
+    port: "{{ hush_port }}"
+    trusted_proxies: "{{ hush_trusted_proxies }}"
+  sources:
+    kuma:
+      type: uptime_kuma
+      auth: token
+      secret: /run/secrets/hush_source_kuma
+      # Flapping (TrueNAS 2026-10-29: six flips in 50 min) and first-problem settling.
+      policies:
+        settle: 2m
+        flap: {changes: 4, within: 15m, hold: 1h, max_hold: 15m}
+        bundle: true
+        join_topology: true
+        update: true
+    hooks-ops:
+      type: generic
+      auth: token
+      secret: /run/secrets/hush_source_hooks_ops
+      policies: {reboot_check: true, bundle: true, join_topology: true, update: true}
+      # Certificate expiry of the ops sites.
+      poll:
+        tls-semaphore:
+          {type: tls_expiry, host: ops.de.wahlberger.dev, service: semaphore, address: semaphore.de.int.wahlberger.dev, port: 443,
+           server_name: semaphore.de.int.wahlberger.dev}
+        tls-hush:
+          {type: tls_expiry, host: ops.de.wahlberger.dev, service: hush, address: hush.de.int.wahlberger.dev, port: 443,
+           server_name: hush.de.int.wahlberger.dev}
+    hooks-nas:
+      type: generic
+      auth: token
+      secret: /run/secrets/hush_source_hooks_nas
+      policies: {reboot_check: true, bundle: true, join_topology: true, update: true}
+      # Certificate expiry of the NAS sites (Let's Encrypt through Caddy).
+      poll:
+        tls-recipes:
+          {type: tls_expiry, host: nas.de.int.wahlberger.dev, service: tandoor, address: recipes.de.int.wahlberger.dev, port: 443,
+           server_name: recipes.de.int.wahlberger.dev}
+        tls-docs:
+          {type: tls_expiry, host: nas.de.int.wahlberger.dev, service: paperless, address: docs.de.int.wahlberger.dev, port: 443,
+           server_name: docs.de.int.wahlberger.dev}
+        tls-photos:
+          {type: tls_expiry, host: nas.de.int.wahlberger.dev, service: immich, address: photos.de.int.wahlberger.dev, port: 443,
+           server_name: photos.de.int.wahlberger.dev}
+        tls-git: {type: tls_expiry, host: nas.de.int.wahlberger.dev, address: git.de.int.wahlberger.dev, port: 443, server_name: git.de.int.wahlberger.dev}
+        tls-lab-grab:
+          {type: tls_expiry, host: nas.de.int.wahlberger.dev, address: lab-grab.de.int.wahlberger.dev, port: 443,
+           server_name: lab-grab.de.int.wahlberger.dev}
+        tls-www:
+          {type: tls_expiry, host: nas.de.int.wahlberger.dev, service: homepage, address: www.de.int.wahlberger.dev, port: 443,
+           server_name: www.de.int.wahlberger.dev}
+    hooks-cloud:
+      type: generic
+      auth: token
+      secret: /run/secrets/hush_source_hooks_cloud
+      policies: {reboot_check: true, bundle: true, join_topology: true, update: true}
+      # Certificate expiry of cloud's public names (Caddy renews them; this catches a renewal that fails).
+      poll:
+        tls-id.wahlberger.dev:
+          {type: tls_expiry, host: cloud.wahlberger.dev, service: pocket-id, address: id.wahlberger.dev, port: 443, server_name: id.wahlberger.dev}
+        tls-rss.wahlberger.dev:
+          {type: tls_expiry, host: cloud.wahlberger.dev, service: freshrss, address: rss.wahlberger.dev, port: 443, server_name: rss.wahlberger.dev}
+        tls-status.wahlberger.dev:
+          {type: tls_expiry, host: cloud.wahlberger.dev, service: uptime-kuma, address: status.wahlberger.dev, port: 443,
+           server_name: status.wahlberger.dev}
+        tls-beszel.wahlberger.dev: {type: tls_expiry, host: cloud.wahlberger.dev, address: beszel.wahlberger.dev, port: 443, server_name: beszel.wahlberger.dev}
+    # TrueNAS SCALE alerts (Mattermost alert service). The secret is the last URL path
+    # segment: https://hush.de.int.wahlberger.dev/ingest/truenas/<secret>. See hush docs/truenas.md.
+    truenas:
+      type: truenas
+      auth: path_token
+      secret: /run/secrets/hush_source_truenas
+    hooks-netcup:
+      type: generic
+      auth: token
+      secret: /run/secrets/hush_source_hooks_netcup
+      policies: {reboot_check: true, bundle: true, join_topology: true, update: true}
+    backup-ops:
+      type: generic
+      dedupe: 15m
+      auth: signed
+      secret: /run/secrets/hush_source_backup_ops
+      expect: {within: 26h, grace: 1h}
+    backup-cloud:
+      type: generic
+      dedupe: 15m
+      auth: signed
+      secret: /run/secrets/hush_source_backup_cloud
+      expect: {within: 26h, grace: 1h}
+  hosts:
+    ops.de.wahlberger.dev:
+      # Kuma's Hush monitor reports under this host name (its URL host).
+      aliases: [ops, hush.de.int.wahlberger.dev]
+      up_check: {source: kuma, check: ops ping}
+      # grace: was absent in v1 (used rules.grace); kept at 5m explicitly (see brief).
+      grace: 5m
+      services:
+        hush: {}
+        caddy: {always_notify: true}
+        semaphore: {}
+        restic-backup: {}
+    cloud.wahlberger.dev:
+      aliases: [cloud]
+      up_check: {source: kuma, check: cloud ping}
+      # grace: was absent in v1 (used rules.grace); kept at 5m explicitly (see brief).
+      grace: 5m
+      services:
+        pocket-id: {always_notify: true}
+        uptime-kuma: {}
+        freshrss: {}
+        restic-backup: {}
+    nas.de.int.wahlberger.dev:
+      aliases: [nas]
+      up_check: {source: kuma, check: nas ping}
+      grace: 5m
+      services:
+        btrfs-scrub: {always_notify: true}
+        samba: {aliases: [smb]}
+        tandoor: {}
+        paperless: {}
+        immich: {}
+        homepage: {}
+    # TrueNAS SCALE at Boras. Its alerts name the host brasseserver; its Kuma monitor
+    # reports under the URL host, so both names are aliases of this host.
+    truenas.boras.int.wahlberger.dev:
+      aliases: [brasseserver]
+      up_check: {source: kuma, check: truenas.boras.int.wahlberger.dev}
+      grace: 5m
+      services:
+        truenas-state: {}
+    ci.de.wahlberger.dev:
+      aliases: [ci]
+      grace: 5m
+  maintenance:
+    max_duration: 2h
+    verify_after: 5m
+    clients:
+      ansible:
+        secret: /run/secrets/hush_maintenance_ansible
+    schedule:
+      reboot-sunday:
+        cron: "0 4 * * 0"
+        for: 1h
+        scope:
+          - {host: ops.de.wahlberger.dev}
+          - {host: cloud.wahlberger.dev}
+          - {host: nas.de.int.wahlberger.dev}
+  rules:
+    dedupe: 15m
+    grace: 5m
+    max_hold: 4h
+    notify_recoveries: true
+  triage:
+    enabled: true
+    model: claude-haiku-5-5
+    api_key: /run/secrets/hush_anthropic_key
+    daily_budget_usd: 1.0
+    context_notes: >-
+      Three hosts: ops and cloud are public Hetzner VMs; nas is on the home LAN (10.10.0.0/16)
+      and reachable over ZeroTier (10.243.0.0/16). Auto-updates run weekly; reboots happen only
+      in the Sunday 04:00 rebootmgr window. restic-backup runs nightly at 04:30.
+    replay_max_cost_usd: 0.5
+    # Triage output cap: range 64-4096 (HUSH-TRIAGE-030).
+    limits:
+      max_output_tokens: 2048
+    # Diagnosis output cap: range 64-8192. Explicit even though it equals the default.
+    diagnosis:
+      max_output_tokens: 2048
+  notifications:
+    email:
+      api_key: /run/secrets/hush_resend_key
+      from: "Hush <hush@no-reply.wahlberger.dev>"
+      to: ["{{ hush_alert_recipient }}"]
+    # n8n triage (architecture/n8n-triage-workflow.md): info handoffs only. The secret is the
+    # HMAC key shared with n8n on the NAS (vault_n8n_hush_secret there).
+    webhook:
+      url: https://n8n.de.int.wahlberger.dev/webhook/hush
+      secret: /run/secrets/hush_n8n_webhook
+      timeout: 10s
+      attempts: 3
+    # Non-critical mails wait until 07:00 and go out as one batch (failsafe, always_notify
+    # and critical events are never held).
+    quiet_hours: {from: "22:00", to: "07:00", timezone: Europe/Berlin}
+    digest:
+      at: "07:00"
+      # Plain-language digest and event classification (1.0.0). Defaults shown explicitly;
+      # thinking stays off: measured at 155 output tokens per digest, with thinking 367 to 663.
+      ai:
+        enabled: true
+        max_message_chars: 800   # 118 stored events: median 27, p99 687, max 717 chars; TrueNAS alerts put the useful part last
+        max_host_chars: 3000
+        host_paragraph_max_chars: 600
+        summary_max_chars: 800
+        max_tokens: 1024
+        thinking: false
+        timeout_seconds: 30
+    escalation: {after: 1h, max_repeats: 1}
+    storm: {threshold: 10, window: 5m}
+    feedback_links: {enabled: true, valid_for: 30d}
+  # Remediation handoff, escalate-only: routes are empty, so nothing is held and e-mail
+  # timing is unchanged (architecture/n8n-triage-workflow.md). Replies are not used yet.
+  remediation:
+    enabled: true
+    routes: []
+    # Replies from n8n (phase 2b, alert handoffs). Required while enabled.
+    reply_url: https://hush.de.int.wahlberger.dev/ingest/remediation
+    secret: /run/secrets/hush_remediation_secret
+  dashboard:
+    public_url: "{{ hush_dashboard_base_url }}"
+    login:
+      issuer: https://id.wahlberger.dev
+      client_id: "{{ hush_oidc_client_id }}"
+      client_secret: /run/secrets/hush_oidc_secret
+      redirect_url: "https://{{ hush_public_host }}/auth/callback"
+    access:
+      allow:
+        groups: "{{ hush_allowed_groups }}"
+    # Admin sessions manage recipients and subscriptions (HUSH-AUTH-053). The single
+    # login group is also the admin group: the operator is the only dashboard user.
+    admin:
+      allow:
+        groups: "{{ hush_allowed_groups }}"
+    session: {idle_timeout: 7d, absolute_timeout: 30d}
+    emergency_login:
+      enabled: false
+      password_hash: /run/secrets/hush_break_glass_hash
+  heartbeat:
+    url: "{{ hush_heartbeat_url }}"
+    every: 1m
+  storage:
+    path: /data/hush.db
+    keep: {events: 30d, decisions: 30d, token_usage: 30d, audit: 30d}
+    backups: {dir: /data/backups, keep: 7, time: "03:00"}
+  redaction:
+    builtin: {ipv4: true, ipv6: true, email: true}
+    patterns: {}
+  metrics:
+    token: /run/secrets/hush_metrics_token
+
+# Recipient of hush's own e-mail. Set in group_vars (ewahlberger@gmail.com).
+hush_alert_recipient: ""
+
+# Forgejo pull token and secret values: provided by group_vars from Vault.
+hush_forgejo_pull_token: ""
+hush_secrets: {}
+# Pocket ID client id of the hush OIDC client (set in group_vars).
+hush_oidc_client_id: ""

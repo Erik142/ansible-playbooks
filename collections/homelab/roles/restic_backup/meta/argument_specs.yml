@@ -1,0 +1,77 @@
+---
+argument_specs:
+  main:
+    short_description: Daily restic backup of a consistent SQLite copy to a restic REST server.
+    options:
+      restic_backup_sqlite_databases:
+        type: list
+        elements: dict
+        required: false
+        description: SQLite databases copied with sqlite3 .backup into the staging directory before each run.
+        options:
+          src:
+            type: path
+            required: true
+            description: Database file on the host.
+          name:
+            type: str
+            required: true
+            description: File name of the consistent copy inside the staging directory.
+      restic_backup_sqlite_required:
+        type: bool
+        required: false
+        description: Fail the run when a source database is missing.
+      restic_backup_staging_dir:
+        type: path
+        required: false
+        description: Root-only directory holding the database copies; the only default backup path.
+      restic_backup_env_dir:
+        type: path
+        required: false
+        description: Root-only directory holding the rendered restic environment file; never backed up.
+      restic_backup_paths:
+        type: list
+        elements: str
+        required: false
+        description: Host paths handed to restic backup.
+      restic_backup_exclude:
+        type: list
+        elements: str
+        required: false
+        description: Exclude patterns keeping config.json, env files and identity.secret out of every backup.
+      restic_backup_repo_password:
+        type: str
+        required: true
+        description: restic repository encryption password.
+      restic_backup_rest_server_host:
+        type: str
+        required: false
+        description: Hostname of the restic REST server backup target.
+      restic_backup_rest_server_port:
+        type: int
+        required: false
+        description: Port of the restic REST server backup target.
+      restic_backup_rest_server_username:
+        type: str
+        required: false
+        description: REST server user; also the repository name (rest:http://user:pw@host:port/user/).
+      restic_backup_rest_server_password:
+        type: str
+        required: true
+        description: Password to authenticate to the REST server with.
+      restic_backup_forget_enabled:
+        type: bool
+        required: false
+        description: Must stay false; this host never runs restic forget or prune (the NAS applies retention).
+      restic_backup_check_read_data_subset:
+        type: str
+        required: false
+        description: Fraction of data blobs restic check re-reads each run (e.g. "10%" or "1/10").
+      restic_backup_on_calendar:
+        type: str
+        required: false
+        description: systemd OnCalendar expression for the backup timer.
+      restic_backup_notify_on_success:
+        type: bool
+        required: false
+        description: Email a backup summary via Resend on every successful run, not just failures.

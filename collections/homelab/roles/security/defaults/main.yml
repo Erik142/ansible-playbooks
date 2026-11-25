@@ -23,6 +23,10 @@ security_ssh_login_notify_enabled: true
 # Sources that never trigger the login email: loopback plus the fail2ban
 # ignore list (the same private networks and the cloud host).
 security_ssh_login_notify_ignore: "{{ ['127.0.0.0/8'] + security_fail2ban_ignoreip }}"
+# Send the login mail's HTML part to hush (HUSH_HTML), with the hush-style template
+# (attribute-free; hush keeps only text-structure tags). Off keeps the card template
+# and the text-only hush path the NAS and ci already run.
+security_login_hush_html: false
 
 # fail2ban bans IPs after repeated failed SSH logins (SH-FR-123: 5 failures
 # within 600 s ban for 3600 s).

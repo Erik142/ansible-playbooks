@@ -31,3 +31,18 @@ caddy_sites: []
 # Quadlet unit names (e.g. garage.network). The network units are deployed by
 # the role that owns the backend, which must run before this role.
 caddy_extra_networks: []
+# Host networking (ops): Caddy shares the host network namespace, so it sees client
+# addresses (needed by caddy_allowed_sources) and binds caddy_bind_address only.
+# No caddy.network and no published ports in that mode. Off keeps the NAS layout.
+caddy_containerfile_src: Containerfile
+# Digest-pinned variant (files/Containerfile.pinned, security review F-02): ops only.
+# Changing this forces an image rebuild, so the NAS keeps the default.
+caddy_host_network: false
+# The only address Caddy listens on (default_bind). Empty: no default_bind line.
+# Ops sets this to vm_zt_ip. Requires caddy_host_network to be meaningful.
+caddy_bind_address: ""
+# Client networks allowed to reach the sites (CIDR); every other source gets 403.
+# Empty: no client gate (the NAS behaviour).
+caddy_allowed_sources: []
+# Admin endpoint off and no port-80 redirect listener (DNS-01 needs neither).
+caddy_no_http_redirect: false

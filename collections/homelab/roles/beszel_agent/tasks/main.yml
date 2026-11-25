@@ -13,6 +13,7 @@
 - name: Create the beszel system group
   ansible.builtin.group:
     name: "{{ beszel_agent_group }}"
+    gid: "{{ beszel_agent_account_gid | default(omit, true) }}"
     system: true
 
 # No login shell, no home directory: this account only ever runs the agent
@@ -20,6 +21,7 @@
 - name: Create the beszel system user
   ansible.builtin.user:
     name: "{{ beszel_agent_user }}"
+    uid: "{{ beszel_agent_account_uid | default(omit, true) }}"
     group: "{{ beszel_agent_group }}"
     system: true
     create_home: false

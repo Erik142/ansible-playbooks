@@ -9,6 +9,9 @@ Type=simple
 # RESEND_API_KEY, NOTIFY_FROM, NOTIFY_TO: written by the notify_failure role.
 EnvironmentFile=/etc/hush/hook.env
 Environment="SSH_LOGIN_NOTIFY_IGNORE={{ security_ssh_login_notify_ignore | unique | join(',') }}"
+{% if security_login_hush_html | bool %}
+Environment="SSH_LOGIN_NOTIFY_HUSH_HTML=1"
+{% endif %}
 ExecStart=/usr/bin/python3 /usr/local/bin/ssh-login-notify.py
 Restart=always
 RestartSec=5

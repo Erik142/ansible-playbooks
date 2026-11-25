@@ -8,6 +8,11 @@ zerotier_image: docker.io/zerotier/zerotier:1.14.2
 # scratch in ZeroTier Central (or your router's controller), same as
 # rejoining the network for the first time.
 zerotier_data_dir: /opt/podman/zerotier
+# Owner of the data directory and its files: the uid/gid the ZeroTier container
+# writes them as (999 in the image). Setting it here makes the role own the
+# same value the container sets, so it does not flip back and forth on each run.
+zerotier_data_uid: 999
+zerotier_data_gid: 999
 
 # REQUIRED: the 16-character network ID from ZeroTier Central (or your
 # router's controller) — the same network the home LAN and the TrueNAS
