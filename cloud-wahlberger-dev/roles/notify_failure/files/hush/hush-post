@@ -4,6 +4,7 @@
 # Usage: hush-post STATUS HOST CHECK [SERVICE] < log-excerpt-on-stdin
 # Environment: HUSH_URL (https://hush.example.org/ingest/<source>), HUSH_TOKEN_FILE (bearer
 # token file; for HMAC sources sign with your own wrapper), HUSH_MESSAGE (optional text),
+# HUSH_HTML (optional HTML mail body, HUSH-DEPLOY-046),
 # HUSH_LABELS (optional, one key=value per line; sent as event labels, HUSH-DEPLOY-028).
 set -eu
 
@@ -36,6 +37,14 @@ case $status in problem | ok | info) ;; *) echo "hush-post: status must be probl
 
 excerpt=$(tail -n 50 | json_escape)
 message=$(printf '%s' "${HUSH_MESSAGE:-}" | json_escape)
+html_bytes=$(printf '%s' "${HUSH_HTML:-}" | wc -c | tr -d ' ')
+if [ "$html_bytes" -gt 65536 ]; then  # HUSH-INGEST-070 cap: the event keeps its fields without html
+  echo "hush-post: HUSH_HTML is $html_bytes bytes, above 65536; sent without html" >&2
+  HUSH_HTML=
+fi
+html=$(printf '%s' "${HUSH_HTML:-}" | json_escape)
+html_json=
+[ -n "$html" ] && html_json=",\"html\":\"$html\""  # HUSH-DEPLOY-046: omitted when empty
 labels=
 if [ -n "${HUSH_LABELS:-}" ]; then
   sep=
@@ -54,7 +63,7 @@ key="$(date +%s)-$$-$(od -An -N4 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')"
 
 body=$(printf '{"schema":"hush.event.v1","host":"%s","service":"%s","check":"%s","status":"%s","message":"%s","log_excerpt":"%s"%s}' \
   "$(printf '%s' "$host" | json_escape)" "$(printf '%s' "$service" | json_escape)" \
-  "$(printf '%s' "$check" | json_escape)" "$status" "$message" "$excerpt" "$labels_json")
+  "$(printf '%s' "$check" | json_escape)" "$status" "$message" "$excerpt" "$html_json$labels_json")
 
 bodyfile=$(mktemp)
 trap 'rm -f "$bodyfile"' EXIT

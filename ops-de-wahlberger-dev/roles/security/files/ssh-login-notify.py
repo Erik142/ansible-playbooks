@@ -134,14 +134,15 @@ def build_payload(login, env, host, now, template=None):
 def send(payload, env):
     """Report the login to hush as a problem event (hush sends the mail). Raises on any failure.
 
-    hush-post reads HUSH_URL and HUSH_TOKEN_FILE from hook.env (the unit loads it)."""
+    hush-post reads HUSH_URL and HUSH_TOKEN_FILE from hook.env (the unit loads it). The HTML
+    part goes in HUSH_HTML (HUSH-DEPLOY-046); hush keeps only its text-structure tags."""
     if not env.get("HUSH_TOKEN_FILE", ""):
         raise RuntimeError("HUSH_TOKEN_FILE is empty")
     subprocess.run(
         [HUSH_POST, "problem", socket.gethostname(), "ssh-login"],
         input=payload["text"],
         text=True,
-        env={**env, "HUSH_MESSAGE": payload["subject"]},
+        env={**env, "HUSH_MESSAGE": payload["subject"], "HUSH_HTML": payload.get("html", "")},
         stdout=subprocess.DEVNULL,
         check=True,
         timeout=SEND_TIMEOUT_SECONDS,
