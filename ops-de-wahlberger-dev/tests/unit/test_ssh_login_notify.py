@@ -137,6 +137,28 @@ def test_send_reports_a_problem_through_hush_post(mod, monkeypatch):
     assert "ops.test" in argv and len(argv) == 4 and argv[3]
     assert seen["input"] == "x" and seen["check"] is True
     assert seen["env"]["HUSH_MESSAGE"] == "s"
+    # The HTML part reaches hush-post unchanged, in the env var its hook reads (HUSH-DEPLOY-046).
+    assert seen["env"]["HUSH_HTML"] == "<p>x</p>"
+
+
+def test_send_passes_no_html_when_the_payload_has_none(mod, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(mod.subprocess, "run", lambda argv, **kw: seen.update(env=kw["env"]))
+    mod.send({"subject": "s", "text": "x"}, {"HUSH_TOKEN_FILE": "/etc/hush/systemd.token"})
+    assert seen["env"]["HUSH_HTML"] == ""
+
+
+# Tags Hush keeps from a source's HTML (hush/notify/source_html.py, HUSH-NOTIFY-115), and no attributes.
+HUSH_KEPT_TAGS = {"p", "br", "hr", "h1", "h2", "h3", "h4", "h5", "h6", "strong", "b", "em", "i", "u",
+                  "code", "pre", "blockquote", "ul", "ol", "li", "table", "thead", "tbody", "tr", "th",
+                  "td", "span", "div"}
+
+
+def test_template_uses_only_tags_hush_keeps_without_attributes(template):
+    # Hush drops every attribute, so a style or width in this template would be silently lost.
+    tags = set(re.findall(r"<\s*([a-zA-Z0-9]+)", template))
+    assert tags <= HUSH_KEPT_TAGS, tags - HUSH_KEPT_TAGS
+    assert not re.search(r"<[a-zA-Z0-9]+\s+[^>]*=", template), "template has an attribute"
 
 
 def test_send_refuses_an_empty_token_file_setting(mod):
