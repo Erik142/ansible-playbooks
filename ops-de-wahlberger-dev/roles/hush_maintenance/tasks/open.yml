@@ -30,7 +30,7 @@
         body_format: json
         body:
           scope: "{{ hush_maintenance_scope }}"
-          duration_seconds: "{{ hush_maintenance_duration_seconds | int }}"
+          duration_seconds: "{{ hush_maintenance_duration_seconds }}"
           reason: "ansible apply of ops-de-wahlberger-dev"
           id: "{{ hush_maintenance_window_id }}"
         status_code: [200, 201]
