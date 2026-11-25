@@ -192,6 +192,10 @@ hush_heartbeat_url: "{{ vault_hush_heartbeat_url | default('') }}"
 # Pocket ID group whose members may log in to the dashboard. The group is created in Pocket ID.
 hush_allowed_groups:
   - hush_admins
+# --- Hush maintenance window (roles/hush_maintenance) -------------------------
+# Hush host names the window for each ansible apply is scoped to.
+hush_maintenance_host_names:
+  - ops.de.wahlberger.dev
 hush_secrets:
   hush_source_kuma: "{{ vault_hush_source_kuma | default('') }}"
   hush_source_hooks_ops: "{{ vault_hush_source_hooks_ops | default('') }}"

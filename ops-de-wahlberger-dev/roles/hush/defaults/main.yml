@@ -215,6 +215,9 @@ hush_config:
       grace: 5m
       services:
         truenas-state: {}
+    ci.de.wahlberger.dev:
+      aliases: [ci]
+      grace: 5m
   maintenance:
     max_duration: 2h
     verify_after: 5m

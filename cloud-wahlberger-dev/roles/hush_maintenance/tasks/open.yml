@@ -1,0 +1,45 @@
+---
+# Opens a Hush maintenance window scoped to this host. A failed open does not
+# stop the apply; the alerts from the restarts are then not held.
+- name: Open a hush maintenance window for this apply
+  when:
+    - hush_maintenance_enabled | bool
+    - not ansible_check_mode
+    - hush_maintenance_host_names | length > 0
+    - hush_maintenance_ansible | default('') | length > 0
+  block:
+    - name: Set the maintenance window id for this apply
+      ansible.builtin.set_fact:
+        hush_maintenance_window_id: "ansible-{{ inventory_hostname | regex_replace('[^A-Za-z0-9]+', '-') }}-{{ lookup('pipe', 'date +%s') }}"
+
+    - name: Build the maintenance window scope
+      ansible.builtin.set_fact:
+        hush_maintenance_scope: []
+
+    - name: Add each host to the maintenance window scope
+      ansible.builtin.set_fact:
+        hush_maintenance_scope: "{{ hush_maintenance_scope + [{'host': item, 'service': None}] }}"
+      loop: "{{ hush_maintenance_host_names }}"
+
+    - name: Open the hush maintenance window
+      ansible.builtin.uri:
+        url: "{{ hush_maintenance_base_url }}/maintenance/windows"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ hush_maintenance_ansible }}"
+        body_format: json
+        body:
+          scope: "{{ hush_maintenance_scope }}"
+          duration_seconds: "{{ hush_maintenance_duration_seconds | int }}"
+          reason: "ansible apply of cloud-wahlberger-dev"
+          id: "{{ hush_maintenance_window_id }}"
+        status_code: [200, 201]
+        timeout: 15
+      no_log: true
+      register: hush_maintenance_open
+      failed_when: false
+
+    - name: Report that the hush maintenance window was not opened
+      ansible.builtin.debug:
+        msg: "hush maintenance window not opened (status {{ hush_maintenance_open.status | default('none') }}); restart alerts are not held"
+      when: hush_maintenance_open.status | default(0) not in [200, 201]
