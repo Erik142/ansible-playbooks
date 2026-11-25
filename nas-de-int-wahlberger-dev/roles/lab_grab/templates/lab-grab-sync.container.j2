@@ -29,6 +29,8 @@ Volume={{ lab_grab_config_dir }}/places.yaml:/app/backend/places.yaml:ro,Z
 Volume={{ lab_grab_exporter_arp_dir }}:/var/lib/lab-grab/exporter:z
 
 [Service]
+# SIGTERM (143) is the normal stop of a container; systemd would count it as a failure and fire OnFailure=.
+SuccessExitStatus=143
 Restart=always
 
 [Install]

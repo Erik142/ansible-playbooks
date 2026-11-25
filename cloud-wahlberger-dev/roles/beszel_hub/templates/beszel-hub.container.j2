@@ -40,6 +40,8 @@ Environment=USER_CREATION={{ beszel_hub_oauth_user_creation | ternary('true', 'f
 Environment=DISABLE_PASSWORD_AUTH={{ beszel_hub_disable_password_auth | ternary('true', 'false') }}
 
 [Service]
+# SIGTERM (143) is the normal stop of a container; systemd would count it as a failure and fire OnFailure=.
+SuccessExitStatus=143
 Restart=always
 
 [Install]

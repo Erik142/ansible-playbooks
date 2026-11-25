@@ -230,18 +230,3 @@
 - name: Restart Hush now if its config, secrets or unit changed
   ansible.builtin.meta: flush_handlers
   tags: [hush]
-
-- name: Close the hush maintenance window
-  ansible.builtin.uri:
-    url: "https://{{ hush_public_host }}/maintenance/windows/{{ hush_maintenance_window_id }}"
-    method: DELETE
-    headers:
-      Authorization: "Bearer {{ hush_secrets.hush_maintenance_ansible }}"
-    status_code: [200, 404]
-    timeout: 15
-  no_log: true
-  failed_when: false
-  when:
-    - not ansible_check_mode
-    - hush_window_open.status | default(0) in [200, 201]
-  tags: [hush]

@@ -21,6 +21,8 @@ HealthInterval=30s
 HealthTimeout=5s
 
 [Service]
+# SIGTERM (143) is the normal stop of a container; systemd would count it as a failure and fire OnFailure=.
+SuccessExitStatus=143
 Restart=always
 TimeoutStopSec=10
 

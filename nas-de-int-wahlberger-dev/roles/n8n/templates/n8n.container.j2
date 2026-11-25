@@ -51,6 +51,8 @@ Environment=EXECUTIONS_DATA_MAX_AGE=720
 EnvironmentFile={{ n8n_data_dir }}/n8n.env
 
 [Service]
+# SIGTERM (143) is the normal stop of a container; systemd would count it as a failure and fire OnFailure=.
+SuccessExitStatus=143
 Restart=always
 MemoryMax={{ n8n_memory_max }}
 CPUQuota={{ n8n_cpu_quota }}

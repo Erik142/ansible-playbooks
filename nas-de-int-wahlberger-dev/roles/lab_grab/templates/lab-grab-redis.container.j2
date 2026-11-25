@@ -14,6 +14,8 @@ Volume={{ lab_grab_redis_data_dir }}:/data:Z
 Exec=redis-server --appendonly yes --notify-keyspace-events Ex
 
 [Service]
+# SIGTERM (143) is the normal stop of a container; systemd would count it as a failure and fire OnFailure=.
+SuccessExitStatus=143
 Restart=always
 
 [Install]

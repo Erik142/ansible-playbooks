@@ -196,6 +196,7 @@ hush_allowed_groups:
 # Hush host names the window for each ansible apply is scoped to.
 hush_maintenance_host_names:
   - ops.de.wahlberger.dev
+hush_maintenance_ansible: "{{ vault_hush_maintenance_ansible | default('') }}"
 hush_secrets:
   hush_source_kuma: "{{ vault_hush_source_kuma | default('') }}"
   hush_source_hooks_ops: "{{ vault_hush_source_hooks_ops | default('') }}"

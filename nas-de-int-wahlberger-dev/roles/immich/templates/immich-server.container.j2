@@ -42,6 +42,8 @@ Environment=IMMICH_CONFIG_FILE=/etc/immich/config.json
 EnvironmentFile={{ immich_data_dir }}/immich-server.env
 
 [Service]
+# SIGTERM (143) is the normal stop of a container; systemd would count it as a failure and fire OnFailure=.
+SuccessExitStatus=143
 Restart=always
 
 [Install]

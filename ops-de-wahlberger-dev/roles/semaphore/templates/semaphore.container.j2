@@ -36,6 +36,8 @@ Volume={{ semaphore_data_dir }}/data:/var/lib/semaphore:Z
 EnvironmentFile={{ semaphore_data_dir }}/semaphore.env
 
 [Service]
+# SIGTERM (143) is the normal stop of a container; systemd would count it as a failure and fire OnFailure=.
+SuccessExitStatus=143
 Restart=always
 
 [Install]
