@@ -59,6 +59,8 @@ Environment=FORGEJO__cron_0x2E_cleanup_packages__OLDER_THAN={{ forgejo_packages_
 EnvironmentFile={{ forgejo_data_dir }}/forgejo.env
 
 [Service]
+# SIGTERM (143) is the normal stop of a container; systemd would count it as a failure and fire OnFailure=.
+SuccessExitStatus=143
 Restart=always
 
 [Install]

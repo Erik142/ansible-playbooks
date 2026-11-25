@@ -33,6 +33,8 @@ Volume={{ caddy_data_dir }}/data:/data:Z
 Volume={{ caddy_data_dir }}/config:/config:Z
 
 [Service]
+# SIGTERM (143) is the normal stop of a container; systemd would count it as a failure and fire OnFailure=.
+SuccessExitStatus=143
 Restart=always
 # Without this, repeated bind failures (address not there yet) hit systemd's
 # start limit within seconds and the unit would stay failed.

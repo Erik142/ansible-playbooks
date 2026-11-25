@@ -15,6 +15,8 @@ Environment=LG_COORDINATOR=127.0.0.1:{{ lab_grab_coordinator_port }}
 Volume={{ lab_grab_exporter_arp_dir }}:/opt/conf:ro,z
 
 [Service]
+# SIGTERM (143) is the normal stop of a container; systemd would count it as a failure and fire OnFailure=.
+SuccessExitStatus=143
 Restart=always
 
 [Install]

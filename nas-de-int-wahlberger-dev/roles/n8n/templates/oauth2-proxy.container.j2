@@ -13,6 +13,8 @@ EnvironmentFile={{ n8n_data_dir }}/oauth2-proxy.env
 Volume={{ n8n_data_dir }}/oauth2-proxy-emails.txt:/etc/oauth2-proxy/emails.txt:ro,Z
 
 [Service]
+# SIGTERM (143) is the normal stop of a container; systemd would count it as a failure and fire OnFailure=.
+SuccessExitStatus=143
 Restart=always
 
 [Install]

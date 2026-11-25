@@ -17,6 +17,8 @@ Volume={{ homepage_data_dir }}/config:/app/config:Z
 Environment=HOMEPAGE_ALLOWED_HOSTS={{ homepage_url | regex_replace('^https?://', '') }}
 
 [Service]
+# SIGTERM (143) is the normal stop of a container; systemd would count it as a failure and fire OnFailure=.
+SuccessExitStatus=143
 Restart=always
 
 [Install]

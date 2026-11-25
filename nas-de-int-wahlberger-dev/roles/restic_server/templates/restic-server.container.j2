@@ -30,6 +30,8 @@ Volume={{ restic_server_data_dir }}:/data:Z
 Exec=rest-server --path /data --htpasswd-file /data/.htpasswd --listen :{{ restic_server_port }}{% if restic_server_private_repos %} --private-repos{% endif %}{% if restic_server_append_only %} --append-only{% endif %} --max-size {{ restic_server_max_size_bytes }}
 
 [Service]
+# SIGTERM (143) is the normal stop of a container; systemd would count it as a failure and fire OnFailure=.
+SuccessExitStatus=143
 Restart=always
 
 [Install]

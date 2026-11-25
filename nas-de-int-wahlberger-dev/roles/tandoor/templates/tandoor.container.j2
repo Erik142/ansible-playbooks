@@ -47,6 +47,8 @@ Environment=HIDE_LOGIN_FORM=1
 EnvironmentFile={{ tandoor_data_dir }}/tandoor.env
 
 [Service]
+# SIGTERM (143) is the normal stop of a container; systemd would count it as a failure and fire OnFailure=.
+SuccessExitStatus=143
 Restart=always
 
 [Install]
