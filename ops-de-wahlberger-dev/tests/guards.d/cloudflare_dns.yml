@@ -22,15 +22,26 @@
   hosts: localhost
   connection: local
   gather_facts: false
+  # The production wiring the expected hostnames come from (the nested run loads the same file).
+  vars_files:
+    - "{{ playbook_dir }}/../../inventories/production/group_vars/all/vars.yml"
   vars:
     gt_ops_dir: "{{ playbook_dir }}/../.."
-    gt_host: ops.de.wahlberger.dev
+    # The inventory name of the host (inventories/production/hosts.yml), not a copy of it.
+    gt_host: >-
+      {{ (lookup('ansible.builtin.file', gt_ops_dir ~ '/inventories/production/hosts.yml')
+      | from_yaml).all.children.ops.hosts | list | first }}
     gt_public_ip: 203.0.113.10
     gt_zt_ip: 10.243.0.5
     gt_token: test-token-do-not-leak
-    gt_extra_record: ops.de.int.wahlberger.dev
-    gt_cname_host: semaphore.de.int.wahlberger.dev
-    gt_zone: wahlberger.dev
+    # The extra A record production sets (cloudflare_dns_extra_a_records) and the
+    # semaphore site's host (semaphore_url, SH-FR-42: https://<caddy site host>).
+    gt_extra_record: "{{ (cloudflare_dns_extra_a_records | first).record }}"
+    gt_cname_host: "{{ semaphore_url | urlsplit('hostname') }}"
+    # The zone is the cloudflare_dns role default (production does not override it).
+    gt_zone: >-
+      {{ (lookup('ansible.builtin.file', gt_ops_dir ~ '/roles/cloudflare_dns/defaults/main.yml')
+      | regex_replace('\{\{', '[[') | regex_replace('\{%', '[%') | from_yaml).cloudflare_dns_zone }}
     # Expected module calls, built once so the cases read as deltas.
     gt_call_host:
       record: "{{ gt_host }}"
@@ -57,7 +68,7 @@
       state: present
       check_mode: false
     # Hush's site in production caddy_sites gets a CNAME like semaphore's.
-    gt_call_hush_cname: "{{ gt_call_cname | combine({'record': 'hush.de.int.wahlberger.dev'}) }}"
+    gt_call_hush_cname: "{{ gt_call_cname | combine({'record': hush_public_host}) }}"
     gt_first_task: "Ensure this host's own A record exists in Cloudflare"
     gt_cases:
       - name: cutover off -> host A + extra A, no CNAME (FR-36, FR-131, FR-37)
@@ -107,7 +118,7 @@
           vm_zt_ip: "{{ gt_zt_ip }}"
           semaphore_dns_cutover_enabled: true
           caddy_sites:
-            - { host: semaphore.de.int.wahlberger.dev, upstream: "127.0.0.1:3000" }
+            - { host: "{{ gt_cname_host }}", upstream: "127.0.0.1:3000" }
             - { host: second.de.int.wahlberger.dev, upstream: "127.0.0.1:4000" }
         rc: 0
         calls:
