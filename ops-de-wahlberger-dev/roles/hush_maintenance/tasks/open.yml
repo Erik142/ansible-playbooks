@@ -43,3 +43,11 @@
       ansible.builtin.debug:
         msg: "hush maintenance window not opened (status {{ hush_maintenance_open.status | default('none') }}); restart alerts are not held"
       when: hush_maintenance_open.status | default(0) not in [200, 201]
+
+- name: Report that the hush maintenance window was skipped (no host names or no token)
+  ansible.builtin.debug:
+    msg: "hush maintenance window not requested: hush_maintenance_host_names or hush_maintenance_ansible is empty; restart alerts are not held"
+  when:
+    - hush_maintenance_enabled | bool
+    - not ansible_check_mode
+    - hush_maintenance_host_names | length == 0 or hush_maintenance_ansible | default('') | length == 0
