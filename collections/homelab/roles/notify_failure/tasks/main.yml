@@ -36,6 +36,8 @@
     owner: root
     group: root
     mode: "0600"
+  no_log: true
+  diff: false
 
 - name: Deploy the email HTML template
   ansible.builtin.copy:

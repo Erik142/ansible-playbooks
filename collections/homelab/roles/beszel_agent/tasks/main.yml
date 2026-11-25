@@ -79,6 +79,12 @@
     group: "{{ beszel_agent_podman_group }}"
     mode: "0755"
   notify: Restart beszel-agent
+  register: beszel_agent_run_podman_dir
+  # --check on a fresh host: the group was only simulated above. Only that
+  # exact miss is tolerated, and only in check mode; a real run still fails.
+  failed_when:
+    - beszel_agent_run_podman_dir is failed
+    - not (ansible_check_mode and (beszel_agent_run_podman_dir.msg | default('')) is search('failed to look up group'))
 
 # /run is tmpfs — recreated from scratch on every boot, at which point
 # podman.socket (not this role) creates /run/podman again with whatever
@@ -99,7 +105,7 @@
     return_content: true
   register: beszel_agent_checksums
   # Read-only GET: it must run under --check, or the checksum fact below has
-  # nothing to parse (ansible-core 2.20 returns no `content` in check mode).
+  # nothing to parse.
   check_mode: false
   changed_when: false
 
@@ -131,6 +137,13 @@
     dest: "{{ beszel_agent_install_dir }}"
     remote_src: true
     creates: "{{ beszel_agent_bin_path }}"
+  register: beszel_agent_unarchive
+  # --check on a fresh host: the install directory was only simulated above.
+  # Only that exact miss is tolerated, and only in check mode; a real run
+  # still fails.
+  failed_when:
+    - beszel_agent_unarchive is failed
+    - not (ansible_check_mode and (beszel_agent_unarchive.msg | default('')) is search('must be an existing dir'))
 
 - name: Ensure the Beszel agent binary is executable
   ansible.builtin.file:
@@ -138,6 +151,13 @@
     owner: root
     group: root
     mode: "0755"
+  register: beszel_agent_bin_perms
+  # --check on a fresh host: the binary was only simulated being extracted.
+  # Only that exact miss is tolerated, and only in check mode; a real run
+  # still fails.
+  failed_when:
+    - beszel_agent_bin_perms is failed
+    - not (ansible_check_mode and (beszel_agent_bin_perms.msg | default('')) is search('is absent, cannot continue'))
 
 # Recent openSUSE Tumbleweed snapshots default to SELinux (targeted policy)
 # — an unlabeled binary outside the package manager's usual paths fails to
@@ -160,6 +180,13 @@
     setype: bin_t
     state: present
   when: ansible_facts.selinux.status == "enabled"
+  register: beszel_agent_sefcontext
+  # --check on a fresh host: python3-selinux is only simulated above. Only
+  # that exact miss is tolerated, and only in check mode; a real run still
+  # fails.
+  failed_when:
+    - beszel_agent_sefcontext is failed
+    - not (ansible_check_mode and (beszel_agent_sefcontext.msg | default('')) is search('Failed to import the required Python library'))
 
 - name: Apply the SELinux file context to the Beszel agent binary
   ansible.builtin.command: "restorecon -v {{ beszel_agent_bin_path }}"
@@ -182,3 +209,10 @@
     enabled: true
     state: started
     daemon_reload: true
+  register: beszel_agent_service
+  # --check on a fresh host: the unit file does not exist yet because the
+  # template task above only simulated creating it. Only that exact miss is
+  # tolerated, and only in check mode; a real run still fails.
+  failed_when:
+    - beszel_agent_service is failed
+    - not (ansible_check_mode and (beszel_agent_service.msg | default('')) is search('Could not find the requested service'))

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Rendered by the reboot_notify role. Do NOT edit on the host — re-run
-# Ansible. Called directly by security's request-reboot-if-needed.sh, right
-# after it requests a reboot via rebootmgrctl — not a shutdown-time systemd
+# Ansible. Called directly by security's zypper-dup-request-reboot.sh, right
+# BEFORE it requests a reboot via rebootmgrctl — not a shutdown-time systemd
 # hook (this role's design until 2026-09; confirmed unreliable in practice,
 # see README.md). Only actually emails when zypper itself says a reboot is
 # genuinely needed, matching the same check the caller already made.

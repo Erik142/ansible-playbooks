@@ -11,7 +11,7 @@ argument_specs:
         type: str
         required: true
         no_log: true
-        description: Bearer secret of this host's hush source (hooks-nas), used by the failure path.
+        description: Bearer secret of this host's hush source, used by the failure path.
       notify_failure_hush_source:
         type: str
         required: false

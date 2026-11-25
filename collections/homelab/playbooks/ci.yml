@@ -1,0 +1,62 @@
+---
+# Full configuration of the netcup CI host (ci.de.wahlberger.dev): a rootless Forgejo
+# Actions runner for the NAS Forgejo instance, reached over ZeroTier.
+# Run from the repo root (check mode first, always):
+#   ansible-playbook wahlberger.homelab.ci --check --diff
+#   ansible-playbook wahlberger.homelab.ci
+# Limit to one role: ansible-playbook wahlberger.homelab.ci --tags forgejo_runner
+- name: Configure the netcup CI host
+  hosts: ci
+  become: true
+  gather_facts: true
+  pre_tasks:
+    # Hush maintenance window for this apply. Tagged always so a --tags run opens it too.
+    - name: Open the hush maintenance window
+      ansible.builtin.include_role:
+        name: wahlberger.homelab.hush_maintenance
+        tasks_from: open
+      tags: [always]
+  roles:
+    - role: wahlberger.homelab.common
+      tags: [common]
+    # Static IPv4 from the NetworkManager profile. Writes the file only; never brings
+    # the connection down. Run --check --diff against the live profile first.
+    - role: wahlberger.homelab.netcup_network
+      tags: [netcup_network]
+    # Early: other roles' units hook OnFailure= into the unit this role deploys.
+    - role: wahlberger.homelab.notify_failure
+      tags: [notify_failure]
+    - role: wahlberger.homelab.disk_space
+      tags: [disk_space]
+    # Authorized before hardening.
+    - role: wahlberger.homelab.ssh_authorized_keys
+      tags: [ssh_authorized_keys]
+    # Harden the host before anything else listens on the network.
+    - role: wahlberger.homelab.security
+      tags: [security]
+    - role: wahlberger.homelab.reboot_notify
+      tags: [reboot_notify]
+    - role: wahlberger.homelab.firewall
+      tags: [firewall]
+    - role: wahlberger.homelab.podman
+      tags: [podman]
+    # Needs ZeroTier's tun module and the rootless Podman it runs under.
+    - role: wahlberger.homelab.zerotier
+      tags: [zerotier]
+    - role: wahlberger.homelab.beszel_agent
+      tags: [beszel_agent]
+    # Publishes ci.de.int.wahlberger.dev -> the ZeroTier address (vm_zt_ip).
+    - role: wahlberger.homelab.cloudflare_dns
+      tags: [cloudflare_dns]
+    # Last: needs ZeroTier up (route to the NAS Forgejo) and rootless Podman.
+    - role: wahlberger.homelab.forgejo_runner
+      tags: [forgejo_runner]
+    # Last, so every unit exists; a changed drop-in restarts that unit.
+    - role: wahlberger.homelab.hush_recovery
+      tags: [hush_recovery]
+  post_tasks:
+    - name: Close the hush maintenance window
+      ansible.builtin.include_role:
+        name: wahlberger.homelab.hush_maintenance
+        tasks_from: close
+      tags: [always]

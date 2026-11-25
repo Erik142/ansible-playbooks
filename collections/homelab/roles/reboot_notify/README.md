@@ -18,8 +18,8 @@ alerting mechanism (`OnFailure=`, crash-loop dedup) at all.
 ## Emails synchronously, called from security's reboot-request script
 
 `reboot-notify.sh` (this role) is invoked directly by
-`roles/security/templates/request-reboot-if-needed.sh.j2`, right when that
-script decides a reboot is needed and is about to call `rebootmgrctl
+`roles/security/templates/zypper-dup-request-reboot.sh.j2`, right when that
+script decides a reboot is needed, just before it calls `rebootmgrctl
 reboot` — not via a separate shutdown-time systemd unit, which is how this
 role worked until 2026-09.
 
@@ -40,10 +40,11 @@ equivalent unit.
 Calling `reboot-notify.sh` directly from the reboot-request script instead
 sidesteps the problem entirely — it's an ordinary foreground script, not
 competing for a slot in a shutdown transaction — and as a bonus gives
-advance notice (right when the reboot is requested) instead of a
+advance notice (right before the reboot is requested; the reboot itself
+happens in rebootmgr's maintenance window, Sunday 04:00 for 1h) instead of a
 same-instant one right as the host goes down. The caller only calls it
 once per pending reboot (gated on `/var/run/reboot-notify-sent`, tmpfs, so
-it resets naturally on the actual reboot), so a later weekly patch run
+it resets naturally on the actual reboot), so a later weekly update run
 while the reboot is still pending doesn't send a duplicate.
 
 ## Why it doesn't fire on every reboot

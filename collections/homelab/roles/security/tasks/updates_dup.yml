@@ -1,0 +1,46 @@
+---
+# Weekly `zypper dup` (method dup). The default; the NAS keeps updates_patch.yml.
+# --- the weekly update -----------------------------------------------------------
+- name: Deploy the reboot-request script
+  ansible.builtin.template:
+    src: zypper-dup-request-reboot.sh.j2
+    dest: /usr/local/bin/zypper-dup-request-reboot.sh
+    owner: root
+    group: root
+    mode: "0700"
+  when: (security_autoupdate_enabled | bool) and (security_autoupdate_reboot | bool)
+
+- name: Deploy the zypper-dup service
+  ansible.builtin.template:
+    src: zypper-dup.service.j2
+    dest: /etc/systemd/system/zypper-dup.service
+    owner: root
+    group: root
+    mode: "0644"
+  when: security_autoupdate_enabled | bool
+  notify: Reload systemd
+
+- name: Deploy the zypper-dup timer
+  ansible.builtin.template:
+    src: zypper-dup.timer.j2
+    dest: /etc/systemd/system/zypper-dup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  when: security_autoupdate_enabled | bool
+  notify: Reload systemd
+
+- name: Apply pending handlers before enabling the timer
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start the zypper-dup timer
+  ansible.builtin.systemd:
+    name: zypper-dup.timer
+    enabled: true
+    state: started
+  when: security_autoupdate_enabled | bool
+  register: security_dup_timer
+  # --check on a fresh host: the unit file above was only simulated.
+  failed_when:
+    - security_dup_timer is failed
+    - not (ansible_check_mode and (security_dup_timer.msg | default('')) is search('Could not find the requested service'))

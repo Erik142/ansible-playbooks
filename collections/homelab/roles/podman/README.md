@@ -14,6 +14,7 @@ role.
 |----------|---------|-------------|
 | `podman_packages` | `[podman, podman-docker]` | Packages to install. |
 | `podman_data_dir` | `/mnt/containers` | Root for persistent container data — must already be a mountpoint. |
+| `podman_require_mountpoint` | `true` | Assert `podman_data_dir` is a mountpoint; `false` for hosts without a separate data mount (the Hetzner VM). |
 | `podman_quadlet_dir` | `/etc/containers/systemd` | Where systemd reads Quadlet units. |
 | `podman_enable_socket` | `true` | Enable/start `podman.socket`. |
 | `podman_image_prune_enabled` | `true` | Install/enable the weekly image-prune timer. |
@@ -35,7 +36,8 @@ reclaims space from replaced image versions. Check with
 Samba data and container data across two different storage media — see the
 top-level README). The role asserts it's an actual mountpoint before creating
 anything under it, so a missing mount fails loudly instead of silently writing
-container data onto the root filesystem.
+container data onto the root filesystem. Hosts with no separate data mount
+(the Hetzner VM) set `podman_require_mountpoint: false` to skip that assert.
 
 ## IPv4 forwarding
 

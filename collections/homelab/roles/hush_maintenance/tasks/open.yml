@@ -31,7 +31,7 @@
         body:
           scope: "{{ hush_maintenance_scope }}"
           duration_seconds: "{{ hush_maintenance_duration_seconds }}"
-          reason: "ansible apply of nas-de-int-wahlberger-dev"
+          reason: "ansible apply of {{ inventory_hostname }}"
           id: "{{ hush_maintenance_window_id }}"
         status_code: [200, 201]
         timeout: 15

@@ -2,7 +2,7 @@
 
 Authorizes one or more SSH public keys for `ssh_authorized_keys_user` — your
 personal key(s), for manual access, and Semaphore UI's dedicated automation
-key (see the `pi-de-int-wahlberger-dev` playbook), for unattended
+key (used by the ops and Semaphore playbooks), for unattended
 `ansible-playbook` runs.
 
 ## Role variables

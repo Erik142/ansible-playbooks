@@ -12,6 +12,10 @@ argument_specs:
         type: path
         required: false
         description: Root directory for persistent container data.
+      podman_require_mountpoint:
+        type: bool
+        required: false
+        description: Whether podman_data_dir must be an actual mountpoint (the role fails otherwise).
       podman_quadlet_dir:
         type: path
         required: false

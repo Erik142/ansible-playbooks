@@ -26,6 +26,25 @@ security_autoupdate_reboot: true
 security_sudoers_passwordless:
   - erikwahlberger
 
+# --- Security role: pins that keep the NAS's behaviour from before the merge of
+# the netcup hardening (collections/homelab/roles/security). Each keeps the old value.
+# Updates: the NAS keeps the weekly zypper patch and its 03:00 slot.
+security_autoupdate_method: "patch"
+security_autoupdate_on_calendar: "Sun *-*-* 03:00:00"
+security_autoupdate_reboot_window_start: "03:00"
+security_autoupdate_reboot_strategy: "best-effort"
+# Snapper is the snapper role's job on the NAS, not the security role's.
+security_snapper_enabled: false
+# Password locking and the SSH login email stay off until decided on the NAS.
+security_lock_passwords: false
+security_ssh_login_notify_enabled: false
+# The only account allowed to log in over SSH (the role asserts it is non-empty).
+security_ssh_allow_users:
+  - erikwahlberger
+# The NAS's public zone keeps the services it had before; the role's default removal
+# list (cockpit, mdns, ...) is for the netcup host.
+firewall_public_removed_services: []
+
 # --- SSH access (ssh_authorized_keys role) ----------------------------------
 # Your personal key (manual access), the Pi's old Semaphore automation key
 # (revoked in the Pi retirement, pull request E) and the new Semaphore
