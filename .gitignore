@@ -3,3 +3,8 @@
 
 # Untracked working files (plans, notes, drafts, logs)
 .scratch/
+
+# Retired hosts, kept on disk only (not tracked). Remove this entry and `git add` the
+# directory explicitly if one is ever needed in the repo again.
+/pi-de-int-wahlberger-dev/
+/rpi-boras/
