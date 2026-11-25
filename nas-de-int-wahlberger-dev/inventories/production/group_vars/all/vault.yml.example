@@ -130,6 +130,8 @@ vault_garage_admin_token: "REPLACE-with-a-generated-token"
 
 # --- Hush (notify_failure failure path) ----------------------------------------
 vault_hush_source_hooks_nas: ""
+# Hush maintenance token (Ansible client, roles/hush_maintenance). Issued by Hush.
+vault_hush_maintenance_ansible: ""
 
 # --- n8n (phase 1: editor only) -----------------------------------------------
 # Encryption key for n8n's stored credentials. Losing it loses every credential

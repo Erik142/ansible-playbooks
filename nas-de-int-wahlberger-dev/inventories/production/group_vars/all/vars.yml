@@ -437,3 +437,10 @@ lab_grab_serial_resources:
       match:
         ID_SERIAL_SHORT: "E6633861A3352838"
         ID_USB_INTERFACE_NUM: "01"
+
+# --- Hush maintenance window (roles/hush_maintenance) -------------------------
+# Hush token for the maintenance window (vault_hush_maintenance_ansible).
+hush_maintenance_ansible: "{{ vault_hush_maintenance_ansible | default('') }}"
+# Hush host names the window for each ansible apply is scoped to.
+hush_maintenance_host_names:
+  - nas.de.int.wahlberger.dev

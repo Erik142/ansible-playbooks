@@ -9,6 +9,14 @@
   hosts: cloud
   become: true
   gather_facts: true
+  pre_tasks:
+    # Hush maintenance window for this apply (roles/hush_maintenance). Tagged always
+    # so that a --tags run opens it too.
+    - name: Open the hush maintenance window
+      ansible.builtin.include_role:
+        name: hush_maintenance
+        tasks_from: open
+      tags: [always]
   roles:
     - role: common
       tags: [common]
@@ -74,3 +82,9 @@
     # Last, so every unit exists; a changed drop-in restarts that unit.
     - role: hush_recovery
       tags: [hush_recovery]
+  post_tasks:
+    - name: Close the hush maintenance window
+      ansible.builtin.include_role:
+        name: hush_maintenance
+        tasks_from: close
+      tags: [always]

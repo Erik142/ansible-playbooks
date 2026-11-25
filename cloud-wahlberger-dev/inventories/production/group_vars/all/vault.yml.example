@@ -60,3 +60,5 @@ vault_restic_backup_rest_server_password: "REPLACE-with-a-32-char-alnum-password
 # --- Hush (notify_failure failure path, restic success HMAC) -------------------
 vault_hush_source_hooks_cloud: ""
 vault_hush_source_backup_cloud: ""
+# Hush maintenance token (Ansible client, roles/hush_maintenance). Issued by Hush.
+vault_hush_maintenance_ansible: ""

@@ -173,3 +173,10 @@ restic_backup_rest_server_password: "{{ vault_restic_backup_rest_server_password
 # prunes. See nas-de-int-wahlberger-dev/README.md, "Backups".
 restic_backup_rest_server_host: nas.de.int.wahlberger.dev
 restic_backup_forget_enabled: false
+
+# --- Hush maintenance window (roles/hush_maintenance) -------------------------
+# Hush token for the maintenance window (vault_hush_maintenance_ansible).
+hush_maintenance_ansible: "{{ vault_hush_maintenance_ansible | default('') }}"
+# Hush host names the window for each ansible apply is scoped to.
+hush_maintenance_host_names:
+  - cloud.wahlberger.dev

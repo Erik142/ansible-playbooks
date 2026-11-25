@@ -1,0 +1,14 @@
+---
+# Defaults for the `hush_maintenance` role. An ansible apply opens a Hush
+# maintenance window scoped to this host, so the alerts its restarts cause are
+# held, and closes it at the end. The token is hush_maintenance_ansible
+# (vault_hush_maintenance_ansible), set in group_vars.
+
+hush_maintenance_enabled: true
+# Upper bound on the window. Hush ends it on its own if the close never runs.
+hush_maintenance_duration_seconds: 1800
+# Hush `host` values the window is scoped to. Set per host in group_vars.
+hush_maintenance_host_names: []
+# Hush base URL. Same host as notify_failure_hush_url, defined here because
+# pre_tasks run before the notify_failure role's defaults are loaded.
+hush_maintenance_base_url: "https://hush.de.int.wahlberger.dev"

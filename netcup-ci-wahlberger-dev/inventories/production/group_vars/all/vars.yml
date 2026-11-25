@@ -117,3 +117,11 @@ common_packages:
   - hostname
   - htop
   - vim
+
+# --- Hush maintenance window (roles/hush_maintenance) -------------------------
+# Hush token for the maintenance window (vault_hush_maintenance_ansible).
+hush_maintenance_ansible: "{{ vault_hush_maintenance_ansible | default('') }}"
+# Hush host names the window for each ansible apply is scoped to.
+hush_maintenance_host_names:
+  - ci.de.int.wahlberger.dev
+  - ci.de.wahlberger.dev
