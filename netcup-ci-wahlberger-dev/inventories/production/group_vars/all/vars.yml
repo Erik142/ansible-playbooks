@@ -122,6 +122,5 @@ common_packages:
 # Hush token for the maintenance window (vault_hush_maintenance_ansible).
 hush_maintenance_ansible: "{{ vault_hush_maintenance_ansible | default('') }}"
 # Hush host names the window for each ansible apply is scoped to.
-hush_maintenance_host_names:
-  - ci.de.int.wahlberger.dev
-  - ci.de.wahlberger.dev
+# Empty until Hush's topology knows this host (ci.de.* names are rejected, HTTP 422).
+hush_maintenance_host_names: []
