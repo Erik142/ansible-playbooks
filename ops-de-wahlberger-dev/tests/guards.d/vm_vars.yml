@@ -24,6 +24,12 @@
     gt_roles: "{{ playbook_dir }}/../../roles"
     gt_stage: "{{ lookup('ansible.builtin.env', 'STATIC_CHECKS_STAGE') | default('A', true) }}"
     gt_subnet_re: '^(10|172|192)\.[0-9]{1,3}\.[0-9]{1,3}\.0/24$'
+    gt_spec: "{{ gt_repo }}/semaphore-migration/reqs/semaphore-to-hetzner.md"
+    # Same expression as static-checks.sh (SH-AC-17, SH-FR-45): the client ID is the
+    # backticked UUID on the SH-FR-45 line of the spec. No role default holds it.
+    gt_spec_client_ids: >-
+      {{ lookup('ansible.builtin.file', gt_spec)
+      | regex_findall('(?m)^- SH-FR-45 \[Must\]:.*?`([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`') }}
   tasks:
     # The ignore list is the security role's own default (LAN and ZeroTier ranges)
     # plus what this host adds: loopback, the Semaphore subnet and cloud's public IPv4.
@@ -69,6 +75,8 @@
     # restic_backup_sqlite_required: false is deleted by PR A3 (the role default
     # then applies), so "absent or false" is the PR A value that stays valid.
     - name: Design and enabled flags hold their values
+      vars:
+        gt_oidc_client_id: "{{ gt_spec_client_ids | first | default('') }}"
       ansible.builtin.assert:
         that:
           - vm_proxy_design in ['primary', 'bridge_fallback']
@@ -81,7 +89,8 @@
           - security_fail2ban_enabled is sameas true
           - semaphore_url | urlsplit('scheme') == 'https'
           - semaphore_url | urlsplit('hostname') in (caddy_sites | map(attribute='host') | list)
-          - semaphore_oidc_client_id == '63093482-d2cc-4c77-89df-9f6ff78b160e'
+          - gt_spec_client_ids | length == 1
+          - semaphore_oidc_client_id == gt_oidc_client_id
         quiet: true
 
     # The disk alert threshold is the disk_space role default unless the host overrides it;
