@@ -20,12 +20,16 @@
       "datasourceTemplate": "github-releases"
     },
     {
-      "description": "immich_version is shared by the server and ML images, which are templated",
+      "description": "immich_version is shared by the server and ML images. Driven by the ML image's -openvino tags, so only versions with a published OpenVINO ML image are proposed. IM-AC-01 in CI checks the server and ML tags at the same version.",
       "customType": "regex",
       "managerFilePatterns": ["/(^|/)roles/immich/defaults/main\\.ya?ml$/"],
       "matchStrings": ["(?:^|\\n)immich_version:\\s*\"?(?<currentValue>v[\\w.-]+)\"?[ \\t]*"],
-      "depNameTemplate": "ghcr.io/immich-app/immich-server",
-      "datasourceTemplate": "docker"
+      "depNameTemplate": "ghcr.io/immich-app/immich-machine-learning",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "regex:^v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-openvino$",
+      "currentValueTemplate": "{{{currentValue}}}-openvino",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)-openvino$",
+      "autoReplaceStringTemplate": "immich_version: {{{newVersion}}}"
     },
     {
       "description": "netcup forgejo_runner job images pinned by digest (tag@sha256)",

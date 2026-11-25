@@ -301,6 +301,46 @@ PY
 }
 
 # --- BD-AC-09 (non-vault part): vars, flags, example placeholders ------------
+# --- IM-AC-01: Immich images exist in the registry at the pinned version -----
+# Renovate proposes one version per image, so nothing else checks that the server,
+# the machine-learning image and its -openvino variant were all published for the
+# same version. The upstream OpenVINO build for v3.4.2 failed, so its tag is missing
+# and the NAS apply breaks. This check asks the registry for each tag.
+immich_images() {
+    cd "$nas_dir" || return 1
+    python3 - <<'PY'
+import json, re, sys, urllib.error, urllib.request
+text = open("roles/immich/defaults/main.yml").read()
+ver = re.search(r"^immich_version:\s*(\S+)", text, re.M).group(1)
+hw = re.search(r"^immich_hwaccel_enabled:\s*(\S+)", text, re.M).group(1) == "true"
+ml_line = re.search(r"^immich_ml_image:.*$", text, re.M).group(0)
+# The role renders the ML tag as immich_version plus -openvino when hwaccel is on.
+if "{{ immich_version }}" not in ml_line or ("'-openvino'" in ml_line) != hw:
+    sys.exit("immich_ml_image no longer renders the -openvino tag from immich_version as expected")
+tags = [
+    ("immich-app/immich-server", ver),
+    ("immich-app/immich-machine-learning", ver + ("-openvino" if hw else "")),
+]
+accept = ("application/vnd.oci.image.index.v1+json,"
+          "application/vnd.docker.distribution.manifest.list.v2+json,"
+          "application/vnd.oci.image.manifest.v1+json")
+errors = []
+for repo, tag in tags:
+    try:
+        req = urllib.request.Request(f"https://ghcr.io/token?scope=repository:{repo}:pull")
+        token = json.load(urllib.request.urlopen(req, timeout=30))["token"]
+        req = urllib.request.Request(f"https://ghcr.io/v2/{repo}/manifests/{tag}", method="HEAD",
+                                     headers={"Authorization": f"Bearer {token}", "Accept": accept})
+        urllib.request.urlopen(req, timeout=30)
+    except urllib.error.HTTPError as exc:
+        errors.append(f"{repo}:{tag} -> HTTP {exc.code} (not published)")
+    except Exception as exc:
+        errors.append(f"{repo}:{tag} -> {exc}")
+if errors:
+    sys.exit("\n".join(errors))
+PY
+}
+
 ac09() {
     cd "$nas_dir" || return 1
     vars=inventories/production/group_vars/all/vars.yml
@@ -515,6 +555,7 @@ check AC-06 "defaults vs argument_specs" ac06
 check AC-07 "render check (default and spindown 120)" ac07
 check AC-08 "rest-server image Renovate-detectable" ac08
 check AC-09 "vars, flags and vault.yml.example wiring" ac09
+check IM-AC-01 "Immich images published at immich_version (server, ML, ML -openvino)" immich_images
 check AC-09v "decrypted vault keys and BD-BR-09 equalities" ac09_vault
 check AC-16v "no production vault value in inventories/vm" ac16_vault
 check UNIT "pytest tests/unit" unit
