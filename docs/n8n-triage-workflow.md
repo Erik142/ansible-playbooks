@@ -1,6 +1,6 @@
 # n8n triage workflow (phase 2, read-only)
 
-Status: proposed, 2026-11-24. Implements phase 2 of [`architecture/ai-incident-remediation-pipeline.md`](ai-incident-remediation-pipeline.md) and [`nas-de-int-wahlberger-dev/PLAN-n8n.md`](../nas-de-int-wahlberger-dev/PLAN-n8n.md). Hush side: HUSH-NOTIFY-040 to -048, HUSH-INGEST-036 to -042 (hush 1.2.1).
+Status: proposed, 2026-11-24. Implements phase 2 of [`ai-incident-remediation-pipeline.md`](ai-incident-remediation-pipeline.md) and `nas-de-int-wahlberger-dev/PLAN-n8n.md` (directory removed from the repo; see git history). Hush side: HUSH-NOTIFY-040 to -048, HUSH-INGEST-036 to -042 (hush 1.2.1).
 
 ## Principle: Hush's decisions do not change
 Erik's constraint: the triage must not change what Hush does. Two rules make that hold:
