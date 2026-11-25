@@ -18,3 +18,5 @@
 # Python bytecode
 __pycache__/
 *.pyc
+/playbooks/pi-de-int-wahlberger-dev/
+/playbooks/rpi-boras/
