@@ -1,0 +1,28 @@
+---
+# Long-running units on this host with OnFailure=notify-failure@%n.service. Read by
+# wahlberger.homelab.hush_recovery. Every such unit must be listed (see CLAUDE.md).
+hush_recovery_units:
+  - beszel-agent.service
+  - caddy.service
+  - forgejo.service
+  - garage.service
+  - homepage.service
+  - immich-machine-learning.service
+  - immich-postgres.service
+  - immich-redis.service
+  - immich-server.service
+  - lab-grab-db.service
+  - lab-grab-redis.service
+  - lab-grab-sync.service
+  - lab-grab.service
+  - n8n.service
+  - oauth2-proxy.service
+  - labgrid-coordinator.service
+  - labgrid-exporter-arp.service
+  - labgrid-exporter-serial.service
+  - paperless-db.service
+  - paperless-ngx.service
+  - paperless-redis.service
+  - restic-server.service
+  - tandoor-db.service
+  - tandoor.service

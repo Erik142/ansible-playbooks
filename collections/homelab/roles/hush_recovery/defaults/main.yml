@@ -1,0 +1,4 @@
+---
+# Long-running units with OnFailure=notify-failure@ (see the role README). Set per
+# host: every host lists its own units in its group_vars.
+hush_recovery_units: []

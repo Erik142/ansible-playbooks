@@ -8,3 +8,13 @@
 # directory explicitly if one is ever needed in the repo again.
 /pi-de-int-wahlberger-dev/
 /rpi-boras/
+
+# Installed copy of the homelab collection (ansible-galaxy install -r requirements.yml -p ../collections)
+/collections/ansible_collections/
+
+# Ansible runtime cache (repo-level ansible.cfg)
+.ansible_cache/
+
+# Python bytecode
+__pycache__/
+*.pyc

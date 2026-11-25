@@ -1,0 +1,138 @@
+---
+# Top-level playbook. Convention: `site.yml` applies the *entire* configuration
+# to every host. As the stack grows, split concerns into per-tier playbooks and
+# pull them together here with `import_playbook:`.
+#
+# Run with:  ansible-playbook site.yml
+# Limit to one role:  ansible-playbook site.yml --tags samba
+- name: Configure the nas.de.int.wahlberger.dev host
+  hosts: nas
+  become: true
+  gather_facts: true
+  pre_tasks:
+    # Hush maintenance window for this apply (roles/hush_maintenance). Tagged always
+    # so that a --tags run opens it too.
+    - name: Open the hush maintenance window
+      ansible.builtin.include_role:
+        name: wahlberger.homelab.hush_maintenance
+        tasks_from: open
+      tags: [always]
+  roles:
+    - role: wahlberger.homelab.common
+      tags: [common]
+    # Early: other roles' units (e.g. btrbk, db_dump) hook OnFailure= into
+    # the unit this role deploys.
+    - role: wahlberger.homelab.notify_failure
+      tags: [notify_failure]
+    # Periodic disk usage check, emailing via notify_failure — the only
+    # thing in this stack that watches disk space at all.
+    - role: wahlberger.homelab.disk_space
+      tags: [disk_space]
+    # Personal + Semaphore automation SSH keys, authorized before hardening.
+    - role: wahlberger.homelab.ssh_authorized_keys
+      tags: [ssh_authorized_keys]
+    # Harden the host before anything else listens on the network.
+    - role: wahlberger.homelab.security
+      tags: [security]
+    # After notify_failure (reuses its Resend credentials). security's own
+    # request-reboot-if-needed.sh calls this role's reboot-notify.sh
+    # directly (see roles/reboot_notify/README.md) — order between the two
+    # roles here doesn't matter beyond that, since both just need to exist
+    # by the time any real automated patch cycle actually runs.
+    - role: wahlberger.homelab.reboot_notify
+      tags: [reboot_notify]
+    - role: wahlberger.homelab.firewall
+      tags: [firewall]
+    # Before podman/samba: both assert their data directories are already
+    # mounted.
+    - role: wahlberger.homelab.storage
+      tags: [storage]
+    # smartd + mail hook, monitoring the main data HDD. After notify_failure
+    # (hook reuses its Resend credentials); before backup_disk, which only adds
+    # its own device line. Not gated: the main disk is monitored from day one.
+    - role: wahlberger.homelab.smartd
+      tags: [smartd]
+    # Backup disk (mount, SMART, scrub, health check). After storage; before
+    # snapper. Off until runbook step 3 (backup_disk_enabled in vars.yml), so
+    # a merged site.yml does not fail on the not-yet-initialised disk.
+    - role: wahlberger.homelab.backup_disk
+      tags: [backup_disk]
+      when: backup_disk_enabled | bool
+    # After storage: needs the subvolumes actually mounted to verify their
+    # .snapshots directories.
+    - role: wahlberger.homelab.snapper
+      tags: [snapper]
+    - role: wahlberger.homelab.podman
+      tags: [podman]
+    # Reports to beszel_hub on cloud-wahlberger-dev. After podman: needs its
+    # rootful API socket to already exist to grant this agent access to it.
+    - role: wahlberger.homelab.beszel_agent
+      tags: [beszel_agent]
+    # Ensure this host's public DNS records exist before Caddy needs them.
+    - role: wahlberger.homelab.cloudflare_dns
+      tags: [cloudflare_dns]
+    # Garage S3 store (sstate). Before caddy: it creates garage.network, which
+    # the Caddy container joins (caddy_extra_networks), and before btrbk: both
+    # subvolumes must exist before btrbk checks or snapshots them.
+    # Off until the enable preconditions hold (garage_enabled in vars.yml).
+    - role: wahlberger.homelab.garage
+      tags: [garage]
+      when: garage_enabled | bool
+    # Reverse proxy (creates the shared network) for tandoor/paperless-ngx/immich/forgejo.
+    - role: wahlberger.homelab.caddy
+      tags: [caddy]
+    # Native Samba file server (not a container) with guest access.
+    - role: wahlberger.homelab.samba
+      tags: [samba]
+    - role: wahlberger.homelab.tandoor
+      tags: [tandoor]
+    # After samba: its inbox directory lives inside the Samba share.
+    - role: wahlberger.homelab.paperless_ngx
+      tags: [paperless_ngx]
+    # Photo/video backup. After samba: its library/import directories live
+    # inside the Samba share.
+    - role: wahlberger.homelab.immich
+      tags: [immich]
+    # Git forge + OCI registry (SQLite). After caddy (shared network) and
+    # before db_dump, which dumps its database.
+    - role: wahlberger.homelab.forgejo
+      tags: [forgejo]
+    # Lab-Grab (app, sync, Postgres, Redis) + Labgrid coordinator and two
+    # exporters. After forgejo: the lab-grab image is pulled from the Forgejo
+    # registry. Its Postgres is dumped by db_dump.
+    - role: wahlberger.homelab.lab_grab
+      tags: [lab_grab]
+    # n8n editor behind oauth2-proxy + Caddy (phase 1, no workflows). After caddy
+    # (creates caddy.network) and forgejo. See roles/n8n/README.md.
+    - role: wahlberger.homelab.n8n
+      tags: [n8n]
+    # Dashboard linking this NAS's and cloud-wahlberger-dev's services.
+    - role: wahlberger.homelab.homepage
+      tags: [homepage]
+    # restic REST server for cloud-wahlberger-dev's backups (host networking,
+    # gated by the firewall role's rich rules). After firewall, podman and
+    # storage (needs /mnt/data mounted). Gated with the backup disk: its
+    # repositories are only protected by btrbk once that disk exists.
+    - role: wahlberger.homelab.restic_server
+      tags: [restic_server]
+      when: backup_disk_enabled | bool
+    # Database dumps (Postgres containers + Forgejo SQLite) for btrbk to
+    # snapshot. After paperless_ngx, immich, tandoor, forgejo and homepage,
+    # whose containers and passwords it needs. Gated with the backup disk.
+    - role: wahlberger.homelab.db_dump
+      tags: [db_dump]
+      when: backup_disk_enabled | bool
+    # After db_dump (snapshots its output) and backup_disk (target mount).
+    - role: wahlberger.homelab.btrbk
+      tags: [btrbk]
+      when: backup_disk_enabled | bool
+    # Hush "ok" drop-ins for every long-running unit with an OnFailure= hook.
+    # Last, so every unit exists; a changed drop-in restarts that unit.
+    - role: wahlberger.homelab.hush_recovery
+      tags: [hush_recovery]
+  post_tasks:
+    - name: Close the hush maintenance window
+      ansible.builtin.include_role:
+        name: wahlberger.homelab.hush_maintenance
+        tasks_from: close
+      tags: [always]

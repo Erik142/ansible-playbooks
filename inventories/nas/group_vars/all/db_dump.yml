@@ -1,0 +1,32 @@
+---
+# What the db_dump role dumps on this host. Read by wahlberger.homelab.db_dump.
+db_dump_postgres:
+  - name: paperless
+    container: paperless-db
+    database: paperless
+    user: paperless
+    password: "{{ paperless_ngx_db_password }}"
+  - name: immich
+    container: immich-postgres
+    database: immich
+    user: immich
+    password: "{{ immich_db_password }}"
+  - name: tandoor
+    container: tandoor-db
+    database: tandoor
+    user: tandoor
+    password: "{{ tandoor_db_password }}"
+  - name: lab-grab
+    container: lab-grab-db
+    database: labgrab
+    user: labgrab
+    password: "{{ lab_grab_db_password }}"
+
+db_dump_sqlite:
+  # Forgejo's SQLite file on the host (bind-mounted volume). Must match Forgejo's [database] PATH.
+  - name: forgejo
+    path: "{{ forgejo_volume_dir }}/data/forgejo.db"
+  # n8n runs in WAL mode; its uid owns the -wal/-shm files the dump may pre-create (roles/n8n).
+  - name: n8n
+    path: /mnt/containers/n8n/data/database.sqlite
+    app_uid: 1000

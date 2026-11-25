@@ -12,13 +12,14 @@ secrets. No shared/external roles repo on purpose — see
 | Playbook | Host | What it runs |
 |----------|------|---------------|
 | [`cloud-wahlberger-dev`](cloud-wahlberger-dev) | `cloud.wahlberger.dev` (Hetzner Cloud VM, Debian) | **Reference design** for this repo. Pocket ID (passkey OIDC) + FreshRSS behind Caddy (HTTP-01). |
-| [`nas-de-int-wahlberger-dev`](nas-de-int-wahlberger-dev) | `nas.de.int.wahlberger.dev` (home NAS, openSUSE Tumbleweed) | Native Samba file share, Tandoor + Paperless-ngx + Immich behind Caddy (DNS-01), a Homepage dashboard. |
+| [`wahlberger.homelab.nas`](collections/homelab) | `nas.de.int.wahlberger.dev` (home NAS, openSUSE Tumbleweed) | Native Samba file share, Tandoor + Paperless-ngx + Immich behind Caddy (DNS-01), a Homepage dashboard. Roles and play in the `wahlberger.homelab` collection, host data in `inventories/nas/`. |
 | [`ops-de-wahlberger-dev`](ops-de-wahlberger-dev) | `ops.de.wahlberger.dev` (Hetzner CX23, openSUSE Tumbleweed) | Semaphore UI (over ZeroTier only), Caddy, Pocket ID login; runs all the playbooks in this repo (see [Automated runs](#automated-runs)). |
 
-`cloud-wahlberger-dev`, `nas-de-int-wahlberger-dev`, and
-`ops-de-wahlberger-dev` each have their own `README.md` and `CLAUDE.md`
-with the full picture: layout, role variables, secrets, and the reasoning
-behind non-obvious decisions.
+`cloud-wahlberger-dev` and `ops-de-wahlberger-dev` each have their own `README.md`
+and `CLAUDE.md` with the full picture: layout, role variables, secrets, and the
+reasoning behind non-obvious decisions. The NAS is documented in
+[`collections/homelab/README.md`](collections/homelab/README.md) and the root
+[`CLAUDE.md`](CLAUDE.md).
 
 ## Automated runs
 
@@ -43,11 +44,16 @@ becomes the actual pain point.
 
 ## Running a playbook
 
-Each playbook is fully self-contained — `cd` into it and follow its own
-`README.md`. In short:
+Each host directory is self-contained — `cd` into it and follow its own
+`README.md`. The NAS runs from the repo root against the collection:
 
 ```sh
-cd cloud-wahlberger-dev  # or nas-de-int-wahlberger-dev, ops-de-wahlberger-dev
+ansible-galaxy collection install -r requirements.yml -p collections --force
+ansible-playbook wahlberger.homelab.nas
+```
+
+```sh
+cd cloud-wahlberger-dev  # or ops-de-wahlberger-dev
 ansible-galaxy collection install -r requirements.yml
 ansible-galaxy role install -r requirements.yml
 ansible-playbook site.yml --ask-vault-pass

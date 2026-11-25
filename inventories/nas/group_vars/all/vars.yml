@@ -1,0 +1,442 @@
+---
+# Variables applied to every host in the production inventory.
+#
+# group_vars/all/ is a *directory* (not a single file) on purpose: it lets a
+# plaintext `vars.yml` sit next to an encrypted `vault.yml`, so secrets and
+# non-secrets live side by side without mixing.
+
+# --- Connection -------------------------------------------------------------
+# SSH login user. Privilege escalation (become) is turned on in site.yml.
+ansible_user: erikwahlberger
+
+# --- Hardening (security role) -----------------------------------------------
+# These mirror the role's secure defaults, set explicitly so the security
+# posture is auditable in one place.
+security_ssh_permit_root_login: "no"
+security_ssh_password_authentication: "no"
+security_fail2ban_enabled: true
+security_autoupdate_enabled: true
+# Reboot automatically (via rebootmgr) for updates that need it (kernel,
+# glibc, …) — the reboot_notify role emails a heads-up right before it
+# happens, gated on `zypper needs-rebooting` so it only fires for a genuine
+# update-triggered reboot. See roles/security/README.md.
+security_autoupdate_reboot: true
+# Passwordless sudo for Semaphore UI's unattended playbook runs (see
+# pi-de-int-wahlberger-dev).
+security_sudoers_passwordless:
+  - erikwahlberger
+
+# --- SSH access (ssh_authorized_keys role) ----------------------------------
+# Your personal key (manual access), the Pi's old Semaphore automation key
+# (revoked in the Pi retirement, pull request E) and the new Semaphore
+# automation key (ops-de-wahlberger-dev), which only works from the VM's
+# addresses (from=). See roles/ssh_authorized_keys/README.md. None is secret
+# (public keys), so all live here in plaintext, not Vault. The same keys are
+# authorized on cloud-wahlberger-dev, the NAS and the VM (the VM: personal and
+# new only).
+ssh_authorized_keys_list:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJSKdeHoK+WkyBI69OSZqn0sVqZPPDRs082S/IVoOeSu erikwahlberger@personal"
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMixf1vPbDUankXYuMO0bJFXjQ+Cmh3QsrwC6TzGPkda semaphore-automation@pi.de.int.wahlberger.dev"
+  - 'from="62.238.112.178,10.243.25.185,172.29.30.0/24"
+    ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFWZ1IpLXNuFDDynKMtnh6q62R8cu+ojBoB2h0/QMPlr semaphore-automation@ops.de.wahlberger.dev'
+
+# --- Disk space check (disk_space role) --------------------------------------
+# This host's two separately mounted disks (see the top-level README's "Data
+# & secrets"), plus the root filesystem the role already defaults to.
+disk_space_paths:
+  - /
+  - /mnt/data
+  - /mnt/containers
+  - /mnt/backup/btrbk
+
+# --- Backup disk (backup_disk, db_dump, btrbk roles) -------------------------
+# Enabled in runbook step 3 (backup disk initialised, backup_disk_uuid set);
+# gates backup_disk, db_dump and btrbk in site.yml.
+backup_disk_enabled: true
+# Filesystem UUID printed by backup_disk_init.yml (runbook step 3). The
+# backup_disk role fails with a pointer to its README while this is empty.
+backup_disk_uuid: "80cb7856-915a-42de-b56d-431d17606b70"
+# Newest direct child of each path must be younger than max_age_hours.
+# The two Garage targets (GS-FR-74) exist only while garage_enabled is true.
+backup_disk_freshness_checks: >-
+  {{ [
+    {'path': '/mnt/backup/btrbk/data', 'max_age_hours': 26},
+    {'path': '/mnt/backup/btrbk/containers', 'max_age_hours': 26},
+    {'path': '/mnt/data/restic-repos/cloud/snapshots', 'max_age_hours': 26},
+    {'path': '/mnt/data/restic-repos/ops/snapshots', 'max_age_hours': 26}
+  ] + ([
+    {'path': '/mnt/backup/btrbk/garage', 'max_age_hours': 26},
+    {'path': '/mnt/backup/btrbk/garage-meta', 'max_age_hours': 26}
+  ] if garage_enabled | bool else []) }}
+
+# data and containers restate roles/btrbk/defaults/main.yml (unchanged, GS-FR-127);
+# garage-meta comes before garage so its snapshot is taken first (GS-FR-79).
+# The Garage entries exist only while garage_enabled is true (GS-FR-126).
+btrbk_sources: >-
+  {{ [
+    {'name': 'data', 'path': '/mnt/data'},
+    {'name': 'containers', 'path': '/mnt/containers'}
+  ] + ([
+    {'name': 'garage-meta', 'path': '/mnt/containers/garage/meta',
+     'mount_path': '/mnt/containers', 'snapshot_dir': '/mnt/containers/.btrbk-garage-meta'},
+    {'name': 'garage', 'path': '/mnt/data/garage',
+     'mount_path': '/mnt/data', 'snapshot_dir': '/mnt/data/.btrbk-garage'}
+  ] if garage_enabled | bool else []) }}
+
+# --- Firewall -----------------------------------------------------------------
+# Beszel's hub (cloud-wahlberger-dev) connects to this host's beszel_agent
+# over the ZeroTier-routed home LAN — must match beszel_agent_port.
+firewall_allowed_ports:
+  - "45876/tcp"
+  # Forgejo's git-over-SSH (forgejo_ssh_port); the host's own sshd stays on
+  # 22. This host has no public inbound port, so this is reachable from the
+  # LAN/ZeroTier only. Must match forgejo_ssh_port.
+  - "2222/tcp"
+
+# --- restic REST server (restic_server role) ---------------------------------
+# Sources allowed to reach the rest-server: the home LAN (10.10.0.0/16) and
+# ZeroTier (10.243.0.0/16). firewall_rich_rules below opens restic_server_port
+# for exactly these; that port must equal restic_server_port (8000), and 8000/tcp
+# stays out of firewall_allowed_ports.
+restic_server_allowed_sources:
+  - "10.10.0.0/16"
+  - "10.243.0.0/16"
+# Ungated on purpose (BD-D-06): the rules exist before anything listens.
+# Labgrid coordinator (gRPC over raw TCP, not HTTP, so it is not behind Caddy).
+# Opened only for the home LAN and ZeroTier; it stays closed to the public zone.
+lab_grab_coordinator_allowed_sources:
+  - "10.10.0.0/16"
+  - "10.243.0.0/16"
+# Labgrid's exporter serves each serial console (RFC2217) on a random port from the
+# kernel's ephemeral range (32768-60999 on this host), so open that range to the same sources.
+lab_grab_console_port_range: "32768-60999"
+# BD-FR-141: firewall_rich_rules is derived from restic_server_allowed_sources (the
+# home LAN 10.10.0.0/16 and ZeroTier 10.243.0.0/16). The restic rule port must equal
+# restic_server_port.
+firewall_rich_rules: >-
+  {{ restic_server_allowed_sources
+  | map('regex_replace', '^(.*)$', 'rule family="ipv4" source address="\1" port port="' ~ restic_server_port ~ '" protocol="tcp" accept')
+  | list }}
+# Lab-Grab rules, applied by the firewall role next to firewall_rich_rules: the Labgrid
+# coordinator port and the serial console range, from the same sources.
+firewall_extra_rich_rules: >-
+  {{ (lab_grab_coordinator_allowed_sources
+  | map('regex_replace', '^(.*)$', 'rule family="ipv4" source address="\1" port port="20408" protocol="tcp" accept')
+  | list)
+  + (lab_grab_coordinator_allowed_sources
+  | map('regex_replace', '^(.*)$', 'rule family="ipv4" source address="\1" port port="' ~ lab_grab_console_port_range ~ '" protocol="tcp" accept')
+  | list) }}
+
+# --- Reverse proxy (caddy role) ----------------------------------------------
+# DNS-01 via Cloudflare (not HTTP-01): this host has no public inbound port,
+# so certificates are issued via a Cloudflare DNS API token instead. See
+# roles/caddy/README.md.
+caddy_acme_email: "ewahlberger@gmail.com"
+caddy_sites_base:
+  - host: recipes.de.int.wahlberger.dev
+    upstream: "tandoor:80"
+    extra: |
+      @setup path /setup /setup/*
+      respond @setup 404
+  - host: docs.de.int.wahlberger.dev
+    upstream: "paperless-ngx:8000"
+  - host: photos.de.int.wahlberger.dev
+    upstream: "immich-server:2283"
+  # Forgejo web UI + OCI registry (/v2/) on one vhost. Caddy applies no
+  # request-body size limit and no upstream timeouts by default, so large
+  # image layer uploads pass through unchanged.
+  - host: git.de.int.wahlberger.dev
+    upstream: "forgejo:3000"
+  # Lab-Grab web UI + API (lab_grab role). The app joins caddy.network.
+  - host: lab-grab.de.int.wahlberger.dev
+    upstream: "lab-grab:8000"
+  # n8n editor (phase 1). Only /webhook/hush bypasses Pocket ID (HMAC-checked by
+  # the workflow); everything else, including the editor, needs an oauth2-proxy
+  # session. Full Caddy site body, so the forward_auth block can sit inside it.
+  - host: n8n.de.int.wahlberger.dev
+    body: |
+      # Never trust a client-supplied copy of the identity header (hooks.js reads it).
+      request_header -X-Auth-Request-Email
+      @hush_webhook path /webhook/hush
+      handle @hush_webhook {
+        reverse_proxy n8n:5678
+      }
+      handle /oauth2/* {
+        reverse_proxy oauth2-proxy:4180
+      }
+      handle {
+        forward_auth oauth2-proxy:4180 {
+          uri /oauth2/auth
+          copy_headers X-Auth-Request-Email
+          @error status 401
+          handle_response @error {
+            redir * /oauth2/sign_in?rd={scheme}://{host}{uri}
+          }
+        }
+        reverse_proxy n8n:5678
+      }
+  - host: www.de.int.wahlberger.dev
+    upstream: "homepage:3000"
+# Caddy joins the dedicated garage.network only while Garage is enabled (the
+# garage role creates the network unit and runs before caddy in site.yml).
+caddy_extra_networks: "{{ ['garage.network'] if garage_enabled | bool else [] }}"
+# The existing sites above plus, only while garage_enabled is true, the one
+# S3 site of GS-FR-32 (body: O-6 of reqs/garage-sstate.md, GS-FR-129).
+caddy_sites: >-
+  {{ caddy_sites_base + ([{'host': garage_s3_domain, 'body': garage_s3_caddy_body}]
+  if garage_enabled | bool else []) }}
+
+# --- Garage (garage role, GS-FR-61) -------------------------------------------
+# Off: nothing Garage-related is applied and no list above contains a Garage
+# entry. Set to true only after the enable checklist (GS-FR-115 to GS-FR-118,
+# GS-FR-120). Buckets, keys and the node layout are user-owned (GS-CC-40) and
+# are deliberately not declared here.
+garage_enabled: true
+garage_s3_domain: s3.de.int.wahlberger.dev
+# Caddy site body of the S3 host (O-6): anonymous GET/HEAD without a signature
+# go to the web endpoint with the bucket taken from the path; the rest goes to
+# the S3 API. Tabs are indentation inside the Caddyfile block.
+garage_s3_caddy_body: "\
+  @web {\n\
+  \tmethod GET HEAD\n\
+  \theader !Authorization\n\
+  \tnot query X-Amz-Signature=*\n\
+  \tpath_regexp bucket ^/([^/]+)(/.*)?$\n\
+  }\n\
+  handle @web {\n\
+  \theader X-Content-Type-Options nosniff\n\
+  \theader Content-Security-Policy \"sandbox\"\n\
+  \trewrite * {re.bucket.2}\n\
+  \treverse_proxy garage:3902 {\n\
+  \t\theader_up Host {re.bucket.1}\n\
+  \t}\n\
+  }\n\
+  handle {\n\
+  \treverse_proxy garage:3900\n\
+  }\n"
+
+# --- Identity provider (Pocket ID) -------------------------------------------
+# Public issuer URL of the Pocket ID instance (served by cloud-wahlberger-dev)
+# that tandoor and paperless-ngx authenticate against. The OIDC discovery
+# document is derived from it as "{{ pocket_id_app_url }}/.well-known/openid-configuration".
+pocket_id_app_url: "https://id.wahlberger.dev"
+
+# --- Paperless-ngx ------------------------------------------------------------
+# This replaces the rpi-karlsruhe paperless-ngx instance at the SAME hostname —
+# reuse the OIDC client already registered in Pocket ID for
+# https://docs.de.int.wahlberger.dev/accounts/oidc/pocketid/login/callback/
+# (same client_id, same vault_paperless_ngx_oidc_client_secret value) rather than
+# registering a new app.
+paperless_ngx_url: "https://docs.de.int.wahlberger.dev"
+paperless_ngx_oidc_provider_id: "pocketid"
+paperless_ngx_oidc_provider_name: "Pocket ID"
+paperless_ngx_oidc_client_id: "d1cd5641-7d8f-4ec2-bb53-8cb5bf558f2f"
+# Account creation from OIDC. BOTH true = fully automatic provisioning.
+paperless_ngx_oidc_auto_signup: true
+paperless_ngx_oidc_allow_signups: true
+# Username/password form is disabled — Pocket ID is the ONLY way in.
+paperless_ngx_disable_local_login: true
+# Login page redirects straight to Pocket ID instead of showing the local form.
+paperless_ngx_oidc_redirect_login: true
+
+# --- Tandoor ------------------------------------------------------------------
+# Replaces Mealie at the SAME hostname. Deliberately does NOT reuse Mealie's
+# Pocket ID OIDC client (id 93041358-e45e-4e44-b838-3c758cfe4681) — a NEW
+# client must be registered for Tandoor (Q4 decision). tandoor_oidc_client_id
+# and vault_tandoor_oidc_client_secret are left blank below: the operator
+# fills them in after manually registering that client in Pocket ID (primary
+# flow step 1, roles/tandoor/README.md). Until then, the role's FR-12 assert
+# fails loudly and on purpose.
+tandoor_url: "https://recipes.de.int.wahlberger.dev"
+tandoor_oidc_provider_name: "Pocket ID"
+tandoor_oidc_provider_id: "pocket-id"
+tandoor_oidc_client_id: "79e5970e-7c2e-45be-b667-58dfd9539fd8"
+
+# --- Immich -------------------------------------------------------------------
+# New service — registered as its own Pocket ID app (see roles/immich/README.md
+# for the redirect URIs used).
+immich_url: "https://photos.de.int.wahlberger.dev"
+immich_oidc_provider_name: "Pocket ID"
+immich_oidc_client_id: "90017f0a-235c-4314-9728-9e2e2dc057b5"
+
+# --- Forgejo ------------------------------------------------------------------
+# Git forge + container registry, LAN/VPN only. forgejo_oidc_client_id is
+# blank until the operator registers a Forgejo client in Pocket ID (redirect
+# URI https://git.de.int.wahlberger.dev/user/oauth2/pocket-id/callback, see
+# roles/forgejo/README.md); the role's assert fails loudly until then, as for
+# tandoor originally. Fill in the real UUID here.
+forgejo_url: "https://git.de.int.wahlberger.dev"
+forgejo_ssh_port: 2222
+forgejo_oidc_provider_name: "pocket-id"
+forgejo_oidc_client_id: "e49c8dc5-2a21-4735-bf3b-cc3c8dadbf2e"
+
+# --- n8n (phase 1: editor only, no workflows) -------------------------------
+# Decision record: nas-de-int-wahlberger-dev/PLAN-n8n.md (removed with that directory; see git history). Register the Pocket ID
+# client first, with redirect URI
+# https://n8n.de.int.wahlberger.dev/oauth2/callback.
+# Until n8n_oidc_client_id is set, the n8n role's assert fails loudly.
+n8n_url: "https://n8n.de.int.wahlberger.dev"
+n8n_diag_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMNsI50JkKSFrfy/xx7Pf7M/tNM+fUaOBwUQP1ueWWP+ n8n-diag@nas"
+# The only editor user. Must equal the Pocket ID email and the n8n owner email.
+n8n_allowed_emails:
+  - "erik@wahlberger.dev"
+n8n_oidc_client_id: "cc5ff956-e839-4cb9-a4e8-727bbf16d582"
+n8n_encryption_key: "{{ vault_n8n_encryption_key | default('') }}"
+# Triage workflow (architecture/n8n-triage-workflow.md). The HMAC secret equals ops' hush_n8n_webhook.
+n8n_hush_secret: "{{ vault_n8n_hush_secret | default('') }}"
+n8n_anthropic_key: "{{ vault_n8n_anthropic_key | default('') }}"
+# Renovate gate (monitor-only): read-only GitHub token, see roles/n8n/README.md.
+n8n_github_token: "{{ vault_n8n_github_token | default('') }}"
+n8n_oidc_client_secret: "{{ vault_n8n_oidc_client_secret | default('') }}"
+n8n_oauth2_cookie_secret: "{{ vault_n8n_oauth2_cookie_secret | default('') }}"
+
+# --- Beszel agent ---------------------------------------------------------------
+# REQUIRED, but can't be set until roles/beszel_hub has booted once and
+# generated its own SSH keypair — see roles/beszel_agent/README.md. Leaving
+# this empty makes the role's assert fail cleanly rather than deploying an
+# agent that will never be able to connect to anything.
+beszel_agent_hub_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKz/U0NWhnhm19QvVrNu6sVuXiEPVdoPCrGMC8MzTNdH"
+
+# --- Homepage (dashboard) ------------------------------------------------------
+# Links cloud-wahlberger-dev's and this NAS's services. rpi-karlsruhe is
+# intentionally excluded — it's legacy, being retired.
+homepage_url: "https://www.de.int.wahlberger.dev"
+
+# --- Samba --------------------------------------------------------------------
+# Matches the existing backup layout (server_backup/samba/Delat/) and the
+# share name rpi-karlsruhe already used — restore the backup into
+# samba_share_path (/mnt/data/samba/Delat) so the directory name lines up.
+samba_share_name: "Delat"
+
+# --- Secrets (Ansible Vault) ---------------------------------------------------
+# Never put secrets in plaintext. They live in an encrypted sibling file
+# `vault.yml` in this directory, each with a `vault_` prefix, surfaced here
+# under a friendly name. `| default('')` keeps roles failing with a clear
+# assert (rather than a bare "undefined variable") when the Vault is absent.
+#
+# Scaffold and the exact contents are in `vault.yml.example`. Create the real,
+# encrypted file with:
+#
+#     ansible-vault create inventories/production/group_vars/all/vault.yml
+#
+# and run plays with `--ask-vault-pass` (or --vault-password-file .vault_pass).
+# See README.md -> "Secrets with Ansible Vault" for the full workflow.
+
+# PostgreSQL password shared by the paperless-db and paperless-ngx containers.
+# Migrating from rpi-karlsruhe? Reuse its EXISTING value or the restored DB
+# dump won't authenticate.
+paperless_ngx_db_password: "{{ vault_paperless_ngx_db_password | default('') }}"
+
+# OIDC client secrets from Pocket ID. Migrating from rpi-karlsruhe? Reuse the
+# EXISTING values — they belong to the client_ids above, not to this host.
+paperless_ngx_oidc_client_secret: "{{ vault_paperless_ngx_oidc_client_secret | default('') }}"
+paperless_ngx_secret_key: "{{ vault_paperless_ngx_secret_key | default('') }}"
+
+# Tandoor's Postgres password and Django SECRET_KEY (48 hex chars each,
+# generated fresh — no migration/reuse concern). Its OIDC client secret is
+# blank until the operator registers the new Pocket ID client (see the
+# --- Tandoor --- section above).
+tandoor_db_password: "{{ vault_tandoor_db_password | default('') }}"
+tandoor_secret_key: "{{ vault_tandoor_secret_key | default('') }}"
+tandoor_oidc_client_secret: "{{ vault_tandoor_oidc_client_secret | default('') }}"
+
+# Immich's Postgres password and OIDC client secret.
+immich_db_password: "{{ vault_immich_db_password | default('') }}"
+immich_oidc_client_secret: "{{ vault_immich_oidc_client_secret | default('') }}"
+
+# Forgejo secrets (generate as described in vault.yml.example) and the Pocket
+# ID client secret for the client registered above.
+forgejo_secret_key: "{{ vault_forgejo_secret_key | default('') }}"
+forgejo_internal_token: "{{ vault_forgejo_internal_token | default('') }}"
+forgejo_oauth2_jwt_secret: "{{ vault_forgejo_oauth2_jwt_secret | default('') }}"
+forgejo_lfs_jwt_secret: "{{ vault_forgejo_lfs_jwt_secret | default('') }}"
+forgejo_admin_password: "{{ vault_forgejo_admin_password | default('') }}"
+forgejo_oidc_client_secret: "{{ vault_forgejo_oidc_client_secret | default('') }}"
+
+# Cloudflare DNS API token for Caddy's DNS-01 challenge (Zone:DNS:Edit on
+# wahlberger.dev). Same token rpi-karlsruhe's Traefik already uses for the
+# same zone — reused rather than minted fresh.
+cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token | default('') }}"
+
+# restic REST server clients: cloud-wahlberger-dev and ops-de-wahlberger-dev.
+# Each htpasswd password is the shared secret of that client's
+# vault_restic_backup_rest_server_password (cloud's is the one the Pi's server
+# used, BD-BR-09). The repository passwords are used by the daily maintenance
+# run to forget/prune the append-only repositories.
+restic_server_clients:
+  - username: cloud
+    password: "{{ vault_restic_server_cloud_htpasswd_password | default('') }}"
+  - username: ops
+    password: "{{ vault_restic_server_ops_htpasswd_password | default('') }}"
+# Maintained by the daily run, in this order (SH-CC-01). Each password is the
+# encryption password of that repository; an empty one fails the role before
+# any change. Merge the `ops` entry only after the first VM backup created
+# restic-repos/ops (SH-E-18).
+restic_server_maintenance_repos:
+  - repo: cloud
+    password: "{{ vault_restic_server_cloud_repo_password | default('') }}"
+  - repo: ops
+    password: "{{ vault_restic_server_ops_repo_password | default('') }}"
+
+# Resend API key for failure notification emails (notify_failure role). Same
+# account/key as cloud-wahlberger-dev and pi-de-int-wahlberger-dev.
+notify_failure_resend_api_key: "{{ vault_notify_failure_resend_api_key | default('') }}"
+notify_failure_hush_token: "{{ vault_hush_source_hooks_nas | default('') }}"
+notify_failure_hush_source: hooks-nas
+
+# Garage's cluster RPC secret and admin API token (formats in
+# roles/garage/README.md); the role fails before any change while one is empty.
+garage_rpc_secret: "{{ vault_garage_rpc_secret | default('') }}"
+garage_admin_token: "{{ vault_garage_admin_token | default('') }}"
+
+# --- Lab-Grab + Labgrid (lab_grab role) --------------------------------------
+lab_grab_url: "https://lab-grab.de.int.wahlberger.dev"
+# Home LAN subnet for the ARP scan (the NAS's enp4s0 is 10.10.0.100/24).
+lab_grab_arp_subnet: "10.10.0.0/24"
+# Forgejo account and read:package token used by `podman login` on the NAS.
+lab_grab_registry_username: "erikwahlberger"
+lab_grab_registry_token: "{{ vault_lab_grab_registry_token | default('') }}"
+lab_grab_db_password: "{{ vault_lab_grab_db_password | default('') }}"
+lab_grab_jwt_secret: "{{ vault_lab_grab_jwt_secret | default('') }}"
+# Pocket ID client for Lab-Grab (login is OIDC only). Register it in Pocket ID
+# with redirect URI https://lab-grab.de.int.wahlberger.dev/auth/callback/oauth2
+# and fill in the UUID below. Its secret goes in the vault.
+lab_grab_oidc_client_id: "5e982e4f-4a81-4cb5-993e-5e7b5123618b"
+lab_grab_oidc_client_secret: "{{ vault_lab_grab_oidc_client_secret | default('') }}"
+# One place: the i.MX8M demo kit. ARP resolves its MAC to the NetworkService address.
+# SSH user on the device (confirmed root).
+lab_grab_places:
+  - name: imx8m-demo-kit
+    comment: "i.MX8M demo kit (home)"
+    tags:
+      board: imx8m
+      unit_type: devkit
+      site: home
+    matches:
+      - exporter: "*"
+        group: imx8m-demo-kit
+        cls: "*"
+    network_services:
+      - name: ssh
+        group: imx8m-demo-kit
+        mac_address: "00:30:d6:2c:7f:51"
+        username: root
+        # The device's root password, from vault. `none` omits the field (key auth).
+        password: "{{ vault_lab_grab_demo_kit_ssh_password | default(none) }}"
+# USB serial adapter (Raspberry Pi Debug Probe, UART interface if01) on the NAS.
+# Match keys are udev properties; verify with `udevadm info` on the NAS.
+lab_grab_serial_resources:
+  imx8m-demo-kit:
+    uart:
+      cls: USBSerialPort
+      # Labgrid's USBSerialPort takes its udev match fields directly (no params wrapper).
+      match:
+        ID_SERIAL_SHORT: "E6633861A3352838"
+        ID_USB_INTERFACE_NUM: "01"
+
+# --- Hush maintenance window (roles/hush_maintenance) -------------------------
+# Hush token for the maintenance window (vault_hush_maintenance_ansible).
+hush_maintenance_ansible: "{{ vault_hush_maintenance_ansible | default('') }}"
+# Hush host names the window for each ansible apply is scoped to.
+hush_maintenance_host_names:
+  - nas.de.int.wahlberger.dev

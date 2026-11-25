@@ -1,0 +1,188 @@
+---
+- name: Validate n8n URL, OIDC and secret inputs are present
+  ansible.builtin.assert:
+    that:
+      - n8n_url | length > 0
+      - n8n_oidc_client_id | length > 0
+      - n8n_oidc_client_secret | length > 0
+      - n8n_encryption_key | length > 0
+      - n8n_oauth2_cookie_secret | length > 0
+      # vault.yml.example ships REPLACE-* placeholders; never deploy one.
+      - not (n8n_oidc_client_secret | string) is match('REPLACE')
+      - not (n8n_encryption_key | string) is match('REPLACE')
+      - not (n8n_oauth2_cookie_secret | string) is match('REPLACE')
+    fail_msg: >-
+      n8n is not fully configured. Empty inputs or REPLACE-* placeholders among
+      n8n_url, n8n_oidc_client_id, n8n_oidc_client_secret, n8n_encryption_key and
+      n8n_oauth2_cookie_secret. Set
+      n8n_url and n8n_oidc_client_id in group_vars and the matching vault_n8n_* secrets
+      in Ansible Vault (see vault.yml.example). See roles/n8n/README.md.
+    quiet: true
+
+- name: Create the n8n base directory
+  ansible.builtin.file:
+    path: "{{ n8n_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# The image runs as node (uid/gid 1000) and rootful Podman does no ID remapping.
+- name: Validate the editor allowlist
+  ansible.builtin.assert:
+    that:
+      - n8n_allowed_emails | length > 0
+    fail_msg: n8n_allowed_emails is empty. Without it oauth2-proxy admits nobody. See roles/n8n/README.md.
+    quiet: true
+
+# Diagnostics account for the triage workflow. Locked password, no sudo, read-only journal
+# access through systemd-journal. Logins are only ever the forced command below.
+- name: Create the n8n-diag account
+  ansible.builtin.user:
+    name: n8n-diag
+    system: true
+    shell: /bin/bash
+    password: "!"
+    home: /var/lib/n8n-diag
+    create_home: true
+    groups: systemd-journal
+    append: true
+
+- name: Install the n8n-diag-bundle forced command
+  ansible.builtin.copy:
+    src: n8n-diag-bundle.sh
+    dest: /usr/local/sbin/n8n-diag-bundle
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create the n8n-diag configuration directory
+  ansible.builtin.file:
+    path: /etc/n8n-diag
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write the n8n-diag unit allowlist
+  ansible.builtin.copy:
+    content: "{{ n8n_diag_units | join('\n') }}\n"
+    dest: /etc/n8n-diag/units
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create the n8n-diag .ssh directory
+  ansible.builtin.file:
+    path: /var/lib/n8n-diag/.ssh
+    state: directory
+    owner: n8n-diag
+    group: n8n-diag
+    mode: "0700"
+
+# The forced command is the only thing this key can run. No port forwarding, no pty, no agent.
+- name: Authorize the n8n-diag key for the forced command only
+  ansible.builtin.copy:
+    content: "restrict,command=\"/usr/local/sbin/n8n-diag-bundle\" {{ n8n_diag_public_key }}\n"
+    dest: /var/lib/n8n-diag/.ssh/authorized_keys
+    owner: n8n-diag
+    group: n8n-diag
+    mode: "0600"
+  when: n8n_diag_public_key | length > 0
+
+- name: Create the n8n data volume directory
+  ansible.builtin.file:
+    path: "{{ n8n_volume_dir }}"
+    state: directory
+    owner: "{{ n8n_uid }}"
+    group: "{{ n8n_gid }}"
+    mode: "0750"
+
+# The trusted-header hook (files/hooks.js), loaded via EXTERNAL_HOOK_FILES. Root-owned so
+# n8n (uid 1000) can read it but cannot change it. Tested per image in tests/n8n-hook/.
+- name: Deploy the n8n trusted-header hook
+  ansible.builtin.copy:
+    src: hooks.js
+    dest: "{{ n8n_volume_dir }}/hooks.js"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart n8n
+
+# Root-only env files. Secrets stay out of the world-readable Quadlet units.
+# Each is rendered immediately before its container include, for the same
+# first-run daemon-reload ordering reason as roles/forgejo/tasks/main.yml.
+- name: Render the n8n environment file
+  ansible.builtin.template:
+    src: n8n.env.j2
+    dest: "{{ n8n_data_dir }}/n8n.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Restart n8n
+
+# The encryption key as a file, read by n8n through N8N_ENCRYPTION_KEY_FILE. It is kept out
+# of the environment because workflows can read the environment (N8N_BLOCK_ENV_ACCESS_IN_NODE=false).
+# Owned by the n8n uid so the container can read it. Losing it loses every credential.
+- name: Render the n8n encryption key file
+  ansible.builtin.copy:
+    content: "{{ n8n_encryption_key }}"
+    dest: "{{ n8n_data_dir }}/encryption.key"
+    owner: "{{ n8n_uid }}"
+    group: "{{ n8n_gid }}"
+    mode: "0400"
+  no_log: true
+  notify: Restart n8n
+
+# The Renovate gate workflow (monitor-only), imported the same way as the triage workflow.
+- name: Copy the Renovate gate workflow for import
+  ansible.builtin.copy:
+    src: renovate-gate-workflow.json
+    dest: "{{ n8n_data_dir }}/renovate-gate-workflow.json"
+    owner: root
+    group: root
+    mode: "0644"
+
+# The triage workflow, for the one-time import described in roles/n8n/README.md.
+- name: Copy the triage workflow for import
+  ansible.builtin.copy:
+    src: triage-workflow.json
+    dest: "{{ n8n_data_dir }}/triage-workflow.json"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy the n8n container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: n8n
+    container_quadlet_src: n8n.container.j2
+
+# The editor gate's allowlist. Mounted read-only into the oauth2-proxy container.
+- name: Render the oauth2-proxy allowlist of editor users
+  ansible.builtin.copy:
+    content: "{{ n8n_allowed_emails | join('\n') }}\n"
+    dest: "{{ n8n_data_dir }}/oauth2-proxy-emails.txt"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart oauth2-proxy
+
+- name: Render the oauth2-proxy environment file
+  ansible.builtin.template:
+    src: oauth2-proxy.env.j2
+    dest: "{{ n8n_data_dir }}/oauth2-proxy.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Restart oauth2-proxy
+
+- name: Deploy the oauth2-proxy container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: oauth2-proxy
+    container_quadlet_src: oauth2-proxy.container.j2
