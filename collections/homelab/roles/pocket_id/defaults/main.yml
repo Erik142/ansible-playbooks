@@ -1,0 +1,29 @@
+---
+# Default variables for the `pocket_id` role.
+
+# Pocket ID image, pinned to a specific release for reproducibility.
+pocket_id_image: ghcr.io/pocket-id/pocket-id:v2.16.0
+
+# Host directory for everything Pocket ID keeps on disk. Holds the encryption key
+# (encryption.key, mounted read-only) and the data/ directory (SQLite DB, uploads),
+# which is bind-mounted at /app/data. Under /opt/podman so restic_backup covers it.
+pocket_id_data_dir: /opt/podman/pocket-id
+pocket_id_db_dir: "{{ pocket_id_data_dir }}/data"
+
+# Owner of data/ as on the live host (verified: 1000:1000). The container runs as root,
+# so the value only needs to match the data already on disk.
+pocket_id_data_uid: 1000
+pocket_id_data_gid: 1000
+
+# Trust X-Forwarded-* headers from the reverse proxy in front of Pocket ID.
+pocket_id_trust_proxy: true
+
+# REQUIRED: public https:// URL Pocket ID is served on. Set in group_vars; it must
+# match the caddy_sites host and the DNS record.
+pocket_id_app_url: ""
+
+# REQUIRED: encrypts Pocket ID's data. It must stay constant, so it lives in Ansible
+# Vault (vault_pocket_id_encryption_key). 64 hex chars (openssl rand -hex 32). When
+# migrating an existing instance, use the CURRENT key. A different value makes the
+# existing encrypted data unrecoverable.
+pocket_id_encryption_key: ""

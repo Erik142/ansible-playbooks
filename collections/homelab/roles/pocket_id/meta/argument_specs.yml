@@ -1,0 +1,39 @@
+---
+argument_specs:
+  main:
+    short_description: Run Pocket ID as a Podman Quadlet behind Caddy.
+    options:
+      pocket_id_image:
+        type: str
+        required: false
+        description: Pocket ID container image (pin a version).
+      pocket_id_data_dir:
+        type: path
+        required: false
+        description: Host directory for the encryption key and data/ (bind-mounted at /app/data).
+      pocket_id_db_dir:
+        type: path
+        required: false
+        description: Host directory bind-mounted at /app/data (SQLite DB, uploads).
+      pocket_id_data_uid:
+        type: int
+        required: false
+        description: Owner UID of pocket_id_db_dir (verify against the live container).
+      pocket_id_data_gid:
+        type: int
+        required: false
+        description: Owner GID of pocket_id_db_dir.
+      pocket_id_trust_proxy:
+        type: bool
+        required: false
+        description: Trust X-Forwarded-* headers from the reverse proxy.
+      pocket_id_app_url:
+        type: str
+        required: true
+        description: Public https URL Pocket ID is served on (must match DNS and the Caddy site).
+      pocket_id_encryption_key:
+        type: str
+        required: true
+        description: >-
+          Key that encrypts Pocket ID data (from Vault). Must stay constant; changing
+          it makes existing encrypted data unrecoverable.

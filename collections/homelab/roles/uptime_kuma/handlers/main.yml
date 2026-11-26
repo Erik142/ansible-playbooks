@@ -1,0 +1,12 @@
+---
+# Restarts oauth2-proxy when its environment file changes. The container role's own
+# handler only fires when the .container unit changes, not the env file. Both get
+# flushed by the flush_handlers inside the container role include.
+# Check mode never writes the unit, so the service does not exist yet. Skip it there;
+# a real apply restarts it.
+- name: Restart oauth2-proxy
+  ansible.builtin.systemd:
+    name: oauth2-proxy.service
+    state: restarted
+    daemon_reload: true
+  when: not ansible_check_mode

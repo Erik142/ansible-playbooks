@@ -1,0 +1,53 @@
+---
+# The pocket-id.container template reads this role's variables plus pocket_id_app_url
+# from group_vars. Data is a bind mount under pocket_id_data_dir. The encryption key
+# is written to a root-owned file the container mounts read-only.
+#
+# IMPORTANT: this key encrypts Pocket ID's data. It must stay constant. A different
+# value makes existing encrypted data unrecoverable.
+- name: Validate the Pocket ID inputs are present
+  ansible.builtin.assert:
+    that:
+      - pocket_id_app_url | length > 0
+      - pocket_id_encryption_key | length >= 32
+    fail_msg: >-
+      pocket_id_app_url or pocket_id_encryption_key is missing or too short. Set the
+      URL in group_vars and provide vault_pocket_id_encryption_key (run with
+      --ask-vault-pass). Migrating an existing instance? Use the CURRENT key value. A
+      new value loses encrypted data. See roles/pocket_id/README.md.
+    quiet: true
+
+- name: Ensure the Pocket ID host directories exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ pocket_id_data_dir }}"
+      owner: root
+      group: root
+      mode: "0755"
+    - path: "{{ pocket_id_db_dir }}"
+      owner: "{{ pocket_id_data_uid }}"
+      group: "{{ pocket_id_data_gid }}"
+      mode: "0700"
+
+# 0644 (not 0600): the container may run as a non-root user and mounts this read-only,
+# so it must be world-readable to be loaded. The host directory is root-owned, and the
+# real protection is Vault plus the host itself.
+- name: Write the encryption key to the target host
+  ansible.builtin.copy:
+    content: "{{ pocket_id_encryption_key }}\n"
+    dest: "{{ pocket_id_data_dir }}/encryption.key"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy the Pocket ID container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: pocket-id
+    container_quadlet_src: pocket-id.container.j2
