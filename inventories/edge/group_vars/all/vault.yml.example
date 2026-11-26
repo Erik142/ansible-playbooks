@@ -1,7 +1,7 @@
 # Scaffold for the edge host's Ansible Vault (vault id `edge`). Copy to vault.yml,
 # fill in the values, then encrypt with:
 #   ansible-vault encrypt --encrypt-vault-id edge inventories/edge/group_vars/all/vault.yml
-# Values are copied from the Debian host's vault (cloud-wahlberger-dev). Do not commit
+# Values are copied from the Debian host's vault (edge host). Do not commit
 # plaintext.
 
 # Cloudflare API token (Zone:DNS:Edit on wahlberger.dev), for cloudflare_dns.

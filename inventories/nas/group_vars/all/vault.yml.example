@@ -95,17 +95,17 @@ vault_restic_backup_repo_password: "REPLACE-with-a-40-char-alnum-password"
 vault_restic_backup_rest_server_password: "REPLACE-with-a-32-char-alnum-password"
 
 # restic REST server (restic_server role), client `cloud`. SHARED SECRET: must
-# be the exact same value as cloud-wahlberger-dev's
+# be the exact same value as the edge host's
 # vault_restic_backup_rest_server_password (and the Pi's current
 # vault_restic_server_cloud_htpasswd_password it replaces).
 vault_restic_server_cloud_htpasswd_password: "REPLACE-with-the-cloud-rest-server-password"
 
 # Repository password of cloud's restic repository, used by the maintenance
-# run. Must be the exact same value as cloud-wahlberger-dev's
+# run. Must be the exact same value as the edge host's
 # vault_restic_backup_repo_password.
 vault_restic_server_cloud_repo_password: "REPLACE-with-cloud-restic-repo-password"
 
-# restic REST server, client `ops` (ops-de-wahlberger-dev). SHARED SECRET: must
+# restic REST server, client `ops` (ops.de.wahlberger.dev). SHARED SECRET: must
 # be the exact same value as ops' vault_restic_backup_rest_server_password.
 # It was copied once with the migration vault-copy helper (removed; see git history).
 vault_restic_server_ops_htpasswd_password: "REPLACE-with-the-ops-rest-server-password"
@@ -115,7 +115,7 @@ vault_restic_server_ops_htpasswd_password: "REPLACE-with-the-ops-rest-server-pas
 vault_restic_server_ops_repo_password: "REPLACE-with-ops-restic-repo-password"
 
 # Resend API key for failure notification emails. Same key as
-# cloud-wahlberger-dev and pi-de-int-wahlberger-dev — one Resend account.
+# the edge host and pi-de-int-wahlberger-dev — one Resend account.
 vault_notify_failure_resend_api_key: "REPLACE-with-a-resend-api-key"
 
 # Garage (S3 sstate store) RPC secret: 64 hex characters, shared by the cluster

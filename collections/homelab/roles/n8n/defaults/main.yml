@@ -39,7 +39,7 @@ n8n_cpu_quota: 200%
 # on the NAS. Documented by n8n as NODES_EXCLUDE.
 n8n_nodes_exclude: '["n8n-nodes-base.executeCommand"]'
 
-# --- oauth2-proxy (editor auth gate, same pattern as cloud-wahlberger-dev/uptime_kuma)
+# --- oauth2-proxy (editor auth gate, same pattern as the edge host/uptime_kuma)
 n8n_oauth2_proxy_image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.6
 n8n_oauth2_proxy_port: 4180
 

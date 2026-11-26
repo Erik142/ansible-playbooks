@@ -2,7 +2,7 @@
 
 [Beszel](https://beszel.dev/) monitoring agent: reports CPU, memory, disk,
 network, temperature, and Podman container stats to the `beszel_hub` role
-running on cloud-wahlberger-dev.
+running on the edge host.
 
 ## Native, not a container — deliberately
 
@@ -22,7 +22,7 @@ and Beszel ships a static binary specifically for this.
 hub's own SSH public key, which only exists after the hub's first boot
 (it's generated then, not something Ansible/Vault can pre-seed). Workflow:
 
-1. Deploy `beszel_hub` on cloud-wahlberger-dev first.
+1. Deploy `beszel_hub` on the edge host first.
 2. Log into the hub's web UI, add this host as a "System" — either the UI
    surface for adding a system or its Settings page shows the hub's own SSH
    public key (a `ssh-ed25519 ...` line). Copy it.
@@ -31,7 +31,7 @@ hub's own SSH public key, which only exists after the hub's first boot
 
 The hub connects **to** this agent (not the other way around) — see
 `roles/beszel_hub/README.md` for why. That means `beszel_agent_port`
-(default `45876`) must be reachable from cloud-wahlberger-dev, which for
+(default `45876`) must be reachable from the edge host, which for
 this host means adding it to `firewall_allowed_ports` in `group_vars`
 (already done — see `inventories/production/group_vars/all/vars.yml`).
 

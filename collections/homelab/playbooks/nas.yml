@@ -64,7 +64,7 @@
       tags: [snapper]
     - role: wahlberger.homelab.podman
       tags: [podman]
-    # Reports to beszel_hub on cloud-wahlberger-dev. After podman: needs its
+    # Reports to beszel_hub on the edge host. After podman: needs its
     # rootful API socket to already exist to grant this agent access to it.
     - role: wahlberger.homelab.beszel_agent
       tags: [beszel_agent]
@@ -106,10 +106,10 @@
     # (creates caddy.network) and forgejo. See roles/n8n/README.md.
     - role: wahlberger.homelab.n8n
       tags: [n8n]
-    # Dashboard linking this NAS's and cloud-wahlberger-dev's services.
+    # Dashboard linking this NAS's and the edge host's services.
     - role: wahlberger.homelab.homepage
       tags: [homepage]
-    # restic REST server for cloud-wahlberger-dev's backups (host networking,
+    # restic REST server for the edge host's backups (host networking,
     # gated by the firewall role's rich rules). After firewall, podman and
     # storage (needs /mnt/data mounted). Gated with the backup disk: its
     # repositories are only protected by btrbk once that disk exists.

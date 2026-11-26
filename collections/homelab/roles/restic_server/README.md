@@ -4,8 +4,8 @@
 
 Runs restic's REST server (`rest-server`) as the Podman Quadlet
 `restic-server` (unit `restic-server.service`, deployed through the `container`
-role). It is the backup target for `cloud-wahlberger-dev`: the cloud host
-pushes its restic repository here over HTTP. The server runs `--append-only` and
+role). It is the backup target for the edge host (the former cloud
+host): it pushes its restic repository here over HTTP. The server runs `--append-only` and
 `--private-repos`, so a compromised client can add data but not delete it, and
 sees only its own repository.
 
@@ -54,7 +54,7 @@ All variables, their defaults and constraints are in `defaults/main.yml` and
   home LAN and `10.243.0.0/16` ZeroTier). This role opens nothing itself; the
   production `firewall_rich_rules` are built from this list.
 
-Two shared secrets must equal the cloud playbook's values (BD-BR-09):
+Two shared secrets must equal the edge playbook's values (BD-BR-09):
 `vault_restic_server_cloud_htpasswd_password` equals cloud's
 `vault_restic_backup_rest_server_password`, and
 `vault_restic_server_cloud_repo_password` equals cloud's `vault_restic_backup_repo_password`.

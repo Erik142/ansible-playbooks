@@ -24,7 +24,7 @@ netcup_network_dns:
 zerotier_network_id: "8056c2e21cc5c789"
 vm_zt_ip: "10.243.73.1"
 vm_zt_iface: "ztmjfaojmv"
-# cloud-wahlberger-dev's ZeroTier member IP and public IPv4, same values as the
+# the edge host's ZeroTier member IP and public IPv4, same values as the
 # ops playbook (Beszel hub source; fail2ban ignore list).
 cloud_zt_ip: "10.243.203.116"
 cloud_public_ip: "49.13.141.178"

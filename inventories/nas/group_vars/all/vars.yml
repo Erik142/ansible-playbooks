@@ -48,10 +48,10 @@ firewall_public_removed_services: []
 # --- SSH access (ssh_authorized_keys role) ----------------------------------
 # Your personal key (manual access), the Pi's old Semaphore automation key
 # (revoked in the Pi retirement, pull request E) and the new Semaphore
-# automation key (ops-de-wahlberger-dev), which only works from the VM's
+# automation key (ops.de.wahlberger.dev), which only works from the VM's
 # addresses (from=). See roles/ssh_authorized_keys/README.md. None is secret
 # (public keys), so all live here in plaintext, not Vault. The same keys are
-# authorized on cloud-wahlberger-dev, the NAS and the VM (the VM: personal and
+# authorized on the edge host, the NAS and the VM (the VM: personal and
 # new only).
 ssh_authorized_keys_list:
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJSKdeHoK+WkyBI69OSZqn0sVqZPPDRs082S/IVoOeSu erikwahlberger@personal"
@@ -103,7 +103,7 @@ btrbk_sources: >-
   ] if garage_enabled | bool else []) }}
 
 # --- Firewall -----------------------------------------------------------------
-# Beszel's hub (cloud-wahlberger-dev) connects to this host's beszel_agent
+# Beszel's hub (edge host) connects to this host's beszel_agent
 # over the ZeroTier-routed home LAN — must match beszel_agent_port.
 firewall_allowed_ports:
   - "45876/tcp"
@@ -235,7 +235,7 @@ garage_s3_caddy_body: "\
   }\n"
 
 # --- Identity provider (Pocket ID) -------------------------------------------
-# Public issuer URL of the Pocket ID instance (served by cloud-wahlberger-dev)
+# Public issuer URL of the Pocket ID instance (served by the edge host)
 # that tandoor and paperless-ngx authenticate against. The OIDC discovery
 # document is derived from it as "{{ pocket_id_app_url }}/.well-known/openid-configuration".
 pocket_id_app_url: "https://id.wahlberger.dev"
@@ -317,7 +317,7 @@ n8n_oauth2_cookie_secret: "{{ vault_n8n_oauth2_cookie_secret | default('') }}"
 beszel_agent_hub_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKz/U0NWhnhm19QvVrNu6sVuXiEPVdoPCrGMC8MzTNdH"
 
 # --- Homepage (dashboard) ------------------------------------------------------
-# Links cloud-wahlberger-dev's and this NAS's services. rpi-karlsruhe is
+# Links the edge host's and this NAS's services. rpi-karlsruhe is
 # intentionally excluded — it's legacy, being retired.
 homepage_url: "https://www.de.int.wahlberger.dev"
 
@@ -377,7 +377,7 @@ forgejo_oidc_client_secret: "{{ vault_forgejo_oidc_client_secret | default('') }
 # same zone — reused rather than minted fresh.
 cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token | default('') }}"
 
-# restic REST server clients: cloud-wahlberger-dev and ops-de-wahlberger-dev.
+# restic REST server clients: the edge host and ops.de.wahlberger.dev.
 # Each htpasswd password is the shared secret of that client's
 # vault_restic_backup_rest_server_password (cloud's is the one the Pi's server
 # used, BD-BR-09). The repository passwords are used by the daily maintenance
@@ -398,7 +398,7 @@ restic_server_maintenance_repos:
     password: "{{ vault_restic_server_ops_repo_password | default('') }}"
 
 # Resend API key for failure notification emails (notify_failure role). Same
-# account/key as cloud-wahlberger-dev and pi-de-int-wahlberger-dev.
+# account/key as the edge host and pi-de-int-wahlberger-dev.
 notify_failure_resend_api_key: "{{ vault_notify_failure_resend_api_key | default('') }}"
 notify_failure_hush_token: "{{ vault_hush_source_hooks_nas | default('') }}"
 notify_failure_hush_source: hooks-nas

@@ -5,7 +5,7 @@ PostgreSQL (with the vectorchord vector-search extension) + a machine-learning
 service + the app itself, each a separate Podman Quadlet on a private
 `immich` network, with the app additionally joined to the shared
 `caddy.network` and reverse-proxied by the `caddy` role. Logs in via the
-Pocket ID instance at `pocket_id_app_url` (served by cloud-wahlberger-dev).
+Pocket ID instance at `pocket_id_app_url` (served by the edge host).
 
 Not exposed publicly: like every other service on this NAS, `immich_url`
 resolves to a private LAN IP (see `roles/cloudflare_dns/README.md`) — reach

@@ -1,7 +1,7 @@
 ---
 # Variables for edge.de.wahlberger.dev (wahlberger.homelab.edge). Non-secret. Secrets
 # live in the encrypted sibling vault.yml (vault id `edge`). Values pinned to the live
-# Debian host (cloud.wahlberger.dev) carry a "pinned" comment.
+# former Debian cloud host (cloud.wahlberger.dev) carry a "pinned" comment.
 
 # --- Connection -------------------------------------------------------------
 ansible_user: erikwahlberger
@@ -54,7 +54,7 @@ beszel_agent_account_uid: 999
 beszel_agent_account_gid: 989
 
 # --- DNS (cloudflare_dns role) ----------------------------------------------
-# pinned: the public IPv4 of the host (the same address as cloud.wahlberger.dev). The
+# pinned: the public IPv4 of the host (the same address as the former cloud host, cloud.wahlberger.dev). The
 # role default would use the interface address.
 cloudflare_dns_ip: "49.13.141.178"
 cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token | default('') }}"

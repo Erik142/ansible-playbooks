@@ -7,7 +7,7 @@ After=network-online.target
 OnFailure=notify-failure@%n.service
 
 [Service]
-# The hub (cloud-wahlberger-dev) connects to this agent over the network —
+# The hub (edge host) connects to this agent over the network —
 # see roles/beszel_hub/README.md for why that direction, not the reverse.
 Environment="PORT={{ beszel_agent_port }}"
 # The hub's SSH public key: only THIS hub is trusted to connect.

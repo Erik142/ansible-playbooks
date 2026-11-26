@@ -5,9 +5,9 @@ Proposed loop: Uptime Kuma alert -> webhook -> n8n LLM agent investigates -> if 
 playbook/role, the agent opens a GitHub PR -> human merges -> Semaphore re-runs the playbook.
 
 Current state (verified in this repo):
-- Uptime Kuma runs on `playbooks/cloud-wahlberger-dev` (Hetzner) and reaches `nas`/`pi` over ZeroTier (`roles/zerotier`).
-  `nas` has no public inbound port, so a webhook to n8n on the NAS travels cloud -> ZeroTier -> NAS Caddy. No port forward is needed.
-- Semaphore on `ops-de-wahlberger-dev` (Hetzner VM, ZeroTier-only UI) is the only holder of the automation SSH key, which has passwordless sudo on all three hosts.
+- Uptime Kuma runs on the edge host (`wahlberger.homelab.edge`, `edge.de.wahlberger.dev`, Hetzner) and reaches `nas`/`pi` over ZeroTier (`roles/zerotier`).
+  `nas` has no public inbound port, so a webhook to n8n on the NAS travels edge -> ZeroTier -> NAS Caddy. No port forward is needed.
+- Semaphore on `ops.de.wahlberger.dev` (Hetzner VM, ZeroTier-only UI) is the only holder of the automation SSH key, which has passwordless sudo on all three hosts.
   Semaphore polls GitHub; there is no inbound webhook.
 - `master` has **no branch protection and no rulesets** (checked with `gh api`, which returned 404 and `[]`).
 - Renovate **auto-merges** minor/patch container bumps once CI passes (`renovate.json`). CI only runs lint, syntax and vault checks. It never applies anything.
@@ -66,13 +66,13 @@ Two prerequisites are worth doing even if no AI is ever built:
 ### Diagram
 ```mermaid
 flowchart LR
-  subgraph cloud["playbooks/cloud-wahlberger-dev"]
+  subgraph edge["edge.de.wahlberger.dev"]
     UK[Uptime Kuma]
   end
   subgraph nas["nas-de-int-wahlberger-dev"]
     N8N[n8n]
   end
-  subgraph ops["ops-de-wahlberger-dev"]
+  subgraph ops["ops.de.wahlberger.dev"]
     SEM["Semaphore (sole sudo key holder)"]
   end
   DIAG["diag-bundle on each host (forced-command SSH, read-only, redacted)"]
@@ -104,7 +104,7 @@ flowchart LR
 
 ### Open risks
 - **Shared fate.** n8n on the NAS is unreachable in exactly the failures that matter most. In the 09-26 ip_forward incident, every published port on the NAS hung, and n8n sits behind Caddy on the NAS.
-  In the 09-19 incident Semaphore could not SSH, so the apply leg was dead too. Pocket ID lives on cloud, so a cloud outage means no alerts and no OIDC logins.
+  In the 09-19 incident Semaphore could not SSH, so the apply leg was dead too. Pocket ID lives on the edge host, so an edge outage means no alerts and no OIDC logins.
   This is why the direct human alert must stay primary.
 - **Wrong-class alerts.** Most "down" alerts will be host, network, ZeroTier, disk, Cloudflare/cert or upstream bugs, not playbook bugs.
   The agent also cannot see vault values, so its space of fixes is narrower than it looks.

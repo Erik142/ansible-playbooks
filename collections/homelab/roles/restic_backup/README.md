@@ -6,7 +6,7 @@ the append-only restic REST server of `nas-de-int-wahlberger-dev` (its
 independently of Ansible and Semaphore: a backup must not depend on the thing
 it protects being reachable.
 
-Adapted from the cloud host's role of the same name (Debian, one live
+Adapted from the former cloud host's role of the same name (Debian, one live
 `/opt/podman` copy, retention on the client). This version differs on purpose:
 
 | | cloud | ops VM |

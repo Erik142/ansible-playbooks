@@ -63,6 +63,7 @@ argument_specs:
         type: str
         required: false
         description: >-
-          The cloud host's ZeroTier member IPv4 address (cloud_zt_ip).
+          The edge host's ZeroTier member IPv4 address (cloud_zt_ip; the variable keeps
+          the name from the former cloud host).
           Required (the role fails before any change if it is not an IPv4
           address) whenever firewall_zerotier_interface is set.

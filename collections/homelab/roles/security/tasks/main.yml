@@ -1,5 +1,5 @@
 ---
-# geerlingguy.security (used by cloud-wahlberger-dev) does not target
+# geerlingguy.security (used by the former Debian cloud host) does not target
 # openSUSE, so this role hand-rolls its controls. This is the only host with
 # public SSH (SH-R-01), so sshd, fail2ban, locked passwords and the login email
 # are the preventive/detective controls. Order matters: sshd first (and

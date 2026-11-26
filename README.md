@@ -2,23 +2,21 @@
 
 [![CI](https://github.com/Erik142/ansible-playbooks/actions/workflows/ci.yml/badge.svg)](https://github.com/Erik142/ansible-playbooks/actions/workflows/ci.yml)
 
-Infrastructure-as-code for Erik's homelab. Three hosts share the
+Infrastructure-as-code for Erik's homelab. Four hosts share the
 `wahlberger.homelab` collection (roles and playbooks in
-`collections/homelab/`, host data in `inventories/<host>/`). The cloud host
-still has its own self-contained playbook.
+`collections/homelab/`, host data in `inventories/<host>/`).
 
 ## Playbooks
 
 | Playbook | Host | What it runs |
 |----------|------|---------------|
-| [`cloud-wahlberger-dev`](playbooks/cloud-wahlberger-dev) | `cloud.wahlberger.dev` (Hetzner Cloud VM, Debian) | Pocket ID (passkey OIDC) + FreshRSS behind Caddy (HTTP-01). Not yet migrated to the collection. |
+| `wahlberger.homelab.edge` | `edge.de.wahlberger.dev` (Hetzner, openSUSE Tumbleweed) | Pocket ID (passkey OIDC) + FreshRSS + Beszel hub + Uptime Kuma behind Caddy (HTTP-01). Inventory `inventories/edge/`. |
 | `wahlberger.homelab.nas` | `nas.de.int.wahlberger.dev` (home NAS, openSUSE Tumbleweed) | Native Samba file share, Tandoor + Paperless-ngx + Immich behind Caddy (DNS-01), a Homepage dashboard. Inventory `inventories/nas/`. |
 | `wahlberger.homelab.ops` | `ops.de.wahlberger.dev` (Hetzner CX23, openSUSE Tumbleweed) | Semaphore UI (over ZeroTier only), Caddy, Hush alerting; runs the other playbooks (see [Automated runs](#automated-runs)). Inventory `inventories/ops/`. |
 | `wahlberger.homelab.ci` | `ci.de.wahlberger.dev` (netcup VPS, openSUSE) | Forgejo Actions runner for the NAS Forgejo, over ZeroTier. Inventory `inventories/ci/`. |
 
 The collection's README is [`collections/homelab/README.md`](collections/homelab/README.md),
-and the repo-wide rules are in [`CLAUDE.md`](CLAUDE.md). `playbooks/cloud-wahlberger-dev`
-has its own `README.md` and `CLAUDE.md`.
+and the repo-wide rules are in [`CLAUDE.md`](CLAUDE.md).
 
 ## Automated runs
 
@@ -32,12 +30,10 @@ host's inventory in `inventories/ops/`.
 
 ## Design philosophy
 
-Roles in the `wahlberger.homelab` collection are shared by the NAS, ci and ops
-playbooks, and each host differs only in its inventory and vault. The cloud
-host keeps its own copies of its roles (for example `caddy`, `container`,
-`cloudflare_dns`), because it runs Debian with HTTP-01 instead of openSUSE with
-DNS-01. A fix to a shared role applies to every host that uses it, so check
-each host's check run after changing one.
+Roles in the `wahlberger.homelab` collection are shared by the NAS, ops, ci and
+edge playbooks, and each host differs only in its inventory and vault. A fix to
+a shared role applies to every host that uses it, so check each host's check
+run after changing one.
 
 ## Running a playbook
 
@@ -49,17 +45,8 @@ ansible-playbook wahlberger.homelab.nas --check --diff   # always first
 ansible-playbook wahlberger.homelab.nas
 ```
 
-Replace `nas` with `ops` or `ci` for those hosts (ci needs its ZeroTier address,
+Replace `nas` with `ops`, `ci` or `edge` for those hosts (ci needs its ZeroTier address,
 see `inventories/ci/`).
-
-The cloud host runs from its own directory:
-
-```sh
-cd playbooks/cloud-wahlberger-dev
-ansible-galaxy collection install -r requirements.yml
-ansible-galaxy role install -r requirements.yml
-ansible-playbook site.yml --ask-vault-pass
-```
 
 ## CI
 

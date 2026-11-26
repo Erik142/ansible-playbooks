@@ -2,20 +2,17 @@
 
 This file covers rules for the whole repo. Host details live in the collection
 README (`collections/homelab/README.md`) and the inventory's `group_vars`.
-`playbooks/cloud-wahlberger-dev/` keeps its own `CLAUDE.md`.
 
 ## Layout
 
 - `collections/homelab/`: the `wahlberger.homelab` collection. Roles live in
-  `roles/`, playbooks in `playbooks/` (`nas`, `ops`, `ci`). See its `README.md`.
+  `roles/`, playbooks in `playbooks/` (`nas`, `ops`, `ci`, `edge`). See its `README.md`.
 - `inventories/<host>/`: host inventory and `group_vars` (Vault-encrypted
-  secrets, non-secret settings). Hosts: `nas`, `ops`, `ci`.
+  secrets, non-secret settings). Hosts: `nas`, `ops`, `ci`, `edge`.
 - `ansible.cfg`, `requirements.yml`, `.vault_pass.sh`, `.vault_pass_nas.sh`,
   `.vault_pass_ops.sh`: shared config at the root. Vault ids: `ci` and `ops`
   have their own password script (`vault_identity_list`); unlabelled files use
   `.vault_pass.sh` (the NAS password).
-- `playbooks/cloud-wahlberger-dev/`: the one host not yet in the collection, with its own
-  playbook and `CLAUDE.md`.
 - `docs/`: architecture notes (flat, no subdirectories).
 
 ## Running a host
@@ -26,7 +23,7 @@ ansible-playbook wahlberger.homelab.<host> --check --diff   # always first
 ansible-playbook wahlberger.homelab.<host>
 ```
 
-`<host>` is `nas`, `ops` or `ci`. The vault passwords come from 1Password
+`<host>` is `nas`, `ops`, `ci` or `edge`. The vault passwords come from 1Password
 through the scripts above. Unlock 1Password before running.
 
 ## Collection rules

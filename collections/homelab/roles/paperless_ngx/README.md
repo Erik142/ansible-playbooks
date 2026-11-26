@@ -4,7 +4,7 @@
 PostgreSQL + the app itself, each a separate Podman Quadlet on a private
 `paperless-ngx` network, with the app additionally joined to the shared
 `caddy.network` and reverse-proxied by the `caddy` role. Logs in via the
-Pocket ID instance at `pocket_id_app_url` (served by cloud-wahlberger-dev).
+Pocket ID instance at `pocket_id_app_url` (served by the edge host).
 
 ## Role variables
 

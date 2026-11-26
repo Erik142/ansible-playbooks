@@ -1,7 +1,7 @@
 ---
 # Full configuration of the edge host (openSUSE Tumbleweed): the public
-# ingress for Pocket ID, FreshRSS, Beszel and Uptime Kuma. Replaces the Debian
-# cloud host (cloud.wahlberger.dev) once the cut-over is approved.
+# ingress for Pocket ID, FreshRSS, Beszel and Uptime Kuma. Replaced the Debian
+# cloud host (cloud.wahlberger.dev).
 # Run from the repo root (check mode first, always):
 #   ansible-playbook wahlberger.homelab.edge --check --diff
 #   ansible-playbook wahlberger.homelab.edge

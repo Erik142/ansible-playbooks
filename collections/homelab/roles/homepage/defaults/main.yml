@@ -12,7 +12,7 @@ homepage_title: "wahlberger.dev"
 # scheme is stripped from this value for HOMEPAGE_ALLOWED_HOSTS.
 homepage_url: ""
 
-# Cross-playbook links to cloud-wahlberger-dev's services. rpi-karlsruhe is
+# Cross-playbook links to the edge host's services. rpi-karlsruhe is
 # intentionally excluded — it's being retired, see the top-level README.
 # Reuses pocket_id_app_url (already defined for tandoor/paperless_ngx's OIDC)
 # rather than duplicating the URL under a new name.
@@ -21,7 +21,7 @@ homepage_freshrss_url: "https://rss.wahlberger.dev"
 homepage_uptime_kuma_url: "https://status.wahlberger.dev"
 homepage_beszel_url: "https://beszel.wahlberger.dev"
 
-# Cross-playbook link to the Semaphore UI on ops-de-wahlberger-dev (same URL before and after the cut-over).
+# Cross-playbook link to the Semaphore UI on ops.de.wahlberger.dev (same URL before and after the cut-over).
 homepage_semaphore_url: "https://semaphore.de.int.wahlberger.dev"
 homepage_hush_url: "https://hush.de.int.wahlberger.dev"
 

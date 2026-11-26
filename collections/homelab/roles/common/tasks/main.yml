@@ -32,8 +32,8 @@
 # inventory_hostname is already this host's real FQDN (matches ansible.cfg's
 # inventory file) — no new variable needed. Fixes cases like a VM's hostname
 # having been left at whatever the provisioning process set it to (seen
-# firsthand on cloud-wahlberger-dev: a notify_failure email tagged a log
-# line "cloud-podman", not "cloud.wahlberger.dev").
+# firsthand on the edge host: a notify_failure email tagged a log
+# line "cloud-podman", not "cloud.wahlberger.dev", the edge host's former name).
 - name: Set the system hostname to the host's FQDN
   ansible.builtin.hostname:
     name: "{{ inventory_hostname }}"

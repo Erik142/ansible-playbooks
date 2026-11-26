@@ -22,19 +22,19 @@ argument_specs:
       homepage_pocket_id_url:
         type: str
         required: false
-        description: Pocket ID URL linked from the dashboard (cloud-wahlberger-dev).
+        description: Pocket ID URL linked from the dashboard (edge host).
       homepage_freshrss_url:
         type: str
         required: false
-        description: FreshRSS URL linked from the dashboard (cloud-wahlberger-dev).
+        description: FreshRSS URL linked from the dashboard (edge host).
       homepage_uptime_kuma_url:
         type: str
         required: false
-        description: Uptime Kuma URL linked from the dashboard (cloud-wahlberger-dev).
+        description: Uptime Kuma URL linked from the dashboard (edge host).
       homepage_semaphore_url:
         type: str
         required: false
-        description: Semaphore UI URL linked from the dashboard (ops-de-wahlberger-dev).
+        description: Semaphore UI URL linked from the dashboard (ops.de.wahlberger.dev).
       homepage_truenas_url:
         type: str
         required: false

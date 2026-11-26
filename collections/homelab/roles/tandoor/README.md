@@ -5,7 +5,7 @@ app itself, each a separate Podman Quadlet on a private `tandoor` network,
 with the app additionally joined to the shared `caddy.network` and
 reverse-proxied by the `caddy` role. Replaces the `mealie` role at the same
 hostname (`recipes.de.int.wahlberger.dev`). Logs in via the Pocket ID
-instance at `pocket_id_app_url` (served by cloud-wahlberger-dev).
+instance at `pocket_id_app_url` (served by the edge host).
 
 ## Role variables
 

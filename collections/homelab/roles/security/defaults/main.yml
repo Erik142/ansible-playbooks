@@ -21,7 +21,7 @@ security_ssh_extra_directives: []
 # (SH-FR-125). Uses the Resend credentials of the notify_failure role.
 security_ssh_login_notify_enabled: true
 # Sources that never trigger the login email: loopback plus the fail2ban
-# ignore list (the same private networks and the cloud host).
+# ignore list (the same private networks and the edge host).
 security_ssh_login_notify_ignore: "{{ ['127.0.0.0/8'] + security_fail2ban_ignoreip }}"
 # Send the login mail's HTML part to hush (HUSH_HTML), with the hush-style template
 # (attribute-free; hush keeps only text-structure tags). Off keeps the card template
@@ -36,7 +36,7 @@ security_fail2ban_findtime: 600
 security_fail2ban_maxretry: 5
 # Never banned (SH-FR-124), besides 127.0.0.0/8 which is always added. Hosts
 # set the full list in group_vars: the Semaphore container subnet, 10.10.0.0/16,
-# 10.243.0.0/16 and cloud-wahlberger-dev's public IPv4.
+# 10.243.0.0/16 and the edge host's public IPv4.
 security_fail2ban_ignoreip:
   - 10.10.0.0/16
   - 10.243.0.0/16

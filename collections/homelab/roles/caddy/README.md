@@ -2,7 +2,7 @@
 
 Reverse proxy with automatic HTTPS via **DNS-01** (Cloudflare), not HTTP-01:
 this host has no public inbound port (it's a home NAS reached over
-ZeroTier/LAN, not a public VM like cloud-wahlberger-dev), so Let's Encrypt
+ZeroTier/LAN, not a public VM like the edge host), so Let's Encrypt
 can't reach it on port 80 to validate a certificate. DNS-01 only needs
 outbound access to Cloudflare's API and Let's Encrypt, which the host already
 has. It also creates the shared `caddy.network` Podman network that backend

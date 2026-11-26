@@ -1,7 +1,7 @@
 # security
 
 SSH hardening, fail2ban, and automatic patching for openSUSE Tumbleweed. Hand-
-rolled because `geerlingguy.security` (used by cloud-wahlberger-dev) doesn't
+rolled because `geerlingguy.security` (used by the former Debian cloud host) doesn't
 target openSUSE.
 
 ## Role variables

@@ -23,7 +23,7 @@ beszel_agent_group: beszel
 beszel_agent_account_uid: null
 beszel_agent_account_gid: null
 
-# The hub (cloud-wahlberger-dev) connects OUT to this agent, over the
+# The hub (edge host) connects OUT to this agent, over the
 # ZeroTier-routed home LAN — see roles/beszel_hub/README.md for why the hub
 # initiates the connection rather than this agent dialing out.
 beszel_agent_port: 45876

@@ -8,7 +8,7 @@ image.
 
 ## Why this host needs it at all
 
-`cloud-wahlberger-dev` is a public Hetzner VM with no other path into the
+The edge host (formerly `cloud.wahlberger.dev`) is a public Hetzner VM with no other path into the
 home network. Every `*.de.int.wahlberger.dev` hostname resolves (via the
 `cloudflare_dns` role) to a private LAN IP — fine for hosts already on that
 LAN or on ZeroTier, but from cloud's public-internet vantage point those

@@ -37,7 +37,7 @@ If Semaphore's key ever needs revoking (compromised instance,
 decommissioning it), you can pull just that one entry without touching your
 own daily-use access, and auth logs can tell the two apart.
 
-Duplicated verbatim across `cloud-wahlberger-dev`,
+Duplicated verbatim across the edge host,
 `nas-de-int-wahlberger-dev`, and `pi-de-int-wahlberger-dev` rather than
 extracted into a shared role — see those playbooks' top-level READMEs for
 why (short version: at this scale, duplication keeps every playbook fully

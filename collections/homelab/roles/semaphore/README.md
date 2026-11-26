@@ -151,10 +151,10 @@ you.
 ## What this role does NOT set up
 
 Deploying the Semaphore application is as far as this role goes — wiring it
-up to actually manage `cloud-wahlberger-dev`, `nas-de-int-wahlberger-dev`,
+up to actually manage the edge host, `nas-de-int-wahlberger-dev`,
 and this ops playbook is a one-time manual setup through Semaphore's own UI
 (not something Ansible manages as code, same as Pocket ID's own admin setup
-in `cloud-wahlberger-dev`):
+on the edge host):
 
 1. Log in once as the local admin (`semaphore_admin_username` /
    `vault_semaphore_admin_password`).

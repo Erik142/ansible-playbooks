@@ -8,7 +8,7 @@ not on every individual restart. This only covers services that crash on a
 host that's still up and running — it can't tell you a host went dark
 entirely (crashed, lost power, lost network), since nothing running on a
 dead host can report its own death. That's a separate, external watcher
-(planned: Uptime Kuma on `cloud-wahlberger-dev`), not this role.
+(planned: Uptime Kuma on the edge host), not this role.
 
 ## How it works
 
