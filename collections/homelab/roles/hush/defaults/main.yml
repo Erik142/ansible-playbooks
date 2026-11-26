@@ -141,16 +141,16 @@ hush_config:
       auth: token
       secret: /run/secrets/hush_source_hooks_cloud
       policies: {reboot_check: true, bundle: true, join_topology: true, update: true}
-      # Certificate expiry of cloud's public names (Caddy renews them; this catches a renewal that fails).
+      # Certificate expiry of the edge host's public names (Caddy renews them; this catches a renewal that fails).
       poll:
         tls-id.wahlberger.dev:
-          {type: tls_expiry, host: cloud.wahlberger.dev, service: pocket-id, address: id.wahlberger.dev, port: 443, server_name: id.wahlberger.dev}
+          {type: tls_expiry, host: edge.de.wahlberger.dev, service: pocket-id, address: id.wahlberger.dev, port: 443, server_name: id.wahlberger.dev}
         tls-rss.wahlberger.dev:
-          {type: tls_expiry, host: cloud.wahlberger.dev, service: freshrss, address: rss.wahlberger.dev, port: 443, server_name: rss.wahlberger.dev}
+          {type: tls_expiry, host: edge.de.wahlberger.dev, service: freshrss, address: rss.wahlberger.dev, port: 443, server_name: rss.wahlberger.dev}
         tls-status.wahlberger.dev:
-          {type: tls_expiry, host: cloud.wahlberger.dev, service: uptime-kuma, address: status.wahlberger.dev, port: 443,
+          {type: tls_expiry, host: edge.de.wahlberger.dev, service: uptime-kuma, address: status.wahlberger.dev, port: 443,
            server_name: status.wahlberger.dev}
-        tls-beszel.wahlberger.dev: {type: tls_expiry, host: cloud.wahlberger.dev, address: beszel.wahlberger.dev, port: 443, server_name: beszel.wahlberger.dev}
+        tls-beszel.wahlberger.dev: {type: tls_expiry, host: edge.de.wahlberger.dev, address: beszel.wahlberger.dev, port: 443, server_name: beszel.wahlberger.dev}
     # TrueNAS SCALE alerts (Mattermost alert service). The secret is the last URL path
     # segment: https://hush.de.int.wahlberger.dev/ingest/truenas/<secret>. See hush docs/truenas.md.
     truenas:
@@ -186,8 +186,8 @@ hush_config:
         caddy: {always_notify: true}
         semaphore: {}
         restic-backup: {}
-    cloud.wahlberger.dev:
-      aliases: [cloud]
+    edge.de.wahlberger.dev:
+      aliases: [edge]
       up_check: {source: kuma, check: cloud ping}
       # grace: was absent in v1 (used rules.grace); kept at 5m explicitly (see brief).
       grace: 5m
@@ -230,7 +230,7 @@ hush_config:
         for: 1h
         scope:
           - {host: ops.de.wahlberger.dev}
-          - {host: cloud.wahlberger.dev}
+          - {host: edge.de.wahlberger.dev}
           - {host: nas.de.int.wahlberger.dev}
   rules:
     dedupe: 15m
@@ -243,7 +243,7 @@ hush_config:
     api_key: /run/secrets/hush_anthropic_key
     daily_budget_usd: 1.0
     context_notes: >-
-      Three hosts: ops and cloud are public Hetzner VMs; nas is on the home LAN (10.10.0.0/16)
+      Three hosts: ops and edge are public Hetzner VMs; nas is on the home LAN (10.10.0.0/16)
       and reachable over ZeroTier (10.243.0.0/16). Auto-updates run weekly; reboots happen only
       in the Sunday 04:00 rebootmgr window. restic-backup runs nightly at 04:30.
     replay_max_cost_usd: 0.5

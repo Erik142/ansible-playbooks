@@ -52,7 +52,7 @@ semaphore_dns_servers:
 # podman_base_hosts_file: image).
 semaphore_getent_names:
   - nas.de.int.wahlberger.dev
-  - cloud.wahlberger.dev
+  - edge.de.wahlberger.dev
   - ops.de.wahlberger.dev
   - github.com
 
