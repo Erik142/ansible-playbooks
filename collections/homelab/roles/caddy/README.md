@@ -23,7 +23,9 @@ before deploying the container — no external/third-party image required.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `caddy_image` | `localhost/caddy-cloudflare:2` | Tag of the locally built image. |
+| `caddy_acme_challenge` | `dns` | `dns`: DNS-01 via Cloudflare (default, NAS/ops/ci). `http`: HTTP-01 on port 80 with `caddy_http_image`; no Cloudflare token, no image build. Use `http` only on a host reachable from the internet (the edge host). |
+| `caddy_http_image` | `docker.io/library/caddy:2` | Stock image used when `caddy_acme_challenge` is `http`. |
+| `caddy_image` | `localhost/caddy-cloudflare:2` | Tag of the locally built image (`dns` mode only). |
 | `caddy_data_dir` | `/mnt/containers/caddy` | Host dir for the build context, Caddyfile, and state (certs in `data/`). |
 | `caddy_build_dir` | `{{ caddy_data_dir }}/build` | Host dir holding the Containerfile build context. |
 | `caddy_http_port` | `80` | Host port → container 80. |

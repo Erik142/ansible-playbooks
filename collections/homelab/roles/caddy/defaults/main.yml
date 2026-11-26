@@ -6,6 +6,13 @@
 # port for HTTP-01), which requires the caddy-dns/cloudflare module baked in.
 caddy_image: localhost/caddy-cloudflare:2
 
+# Certificate challenge. `dns` (default) uses DNS-01 through the Cloudflare
+# module in caddy_image, for hosts with no public inbound port. `http` uses HTTP-01
+# on port 80 with the stock image in caddy_http_image, for hosts that are reachable
+# from the internet (the edge host). Other roles keep `dns`, so they render as before.
+caddy_acme_challenge: dns
+caddy_http_image: docker.io/library/caddy:2
+
 # Host directory holding the build context, the rendered Caddyfile, and
 # Caddy's persistent state. Issued certificates live in <dir>/data — back
 # that up.

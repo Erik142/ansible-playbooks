@@ -12,9 +12,11 @@
     admin off
     auto_https disable_redirects
 {% endif %}
+{% if caddy_acme_challenge == 'dns' %}
     # DNS-01 via Cloudflare: this host has no public inbound port for
     # HTTP-01. The token comes from caddy.env, never written here.
     acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+{% endif %}
 }
 {% for site in caddy_sites %}
 {{ site.host }} {
@@ -31,7 +33,9 @@
     @denied not remote_ip {{ caddy_allowed_sources | join(' ') }}
     respond @denied 403
 {% endif %}
+{% if site.upstream is defined %}
     reverse_proxy {{ site.upstream }}
+{% endif %}
 {% if site.extra | default("", true) | length > 0 %}
     {{ site.extra }}
 {% endif %}

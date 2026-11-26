@@ -19,7 +19,7 @@ OnFailure=notify-failure@%n.service
 
 [Container]
 ContainerName=caddy
-Image={{ caddy_image }}
+Image={{ caddy_http_image if caddy_acme_challenge == 'http' else caddy_image }}
 {% if caddy_host_network | bool %}
 # Host networking: Caddy sees the real client addresses (the caddy_allowed_sources
 # check depends on it) and binds caddy_bind_address through default_bind.
@@ -32,9 +32,11 @@ Network={{ n }}
 PublishPort={{ caddy_http_port }}:80
 PublishPort={{ caddy_https_port }}:443
 {% endif %}
+{% if caddy_acme_challenge == 'dns' %}
 # Cloudflare DNS API token for the DNS-01 challenge, rendered to a root-only
 # 0600 file by the caddy role from Ansible Vault.
 EnvironmentFile={{ caddy_data_dir }}/caddy.env
+{% endif %}
 Volume={{ caddy_data_dir }}/Caddyfile:/etc/caddy/Caddyfile:Z,ro
 Volume={{ caddy_data_dir }}/data:/data:Z
 Volume={{ caddy_data_dir }}/config:/config:Z
