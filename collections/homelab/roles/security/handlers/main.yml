@@ -13,6 +13,7 @@
   failed_when:
     - security_handler_sshd is failed
     - not (ansible_check_mode and (security_handler_sshd.msg | default('')) is search('Could not find the requested service'))
+  when: not ansible_check_mode
 
 - name: Reload fail2ban
   ansible.builtin.systemd:
@@ -22,6 +23,7 @@
   failed_when:
     - security_handler_fail2ban is failed
     - not (ansible_check_mode and (security_handler_fail2ban.msg | default('')) is search('Could not find the requested service'))
+  when: not ansible_check_mode
 
 - name: Reload systemd
   ansible.builtin.systemd:
@@ -35,6 +37,7 @@
   failed_when:
     - security_handler_login_notify is failed
     - not (ansible_check_mode and (security_handler_login_notify.msg | default('')) is search('Could not find the requested service'))
+  when: not ansible_check_mode
 
 # A changed /etc/rebootmgr/rebootmgr.conf (rebootmgr 4 does not read the old
 # /etc/rebootmgr.conf) is only read at start. restart is fine here:
@@ -47,3 +50,4 @@
   failed_when:
     - security_handler_rebootmgr is failed
     - not (ansible_check_mode and (security_handler_rebootmgr.msg | default('')) is search('Could not find the requested service'))
+  when: not ansible_check_mode

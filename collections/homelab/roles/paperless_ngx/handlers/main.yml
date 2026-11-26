@@ -13,9 +13,11 @@
     name: paperless-db.service
     state: restarted
     daemon_reload: true
+  when: not ansible_check_mode
 
 - name: Restart paperless-ngx
   ansible.builtin.systemd:
     name: paperless-ngx.service
     state: restarted
     daemon_reload: true
+  when: not ansible_check_mode

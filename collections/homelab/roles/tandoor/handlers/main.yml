@@ -14,9 +14,11 @@
     name: tandoor.service
     state: restarted
     daemon_reload: true
+  when: not ansible_check_mode
 
 - name: Restart tandoor-db
   ansible.builtin.systemd:
     name: tandoor-db.service
     state: restarted
     daemon_reload: true
+  when: not ansible_check_mode

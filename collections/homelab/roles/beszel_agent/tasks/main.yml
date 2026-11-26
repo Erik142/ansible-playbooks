@@ -133,33 +133,37 @@
     group: root
     mode: "0755"
 
+- name: Check whether the Beszel install directory exists
+  ansible.builtin.stat:
+    path: "{{ beszel_agent_install_dir }}"
+  register: beszel_agent_install_stat
+  check_mode: false
+
+# In check mode a fresh host has no install directory: the task above was only
+# simulated, so the extract below has no target. Skip it then. A real run always
+# extracts.
 - name: Extract the Beszel agent binary
   ansible.builtin.unarchive:
     src: "/tmp/beszel-agent_{{ beszel_agent_version }}_{{ beszel_agent_arch }}.tar.gz"
     dest: "{{ beszel_agent_install_dir }}"
     remote_src: true
     creates: "{{ beszel_agent_bin_path }}"
-  register: beszel_agent_unarchive
-  # --check on a fresh host: the install directory was only simulated above.
-  # Only that exact miss is tolerated, and only in check mode; a real run
-  # still fails.
-  failed_when:
-    - beszel_agent_unarchive is failed
-    - not (ansible_check_mode and (beszel_agent_unarchive.msg | default('')) is search('must be an existing dir'))
+  when: not ansible_check_mode or beszel_agent_install_stat.stat.exists
 
+- name: Check whether the Beszel agent binary exists
+  ansible.builtin.stat:
+    path: "{{ beszel_agent_bin_path }}"
+  register: beszel_agent_bin_stat
+  check_mode: false
+
+# Same for the binary: a fresh check-mode host has not extracted it yet.
 - name: Ensure the Beszel agent binary is executable
   ansible.builtin.file:
     path: "{{ beszel_agent_bin_path }}"
     owner: root
     group: root
     mode: "0755"
-  register: beszel_agent_bin_perms
-  # --check on a fresh host: the binary was only simulated being extracted.
-  # Only that exact miss is tolerated, and only in check mode; a real run
-  # still fails.
-  failed_when:
-    - beszel_agent_bin_perms is failed
-    - not (ansible_check_mode and (beszel_agent_bin_perms.msg | default('')) is search('is absent, cannot continue'))
+  when: not ansible_check_mode or beszel_agent_bin_stat.stat.exists
 
 # Recent openSUSE Tumbleweed snapshots default to SELinux (targeted policy)
 # — an unlabeled binary outside the package manager's usual paths fails to

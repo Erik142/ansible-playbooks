@@ -9,3 +9,4 @@
     name: homepage.service
     state: restarted
     daemon_reload: true
+  when: not ansible_check_mode
