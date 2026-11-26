@@ -1,0 +1,17 @@
+---
+# Long-running units on this host with OnFailure=notify-failure@%n.service. Read by
+# wahlberger.homelab.hush_recovery. Every such unit must be listed (see CLAUDE.md).
+# caddy.service is listed here because the edge host is not ops, so the hush role's
+# hush_systemd_watched_units does not cover it. One-shot units (disk-space-check,
+# restic-backup, zypper-dup) are not listed.
+# A drop-in restart of zerotier.service drops the ZeroTier link this run connects
+# over. Run the apply in a window where that is acceptable.
+hush_recovery_units:
+  - beszel-agent.service
+  - beszel-hub.service
+  - caddy.service
+  - freshrss.service
+  - oauth2-proxy.service
+  - pocket-id.service
+  - uptime-kuma.service
+  - zerotier.service
