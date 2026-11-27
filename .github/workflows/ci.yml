@@ -126,7 +126,7 @@ jobs:
       - uses: docker/setup-buildx-action@v3
 
       - name: Build the shared test image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: collections/homelab/extensions/molecule/build
           tags: homelab-molecule:tumbleweed
