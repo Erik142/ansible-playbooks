@@ -1,7 +1,7 @@
 # restic_backup
 
 Daily [restic](https://restic.net/) backup of the ops VM's Semaphore state to
-the append-only restic REST server of `nas-de-int-wahlberger-dev` (its
+the append-only restic REST server on `nas.de.int.wahlberger.dev` (its
 `restic_server` role), repository `ops`, via a systemd timer. The timer runs
 independently of Ansible and Semaphore: a backup must not depend on the thing
 it protects being reachable.
@@ -42,7 +42,7 @@ NAS freshness check (26 h) is the second line of defence.
 `identity.secret` are out because (a) restic reads nothing but the staging
 directory by default and (b) `restic_backup_exclude` repeats the patterns as a
 second layer if someone adds a path to `restic_backup_paths`. The rendered
-script is checked for both in `tests/render.d/restic.yml`. The restic env file
+script covers both. The restic env file
 lives in `restic_backup_env_dir`, a different directory from the staging
 directory.
 
@@ -54,43 +54,6 @@ host; retention and pruning run on the NAS (`restic-server-maintenance`).
 Because the staging directory holds exactly the latest copy, a deleted
 Semaphore project is still restorable from older snapshots until the NAS
 prunes them.
-
-## Missing database
-
-`restic_backup_sqlite_required: true` (default, and it stays the default) makes
-a missing source database fail the run and mail the owner, so an
-empty-but-green backup cannot happen. The migrated database only exists from
-step 4 on. The role is not applied in steps 2 to 4 (those runs use other tags), so
-production `vars.yml` carries a stopgap `restic_backup_sqlite_required: false`
-that is **deleted in pull request A3, before the step-5 apply** (together with
-the matching `sameas false` assert in `tests/guards.d/vm_vars.yml`):
-
-1. **Until A3**: `inventories/production/group_vars/all/vars.yml` holds, in the
-   "Backups (restic_backup role)" block next to `restic_backup_forget_enabled`:
-
-   ```yaml
-   restic_backup_sqlite_required: false
-   ```
-
-   With it, the script logs `SQLite database ... is missing; skipped` and still
-   takes a (database-less) snapshot, so the repository, the REST credentials and
-   the NAS freshness check can be proven early if the role is applied before
-   step 4 (check mode first, `--tags restic_backup`).
-2. **Step 4**: the operator places the migrated database at
-   `restic_backup_sqlite_databases[].src` (default
-   `/opt/podman/semaphore/data/database.sqlite`).
-3. **Flip back (A3)**: delete the `restic_backup_sqlite_required: false` line (the
-   role default is `true`; do not set it to `false` permanently) and apply with
-   `--tags restic_backup`. The rendered script changes from the skip branch to
-   the hard `[ -f ... ] || exit 1` check.
-4. **Prove it**: `systemctl start restic-backup.service`, then
-   `journalctl -u restic-backup.service -n 30` must show no `skipped`, and
-   `restic snapshots` must list a new snapshot containing
-   `/var/lib/restic-backup/staging/semaphore.sqlite`.
-
-Forgetting the flip back is not harmful while the database exists (it is
-still copied), but a later disappearance of the database would no longer mail the
-owner. `tests/render.d/restic.yml` renders both variants.
 
 ## `Environment=HOME=/root`
 
@@ -120,16 +83,3 @@ Stop the Semaphore container, copy `semaphore.sqlite` to
 `<semaphore_data_dir>/data/database.sqlite` with mode `0600` and owner
 `semaphore_uid`, start the container.
 
-## Tests
-
-- `tests/render-check.sh` renders the templates against production vars and
-  asserts SH-AC-30 (`tests/render.d/restic.yml`).
-- `roles/restic_backup/tests/behaviour.sh` runs the real rendered script in a
-  disposable openSUSE container against a local throwaway repository: WAL-mode
-  database copy, secrets not in the snapshot, failure on missing database.
-- `tests/guards.d/restic_backup.yml` runs the real role tasks as root in a
-  disposable container (`--network none`, zypper and systemctl stubbed) and
-  reads back: `restic-backup.env` is `0600 root:root`, its directory, the
-  staging directory and the script are `0700`, no password reaches the output,
-  `restic_backup_forget_enabled` (bool or string `true`) is refused before any
-  change, empty passwords are refused before any change.

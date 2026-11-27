@@ -2,7 +2,7 @@
 
 Garage S3 object store as a rootful Podman Quadlet, on two dedicated btrfs
 subvolumes (data on `/mnt/data`, metadata on `/mnt/containers`). Spec:
-`reqs/garage-sstate.md`; plan: `PLAN-garage.md`.
+The spec and plan were removed from the repo (see git history).
 
 ## Scope
 
@@ -12,17 +12,14 @@ grant, quota, website flag or lifecycle rule. Those are user steps with the
 Garage and S3 CLIs (below). Until the user applies a layout (step 1), Garage runs
 and `garage status` exits 0, but it stores and serves no objects (GS-BR-16).
 
-Commands below are tagged: "VM" = run in `tests/vm/scenarios/garage-test-setup.sh`
-(layout, buckets, website, key, grant, put-object); "spike" = observed in
-`tests/spikes/garage-v2.4.1-cli-config.md` on a throwaway node; "unverified" =
-in neither. The Garage CLI runs in the container: prefix every `garage ...` with
+Commands below are tagged "verified" (run and observed on a test node; that node is not kept in the repo) or "unverified" (not run).in neither. The Garage CLI runs in the container: prefix every `garage ...` with
 `podman exec garage /garage ...` (the form the VM script uses).
 
 ## Variables
 
 All inputs are in `defaults/main.yml` and declared in `meta/argument_specs.yml`
 (the spec's Inputs table is normative). `garage_enabled` defaults to `false`;
-`site.yml` runs the role after `caddy` and before `btrbk` only when it is true.
+The nas playbook runs the role after `caddy` and before `btrbk` only when it is true.
 Enabling needs `backup_disk_enabled: true` (the role fails before any change
 naming both flags).
 
@@ -30,7 +27,7 @@ naming both flags).
 
 `garage_uid` and `garage_gid` are not inputs. `tasks/storage.yml` sets them with
 `getent` for `garage_user`; the Quadlet (`templates/garage.container.j2`) and
-`tasks/secrets.yml` consume them. The render check supplies fixture values.
+`tasks/secrets.yml` consume them. Renders use fixture values.
 
 ## What this role does not do
 
@@ -45,8 +42,7 @@ naming both flags).
 ## Consumer settings (GS-FR-34)
 
 - Endpoint `https://s3.de.int.wahlberger.dev`, path-style addressing, region `garage`.
-  (The HTTPS endpoint through Caddy is covered by `tests/spikes/garage-caddy-routing.md`
-  and the VM scenarios, not by the commands in this README.)
+  (The HTTPS endpoint through Caddy is not covered by the commands in this README.)
 - Once a bucket has website access (step 3), BitBake reads it anonymously:
 
   ```
@@ -132,8 +128,7 @@ Use the `garage` and `garage-meta` snapshots of the same btrbk run, the same
 `<ts>`. Never combine snapshots of different runs. A plain
 `btrfs subvolume snapshot` from the backup disk fails with "Invalid cross-device
 link", so send/receive into a staging directory first, then take a writable
-snapshot. Paths as in the spec; the VM drill (`tests/vm/scenarios/garage-v3-restore.sh`,
-helper `restore_stop_replace` in `garage-v3-guest.sh`) used the same sequence
+snapshot. Paths as in the spec; a test restore used the same sequence
 with staging dirs `/mnt/data/.restore-stage` and `/mnt/containers/.restore-stage`
 and `.pre-restore` suffixes, and received before stopping the service.
 
@@ -146,7 +141,7 @@ mv /mnt/data/garage /mnt/data/garage.pre-restore-<date>
 mv /mnt/containers/garage/meta /mnt/containers/garage/meta.pre-restore-<date>
 btrfs subvolume snapshot /mnt/data/.garage-restore/garage.<ts> /mnt/data/garage
 btrfs subvolume snapshot /mnt/containers/.garage-restore-meta/garage-meta.<ts> /mnt/containers/garage/meta
-ansible-playbook site.yml --tags garage      # re-render the secrets from Vault (not in any backup)
+ansible-playbook wahlberger.homelab.nas --tags garage      # re-render the secrets from Vault (not in any backup)
 systemctl start garage.service
 podman exec garage /garage status
 podman exec garage /garage block list-errors   # healthy: only the header "Hash  RC  Errors  Last error  Next try"
@@ -154,14 +149,14 @@ podman exec garage /garage block list-errors   # healthy: only the header "Hash 
 btrfs subvolume delete <staging and .pre-restore-<date> subvolumes>
 ```
 
-- `mkdir`, `mv` and the `-<date>` suffix are as in the spec/VM helper; the
+- `mkdir`, `mv` and the `-<date>` suffix are as in the spec; the
   `.garage-restore*` directory names and the order stop-then-receive follow the
-  spec (the VM used other directory names). Not run verbatim on the VM.
+  spec Not run verbatim.
 - If btrbk finds no common parent for the restored subvolumes, its next run
   sends a full copy of each Garage source; the `disk_space` alert covers the space.
 - Skew: the two snapshots are taken seconds apart, not atomically (accepted risk
-  GS-R-01). The VM drill read objects written before the metadata snapshot and
-  got 404 for objects written after it.
+  GS-R-01). Observed on a test node: objects written before the metadata snapshot
+  were readable, and objects written after it returned 404.
 
 ## Image user (GS-FR-84)
 

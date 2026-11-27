@@ -17,7 +17,7 @@ Merges don't apply anything. A merged fix reaches a host at the next scheduled S
 
 ## 2. Preconditions (all must hold before the first real merge)
 From `PLAN-n8n.md` §4 phase 3, plus the merge gate:
-1. Branch protection on `master` with the required checks, including `n8n-hook` (done 2026-11-24 for `n8n-hook`; the other checks are in place from 2026-11-23).
+1. Branch protection on `master` with the required checks, including the former `n8n-hook` job (done 2026-11-24; the job is gone, only `gate` is required now; the other checks are in place from 2026-11-23).
 2. A GitHub App for this repository, not a personal token. Permissions: contents write, pull requests write, checks read. **No Workflows permission.**
 3. A ruleset for `ai/*` branches and draft PRs. The App cannot push to `master`.
 4. A CI path guard that fails any change to `vault.yml`, `.github/`, `ssh_authorized_keys`, `security`, `firewall` on an App-authored PR, independent of the classifier.

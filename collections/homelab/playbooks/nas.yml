@@ -1,10 +1,8 @@
 ---
-# Top-level playbook. Convention: `site.yml` applies the *entire* configuration
-# to every host. As the stack grows, split concerns into per-tier playbooks and
-# pull them together here with `import_playbook:`.
+# The NAS host playbook: every role the nas host runs, in dependency order.
 #
-# Run with:  ansible-playbook site.yml
-# Limit to one role:  ansible-playbook site.yml --tags samba
+# Run with:  ansible-playbook wahlberger.homelab.nas --check --diff   (then without --check)
+# Limit to one role:  ansible-playbook wahlberger.homelab.nas --tags samba
 - name: Configure the nas.de.int.wahlberger.dev host
   hosts: nas
   become: true
@@ -53,8 +51,8 @@
     - role: wahlberger.homelab.smartd
       tags: [smartd]
     # Backup disk (mount, SMART, scrub, health check). After storage; before
-    # snapper. Off until runbook step 3 (backup_disk_enabled in vars.yml), so
-    # a merged site.yml does not fail on the not-yet-initialised disk.
+    # snapper. Off until backup_disk_enabled is set in vars.yml, so
+    # a merged playbook does not fail on the not-yet-initialised disk.
     - role: wahlberger.homelab.backup_disk
       tags: [backup_disk]
       when: backup_disk_enabled | bool

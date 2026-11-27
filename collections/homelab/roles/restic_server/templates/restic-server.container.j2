@@ -12,7 +12,7 @@ OnFailure=notify-failure@%n.service
 [Container]
 ContainerName=restic-server
 Image={{ restic_server_image }}
-# Host networking (spike A-05, tests/spikes/A-05-firewall-podman.md): a
+# Host networking: a
 # published port is DNATed and takes the FORWARD path, so firewalld rich rules
 # would not filter it. With the host namespace the traffic is INPUT and the
 # source-restricted rich rules are the gate. No PublishPort and no Caddy network.

@@ -102,7 +102,7 @@
 # BD-FR-25 (BD-BR-04): the data filesystem must be mounted, from its subvolume,
 # when this role runs; otherwise the tasks below would write the account, the
 # repository directory and .htpasswd into the bare mount-point directory. Reads
-# the live mount table, not facts gathered at play start. Found on the VM
+# the live mount table, not facts gathered at play start. Found in testing
 # (BD-AC-27 rows 4 and 5): the role used to run on an unmounted /mnt/data.
 - name: Read the live mount table entry for the data filesystem
   ansible.builtin.command:

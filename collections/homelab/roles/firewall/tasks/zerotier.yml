@@ -78,6 +78,5 @@
     msg: >-
       Zone {{ firewall_zerotier_zone }} is configured permanently but is not
       known to the running firewalld yet, so its rules are not active until
-      firewalld re-reads its permanent configuration (operator step, see the
-      runbook). This role does not do that itself (SH-FR-189).
+      firewalld re-reads its permanent configuration (operator step). This role does not do that itself (SH-FR-189).
   when: not firewall_zerotier_runtime

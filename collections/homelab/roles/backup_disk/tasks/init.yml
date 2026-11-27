@@ -1,6 +1,6 @@
 ---
 # Entry point `init`: partition and format the backup disk ONCE. Run only via
-# backup_disk_init.yml, never from site.yml (BD-FR-02). This is the only file
+# collections/homelab/extensions/backup_disk_init.yml, never from the host playbook (BD-FR-02). This is the only file
 # in the repository that may write to a block device (BD-FR-03, BD-AC-04).
 #
 # Flow: (1) evaluate the refusal conditions R-01 to R-10 with read-only
@@ -303,7 +303,7 @@
   check_mode: false
   when: backup_disk_init_done or not ansible_check_mode
 
-- name: Print the UUID (set backup_disk_uuid to this value, runbook step 3)
+- name: Print the UUID (set backup_disk_uuid to this value)
   ansible.builtin.debug:
     msg: "Backup filesystem UUID: {{ backup_disk_init_uuid.stdout }}"
   when: backup_disk_init_uuid.stdout is defined

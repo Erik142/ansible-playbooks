@@ -3,7 +3,7 @@
 # Every read-only check runs first and fails before any change (GS-FR-01,
 # GS-FR-09, GS-E-01 to GS-E-03). This is the only file in the repository outside
 # backup_disk/init*.yml that may hold `btrfs subvolume create` and `chattr +C`
-# (A0 carve-out in tests/static-checks.sh, GS-FR-02, GS-FR-06).
+# (GS-FR-02, GS-FR-06).
 # Sets the runtime facts garage_uid and garage_gid (README.md).
 
 - name: Check that the btrfs and lsattr tools exist

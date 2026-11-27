@@ -1,6 +1,6 @@
 # n8n triage workflow (phase 2, read-only)
 
-Status: proposed, 2026-11-24. Implements phase 2 of [`ai-incident-remediation-pipeline.md`](ai-incident-remediation-pipeline.md) and `nas-de-int-wahlberger-dev/PLAN-n8n.md` (directory removed from the repo; see git history). Hush side: HUSH-NOTIFY-040 to -048, HUSH-INGEST-036 to -042 (hush 1.2.1).
+Status: proposed, 2026-11-24. Implements phase 2 of [`ai-incident-remediation-pipeline.md`](ai-incident-remediation-pipeline.md) and `PLAN-n8n.md` (removed; see git history) (directory removed from the repo; see git history). Hush side: HUSH-NOTIFY-040 to -048, HUSH-INGEST-036 to -042 (hush 1.2.1).
 
 ## Principle: Hush's decisions do not change
 Erik's constraint: the triage must not change what Hush does. Two rules make that hold:
@@ -51,7 +51,7 @@ In: webhook, HMAC, validation, NAS diagnostics, Claude triage, `escalate`-only o
 Out, for now: recent GitHub commits (needs a read token and the Semaphore CVE check), last Semaphore task (same), other hosts' diagnostics, any reply that is not `escalate`.
 
 ## Tests
-- CI job `n8n-hook` extended: the workflow is imported into a test n8n 2.48.8 (`tests/n8n-triage/`). Stubs stand in for Claude and the diagnostics. The test asserts: bad signature 401; malformed body 400; a valid handoff is triaged; the stub Claude request contains no hostname from the fixture; the reply, if any, is `escalate`.
+- Test harness removed (git history); no CI job runs it. It imported the workflow into a test n8n 2.48.8. Stubs stand in for Claude and the diagnostics. The test asserts: bad signature 401; malformed body 400; a valid handoff is triaged; the stub Claude request contains no hostname from the fixture; the reply, if any, is `escalate`.
 - `diag-bundle` unit test: an unlisted unit is refused.
 
 ## Success criteria before any further step

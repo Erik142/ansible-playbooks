@@ -47,7 +47,7 @@ semaphore_dns_servers:
   - 8.8.8.8
 # Names whose `podman exec semaphore getent hosts <name>` must equal
 # `dig +short <name> @1.1.1.1` (SH-AC-16). Rendered into the Quadlet as a
-# comment and asserted by tests/render.d/semaphore.yml. The own name resolves
+# comment (rendered by the role templates). The own name resolves
 # to the public IPv4 because /etc/hosts is not inherited (podman role,
 # podman_base_hosts_file: image).
 semaphore_getent_names:

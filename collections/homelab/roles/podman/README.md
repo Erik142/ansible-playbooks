@@ -34,7 +34,7 @@ reclaims space from replaced image versions. Check with
 
 `podman_data_dir` is expected to be a separately mounted disk (this NAS splits
 Samba data and container data across two different storage media — see the
-top-level README). The role asserts it's an actual mountpoint before creating
+`roles/storage/README.md`). The role asserts it's an actual mountpoint before creating
 anything under it, so a missing mount fails loudly instead of silently writing
 container data onto the root filesystem. Hosts with no separate data mount
 (the Hetzner VM) set `podman_require_mountpoint: false` to skip that assert.

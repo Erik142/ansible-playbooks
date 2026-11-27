@@ -54,7 +54,7 @@ roles:
   podman:
     exclude: rootful Podman socket, ip_forward sysctl, image prune
   firewall:
-    exclude: firewalld and nftables fail in a container netns (proven on the VM)
+    exclude: firewalld and nftables fail in a container netns (not run in a container)
   zerotier:
     exclude: needs /dev/net/tun and the tun module; Podman container
   beszel_agent:

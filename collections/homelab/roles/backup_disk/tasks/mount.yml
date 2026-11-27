@@ -2,14 +2,14 @@
 # Mount the @btrbk subvolume (BD-FR-20 to BD-FR-23, BD-FR-26, BD-FR-29).
 # Read-only except for the fstab line, the mount and the root dir mode. This
 # file never creates or deletes a subvolume and never sets the C attribute
-# (BD-FR-24): the subvolume must already exist from backup_disk_init.yml.
+# (BD-FR-24): the subvolume must already exist from collections/homelab/extensions/backup_disk_init.yml.
 # All probes run under --check too (check_mode: false) and write nothing.
 
 - name: Precondition, backup_disk_uuid must be set (BD-FR-20)
   ansible.builtin.assert:
     that: backup_disk_uuid | string | length > 0
     fail_msg: >-
-      backup_disk_uuid is empty. Initialise the disk with backup_disk_init.yml, set
+      backup_disk_uuid is empty. Initialise the disk with collections/homelab/extensions/backup_disk_init.yml, set
       backup_disk_uuid to the printed UUID, or skip this role with
       --skip-tags backup_disk,btrbk. See roles/backup_disk/README.md.
     quiet: true
@@ -36,7 +36,7 @@
   check_mode: false
 
 # lsblk reads the udev database, which is stale after `btrfs filesystem label`
-# (found on the VM, BD-AC-24 row 3); blkid -p probes the superblock directly.
+# (BD-AC-24 row 3); blkid -p probes the superblock directly.
 - name: Precondition, probe type and label from the superblock (not the udev cache)
   ansible.builtin.command: blkid -p -o export -- {{ backup_disk_blkid.stdout | trim | quote }}
   register: backup_disk_blkid_probe
@@ -112,7 +112,7 @@
     fail_msg: >-
       Cannot mount subvolume {{ item.item.item.subvol }} for {{ item.item.item.path }}:
       filesystem {{ backup_disk_uuid }} has no such subvolume (create it with
-      backup_disk_init.yml; this role never creates one). Details: {{ item.stderr | default('') | trim }}
+      collections/homelab/extensions/backup_disk_init.yml; this role never creates one). Details: {{ item.stderr | default('') | trim }}
     quiet: true
   loop: "{{ backup_disk_probe.results }}"
   loop_control:

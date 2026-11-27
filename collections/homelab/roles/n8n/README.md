@@ -5,14 +5,14 @@ remediation pipeline**: the editor only, no workflows. Rootful Podman Quadlet
 joined to `caddy.network`, reverse-proxied by the `caddy` role at
 `n8n.de.int.wahlberger.dev`. LAN/ZeroTier only (no public inbound port).
 
-Decision record: [`PLAN-n8n.md`](../../PLAN-n8n.md) (host, phases, verified
-facts). ADR: [`architecture/ai-incident-remediation-pipeline.md`](../../../architecture/ai-incident-remediation-pipeline.md).
+Decision record: `PLAN-n8n.md` (removed; see git history; host, phases, verified
+facts). ADR: [`docs/ai-incident-remediation-pipeline.md`](../../../../docs/ai-incident-remediation-pipeline.md).
 
 ## Units
 
 | Unit | Image | Role |
 |------|-------|------|
-| `n8n.service` | `docker.io/n8nio/n8n:2.47.4` (pinned) | Editor and workflow engine, SQLite, port 5678 on `caddy.network`, no published ports |
+| `n8n.service` | `docker.io/n8nio/n8n:2.50.2` (pinned) | Editor and workflow engine, SQLite, port 5678 on `caddy.network`, no published ports |
 | `oauth2-proxy.service` | `quay.io/oauth2-proxy/oauth2-proxy:v7.15.5` | Pocket ID login for the editor (Caddy `forward_auth`) |
 
 Limits on `n8n.service`: `MemoryMax=2G`, `CPUQuota=200%`.
@@ -25,7 +25,7 @@ Limits on `n8n.service`: `MemoryMax=2G`, `CPUQuota=200%`.
 | `/oauth2/*` | oauth2-proxy |
 | everything else | `forward_auth` to oauth2-proxy, then n8n. Unauthenticated requests redirect to sign-in. |
 
-The vhost is defined in `inventories/production/group_vars/all/vars.yml` (`caddy_sites_base`).
+The vhost is defined in `inventories/nas/group_vars/all/vars.yml` (`caddy_sites_base`).
 
 ## Data and secrets
 
@@ -34,7 +34,7 @@ The vhost is defined in `inventories/production/group_vars/all/vars.yml` (`caddy
 - `/mnt/containers/n8n/n8n.env` (root, 0600): `N8N_ENCRYPTION_KEY`.
 - `/mnt/containers/n8n/oauth2-proxy.env` (root, 0600): OIDC client secret, cookie secret.
 
-Vault keys (see `vault.yml.example`):
+Vault keys (see `inventories/nas/group_vars/all/vault.yml.example`):
 
 | Key | Purpose |
 |-----|---------|
@@ -59,16 +59,16 @@ Requirements, all enforced by the config above:
 - n8n must not be reachable except through Caddy. It has no published port. Anyone who can send the header directly can log in as that user.
 - The hook uses n8n internals (cookie-parser layer, `AuthService.issueJWT/issueCookie`, the `n8n-auth` cookie). It is not a supported n8n feature.
 
-Compatibility: `tests/n8n-hook/run.sh <image>` runs the hook against an n8n image with the same checks as the manual test (owner setup, header login, unknown user, cookie flow). CI runs it against the pinned `n8n_image`, so a Renovate bump that breaks the hook fails CI before merge. If the hook stops loading, the hook logs `disabled` or errors, and API calls without the cookie return 401. Nothing gets through by accident.
+Compatibility: when bumping `n8n_image`, check the hook by hand against the new image (owner setup, header login, unknown user, cookie flow). If the hook stops loading, the hook logs `disabled` or errors, and API calls without the cookie return 401. Nothing gets through by accident.
 
 ## Triage workflow (phase 2a)
 
-Design: `architecture/n8n-triage-workflow.md`. The workflow is `files/triage-workflow.json`, deployed to `{{ n8n_data_dir }}/triage-workflow.json`. Import is manual, because n8n has no declarative import at boot.
+Design: `docs/n8n-triage-workflow.md`. The workflow is `files/triage-workflow.json`, deployed to `{{ n8n_data_dir }}/triage-workflow.json`. Import is manual, because n8n has no declarative import at boot.
 
 One-time setup on the NAS (after deploy):
 
 1. Create the SSH credential in n8n's CLI import, from the vault key `vault_n8n_diag_ssh_key`, with id `n8ndiagssh01`, name `n8n-diag`, host `nas.de.int.wahlberger.dev`, port 22, user `n8n-diag`, `sshAuthenticateWith: privateKey`. The public half is `n8n_diag_public_key` (vars.yml), already authorised with the forced command.
-2. Import and activate the workflow with the n8n CLI in a one-off container on the same volume, with n8n stopped (`import:credentials`, `import:workflow`, `update:workflow --id=n8ntriage01 --active=true`). The CI harness `tests/n8n-triage/run.sh` does these steps.
+2. Import and activate the workflow with the n8n CLI in a one-off container on the same volume, with n8n stopped (`import:credentials`, `import:workflow`, `update:workflow --id=n8ntriage01 --active=true`). These steps are manual.
 3. Hush: the webhook secret in ops (`hush_n8n_webhook`) must equal `vault_n8n_hush_secret` here. Hush's `notifications.webhook` and `remediation` config are in the spec.
 
 The Anthropic key is `vault_n8n_anthropic_key`. It is a placeholder until replaced.

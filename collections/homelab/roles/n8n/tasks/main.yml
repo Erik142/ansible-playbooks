@@ -99,7 +99,7 @@
     mode: "0750"
 
 # The trusted-header hook (files/hooks.js), loaded via EXTERNAL_HOOK_FILES. Root-owned so
-# n8n (uid 1000) can read it but cannot change it. Tested per image in tests/n8n-hook/.
+# n8n (uid 1000) can read it but cannot change it. Check per image when bumping n8n_image.
 - name: Deploy the n8n trusted-header hook
   ansible.builtin.copy:
     src: hooks.js

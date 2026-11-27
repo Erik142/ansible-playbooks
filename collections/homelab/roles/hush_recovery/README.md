@@ -8,4 +8,4 @@ events stay with `OnFailure=notify-failure@`.
 - Same hook script and `/etc/hush/hook.env` as `notify_failure`, so both events go
   to the same Hush source.
 - `-` prefix: a failed post does not fail the unit.
-- Runs last in `site.yml`, after every unit exists. A changed drop-in restarts that unit.
+- Runs last in each host playbook, after every unit exists. A changed drop-in restarts that unit.

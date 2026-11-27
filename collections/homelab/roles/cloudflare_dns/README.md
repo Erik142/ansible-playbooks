@@ -17,21 +17,16 @@ VM that is:
 Runs before the `caddy` role, using `community.general.cloudflare_dns` (no
 new collection).
 
-## The CNAME gate (why a flag, not "just run it")
+## The CNAME gate
 
-`semaphore.de.int.wahlberger.dev` points at the Pi until the cut-over.
-Production wires `cloudflare_dns_cnames_enabled` to
-`semaphore_dns_cutover_enabled` (default `false`), so every run before
-pull request D leaves that record alone — it is neither created nor
-changed. Pull request D flips the one flag and the next run points the CNAME
-at the VM. While the flag is false the CNAME task loops over an empty list, so
-it also does not need `caddy_sites` to be defined.
+`cloudflare_dns_cnames_enabled` is wired to `semaphore_dns_cutover_enabled` in the
+ops inventory, which is `true`: `semaphore.de.int.wahlberger.dev` points at the ops
+host. While the flag is false the CNAME task loops over an empty list, and it does
+not need `caddy_sites` to be defined.
 
-If the CNAME already exists with a different type or value, Cloudflare
-rejects creating a second record and the task fails with the API error
-(SH-E-12). Fix the record by hand once, re-run, and confirm `changed=0`.
-Whether the in-place update works is only checkable live (`--check --diff`
-at the cut-over, SH-A-06).
+If a CNAME already exists with a different type or value, Cloudflare rejects a
+second record and the task fails with the API error (SH-E-12). Fix that record by
+hand once, re-run, and confirm `changed=0`.
 
 ## Guards (fail before any change)
 
@@ -69,10 +64,3 @@ It only *adds/updates* records (`state: present`, never `solo: true`, which
 would delete other records with the same name). It never deletes a record.
 Decommissioning the Pi's records is a separate, deliberate step.
 
-## Tests
-
-`tests/guards.d/cloudflare_dns.yml` runs the role against a stub
-`community.general.cloudflare_dns` (no network, no Cloudflare) and asserts
-the exact calls the role makes for the cut-over off and on, check mode, and
-every guard. Run it with `ansible-playbook tests/guards.d/cloudflare_dns.yml`
-from the playbook directory (or `tests/guard-tests.sh cloudflare_dns`).

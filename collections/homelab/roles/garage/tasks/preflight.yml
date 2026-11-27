@@ -8,7 +8,7 @@
       - backup_disk_enabled | default(false) | bool
     fail_msg: >-
       garage_enabled is true but backup_disk_enabled is false. The Garage store
-      must be backed up: enable backup_disk_enabled (runbook step 3) before
+      must be backed up: enable backup_disk_enabled before
       garage_enabled. See roles/garage/README.md.
     quiet: true
 

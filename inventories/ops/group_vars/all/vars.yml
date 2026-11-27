@@ -10,7 +10,7 @@
 # step are set here; the roles that need them fail naming the variable.
 
 # --- Connection -------------------------------------------------------------
-# SSH login user. Privilege escalation (become) is turned on in site.yml.
+# SSH login user. Privilege escalation (become) is turned on in the host playbook.
 ansible_user: erikwahlberger
 
 # Proxy design: primary only (Caddy on host networking, Semaphore published on
@@ -22,7 +22,7 @@ zerotier_network_id: "8056c2e21cc5c789"
 # This VM's member IP in Central (10.243.0.0/16), set in pull request A2 (it was
 # empty in pull request A, when Caddy and cloudflare_dns refused to run).
 vm_zt_ip: "10.243.25.185"
-# Interface name of the ZeroTier device on the VM (`ip -br link`), set in pull
+# Interface name of the ZeroTier device on the host (`ip -br link`), set in pull
 # request A2. ZeroTier derives the name from the network ID, so it is the same on
 # every host of this network. Empty would make the firewall skip the zone.
 vm_zt_iface: "ztmjfaojmv"
@@ -43,8 +43,8 @@ security_ssh_allow_users:
 security_fail2ban_enabled: true
 security_fail2ban_findtime: 600
 # SH-FR-124: loopback, the Semaphore container subnet, the home LAN, the
-# ZeroTier network and cloud's public IPv4. tests/guards.d/vm_vars.yml checks
-# this list; 127.0.0.0/8 is also always added by the security role.
+# ZeroTier network and cloud's public IPv4.
+# 127.0.0.0/8 is also always added by the security role.
 security_fail2ban_ignoreip:
   - 127.0.0.0/8
   - "{{ semaphore_network_subnet }}"
@@ -142,7 +142,7 @@ semaphore_oidc_client_id: "63093482-d2cc-4c77-89df-9f6ff78b160e"
 # Production refuses to create an empty database (SH-E-01).
 semaphore_require_existing_db: true
 # Fixed bridge subnet for semaphore.network (SH-FR-127); outside 10.10.0.0/16
-# and 10.243.0.0/16 (checked by tests/guards.d/vm_vars.yml). 172.29.30.0/24 is in
+# and 10.243.0.0/16. 172.29.30.0/24 is in
 # 172.16.0.0/12, which collides with neither the LAN, ZeroTier, podman's default
 # 10.88.0.0/16 nor Hetzner's public ranges.
 semaphore_network_subnet: 172.29.30.0/24
