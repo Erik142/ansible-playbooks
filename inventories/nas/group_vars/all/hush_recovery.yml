@@ -26,3 +26,6 @@ hush_recovery_units:
   - restic-server.service
   - tandoor-db.service
   - tandoor.service
+  # Samba (smb, nmb): the packaged units with an immediate OnFailure drop-in (samba role).
+  - smb.service
+  - nmb.service

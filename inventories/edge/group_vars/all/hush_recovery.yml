@@ -13,5 +13,6 @@ hush_recovery_units:
   - freshrss.service
   - oauth2-proxy.service
   - pocket-id.service
+  - ssh-login-notify.service
   - uptime-kuma.service
   - zerotier.service
