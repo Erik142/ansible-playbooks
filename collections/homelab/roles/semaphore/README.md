@@ -24,7 +24,7 @@ the migrated Key Store cannot be decrypted).
 | `semaphore_data_dir` | `{{ podman_data_dir }}/semaphore` | Base directory. |
 | `semaphore_dns_servers` | `1.1.1.1`, `8.8.8.8` | Container resolvers (SH-FR-41). |
 | `semaphore_oidc_provider_url` | `https://id.wahlberger.dev` | Pocket ID issuer (the Pi reads `pocket_id_app_url`, which the VM does not define). |
-| `semaphore_image` | `v2.19.16` | Must equal the tag running on the Pi when the database was copied (SH-FR-50). |
+| `semaphore_image` | `v2.20.24` | Must equal the tag running on the Pi when the database was copied (SH-FR-50). |
 
 ## Migration and the missing-database guard
 
@@ -47,7 +47,7 @@ never copies or creates `database.sqlite-wal`, `-shm` or `-journal` files
 | `.../semaphore.env` | root:root | 0600 | SH-FR-167, SH-FR-216 |
 
 Group `root` is the container process's primary group (gid 0). The Pi uses
-`config.json` 0644 root:root; on the VM the secrets are not world readable, so
+`config.json` 0644 root:root; on the test host the secrets are not world readable, so
 the owner must be the UID the process runs as (compare with
 `podman exec semaphore id -u`, SH-AC-53).
 
@@ -55,8 +55,7 @@ the owner must be the UID the process runs as (compare with
 after the container's first start because both volumes use `:Z`, which makes
 Podman relabel the mounted tree recursively. The role sets no label itself (no
 `sefcontext`/`restorecon` task): a plain `chcon` would be undone by the `:Z`
-relabel anyway. Check with `ls -Z` after the first start (T-16 does so on the
-fixture, SH-AC-53 on the VM). `:Z` also means the data directory must not be
+relabel anyway. Check with `ls -Z` after the first start. `:Z` also means the data directory must not be
 shared with another container.
 
 ## Network and DNS
@@ -72,20 +71,14 @@ name resolves to the public IPv4 only because the `podman` role sets
 `podman_base_hosts_file: image` (Podman otherwise copies the host's
 `/etc/hosts`). `getent hosts` inside the container for the names in
 `semaphore_getent_names` must equal `dig +short <name> @1.1.1.1` (SH-AC-16); the
-list is rendered into the Quadlet and asserted by `tests/render.d/semaphore.yml`.
+list is rendered into the Quadlet and rendered by the role templates.
 
 ## Self-run exclusion
 
-`site.yml` tags the role `semaphore`, and the Semaphore template for this
+`collections/homelab/playbooks/ops.yml` tags the role `semaphore`, and the Semaphore template for this
 playbook passes `--skip-tags semaphore,zerotier` (SH-FR-149), so a run started
 from this very Semaphore never restarts `semaphore.service` (SH-FR-66). A change to this role's
 files therefore has to be applied from the workstation (`--tags semaphore`). The restart handler is skipped in `--check`.
-
-## Tests
-
-`tests/guards.d/semaphore.yml` runs the real role in a container (UID, database
-guard, modes/owners, both designs, `--check`, `--skip-tags`, no secret in any
-output); `tests/render.d/semaphore.yml` renders and verifies the Quadlets.
 
 ## Pocket ID login — know the two gaps
 
@@ -160,11 +153,11 @@ on the edge host):
    `vault_semaphore_admin_password`).
 2. Add a **Key Store** entry with the *private* half of the dedicated
    automation key in `ssh_authorized_keys_list` (its public half is already
-   authorized on all three hosts by the `ssh_authorized_keys` role, alongside
+   authorized on all four hosts by the `ssh_authorized_keys` role, alongside
    your own personal key) — this is how Semaphore actually connects over SSH.
-3. Add each playbook's git repo, its `inventories/production/hosts.yml` as
+3. Add each playbook's git repo, the matching `inventories/<host>/` directory as
    an inventory, and the vault password as an "Environment" secret.
-4. Create a **Task Template** per playbook pointing at `site.yml`. Semaphore
+4. Create a **Task Template** per host playbook (`collections/homelab/playbooks/<host>.yml`). Semaphore
    auto-installs a repo's `requirements.yml` (collections/roles) before
    running, so nothing extra is needed there.
 5. Log in once with Pocket ID, then use the local admin to grant that new
@@ -174,5 +167,5 @@ on the edge host):
 
 Nothing here wires up a schedule or a git webhook — that's also configured
 per Task Template in Semaphore's own UI once the above is set up. See the
-top-level README for the reasoning on preferring an internal, polling-based
+the design notes in `docs/` for the reasoning on preferring an internal, polling-based
 schedule over exposing a webhook endpoint to the internet.

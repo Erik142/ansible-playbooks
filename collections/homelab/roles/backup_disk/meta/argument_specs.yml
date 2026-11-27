@@ -4,7 +4,7 @@ argument_specs:
     short_description: Mount the backup disk's @btrbk subvolume, scrub it, watch it with smartd and a daily health check.
     description:
       - Never formats or partitions anything. The disk is initialised once by
-        backup_disk_init.yml (entry point init).
+        collections/homelab/extensions/backup_disk_init.yml (entry point init).
     options:
       backup_disk_device:
         type: path
@@ -92,7 +92,7 @@ argument_specs:
             required: true
             description: Maximum age of the newest direct child, in hours.
   init:
-    short_description: Partition and format the backup disk once (used by backup_disk_init.yml only).
+    short_description: Partition and format the backup disk once (used by collections/homelab/extensions/backup_disk_init.yml only).
     description:
       - Evaluates the refusal conditions R-01 to R-10 first and writes to the
         disk only when none holds and the disk is not yet initialised.

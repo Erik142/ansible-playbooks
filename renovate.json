@@ -32,9 +32,9 @@
       "autoReplaceStringTemplate": "immich_version: {{{newVersion}}}"
     },
     {
-      "description": "netcup forgejo_runner job images pinned by digest (tag@sha256)",
+      "description": "forgejo_runner job images pinned by digest (tag@sha256)",
       "customType": "regex",
-      "managerFilePatterns": ["/(^|/)netcup-ci-wahlberger-dev/roles/forgejo_runner/defaults/main\\.ya?ml$/"],
+      "managerFilePatterns": ["/(^|/)collections/homelab/roles/forgejo_runner/defaults/main\\.ya?ml$/"],
       "matchStrings": ["(?:^|\\n)\\w+_image:\\s*\"?(?<depName>[a-z0-9./_-]+):(?<currentValue>[\\w.-]+)@(?<currentDigest>sha256:[a-f0-9]+)\"?[ \\t]*"],
       "datasourceTemplate": "docker"
     }

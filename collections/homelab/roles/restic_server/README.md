@@ -20,7 +20,7 @@ All variables, their defaults and constraints are in `defaults/main.yml` and
 
 - `restic_server_clients`: list of `{username, password}`, one per backup client.
   The role fails before any change if the list is empty or a password is empty.
-  Production has one entry, `cloud`. Source the password from the Vault:
+  The nas inventory has two entries, `cloud` and `ops`. Source the password from the Vault:
 
   ```yaml
   restic_server_clients:
@@ -62,14 +62,14 @@ Two shared secrets must equal the edge playbook's values (BD-BR-09):
 ## Network and firewall
 
 `restic-server` uses `Network=host` and `--listen :<restic_server_port>`, with no
-`PublishPort=` and no Caddy network (spike `tests/spikes/A-05-firewall-podman.md`).
+`PublishPort=` and no Caddy network.
 A published port is DNATed and takes firewalld's FORWARD path, which zone rich
 rules do not filter. With host networking the traffic is INPUT, so the rich rules
 (one per allowed source: `rule family="ipv4" source address="<CIDR>" port
 port="8000" protocol="tcp" accept`) are the only gate, and `8000/tcp` must never
 be added to `firewall_allowed_ports` or a firewalld service. The listener binds
 every interface; firewalld is the only access control. This is unverified until
-BD-AC-45 passes on the VM.
+BD-AC-45 passes in a live check.
 
 ## Repository location (DOC-O12, BD-D-08)
 
@@ -123,7 +123,7 @@ other options are shared, so every repository gets the same prune guard,
 systemd stops at the first failing `ExecStart=`, so a failure (for example a
 tripped guard) on `cloud` skips `ops` for that run; `ExecStartPost=` (the
 `restic-server` restart) runs only if all succeeded. A one-entry list renders
-the unit exactly as before SH-CC-01 (pinned by `tests/unit/test_restic_maintenance_render.py`).
+the unit exactly as before SH-CC-01.
 The repository passwords are in `/etc/restic-server-maintenance.env`
 (`0600 root:root`), one `RESTIC_PASSWORD_<REPO>` line per repository (name
 upper-cased, non-alphanumerics replaced by `_`: `RESTIC_PASSWORD_CLOUD`,

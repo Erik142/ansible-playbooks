@@ -6,7 +6,7 @@
 # non-secrets live side by side without mixing.
 
 # --- Connection -------------------------------------------------------------
-# SSH login user. Privilege escalation (become) is turned on in site.yml.
+# SSH login user. Privilege escalation (become) is turned on in the host playbook.
 ansible_user: erikwahlberger
 
 # --- Hardening (security role) -----------------------------------------------
@@ -69,10 +69,11 @@ disk_space_paths:
   - /mnt/backup/btrbk
 
 # --- Backup disk (backup_disk, db_dump, btrbk roles) -------------------------
-# Enabled in runbook step 3 (backup disk initialised, backup_disk_uuid set);
-# gates backup_disk, db_dump and btrbk in site.yml.
+# Enabled once the backup disk is initialised and backup_disk_uuid is set (see
+# roles/backup_disk/README.md);
+# gates backup_disk, db_dump and btrbk in nas.yml.
 backup_disk_enabled: true
-# Filesystem UUID printed by backup_disk_init.yml (runbook step 3). The
+# Filesystem UUID printed by extensions/backup_disk_init.yml. The
 # backup_disk role fails with a pointer to its README while this is empty.
 backup_disk_uuid: "80cb7856-915a-42de-b56d-431d17606b70"
 # Newest direct child of each path must be younger than max_age_hours.
@@ -197,7 +198,7 @@ caddy_sites_base:
   - host: www.de.int.wahlberger.dev
     upstream: "homepage:3000"
 # Caddy joins the dedicated garage.network only while Garage is enabled (the
-# garage role creates the network unit and runs before caddy in site.yml).
+# garage role creates the network unit and runs before caddy in the host playbook).
 caddy_extra_networks: "{{ ['garage.network'] if garage_enabled | bool else [] }}"
 # The existing sites above plus, only while garage_enabled is true, the one
 # S3 site of GS-FR-32 (body: O-6 of reqs/garage-sstate.md, GS-FR-129).

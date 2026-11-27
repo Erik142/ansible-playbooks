@@ -155,7 +155,7 @@ subdirectory of the existing share (`samba_share_path` comes from the
 uses for its own subfolder of that same share. Everything Immich-related
 (library and import folders alike) lives under this one `Bilder/immich/`
 prefix, rather than scattered directly under `Bilder/`. Run `samba` before
-this role in `site.yml` (already the case).
+this role in `collections/homelab/playbooks/nas.yml` (already the case).
 
 ## Two different photo folders, two different purposes
 

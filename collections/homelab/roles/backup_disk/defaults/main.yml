@@ -3,7 +3,7 @@
 # main/mount/health tasks added by later tasks). One definition per variable.
 #
 # The init confirmation is deliberately NOT defined here or anywhere in the
-# repository: it is an extra-var of backup_disk_init.yml only (BD-FR-05).
+# repository: it is an extra-var of collections/homelab/extensions/backup_disk_init.yml only (BD-FR-05).
 
 # The backup disk, addressed by a stable by-id path (never /dev/sdX).
 backup_disk_device: /dev/disk/by-id/wwn-0x500003982b7021c1
@@ -12,7 +12,7 @@ backup_disk_expected_size_bytes: 6001175126016
 backup_disk_size_tolerance_percent: 1
 
 # Filesystem UUID of the initialised backup disk. Empty on purpose: the role
-# fails with a pointer to the README until it is set (runbook step 3).
+# fails with a pointer to the README until it is set.
 backup_disk_uuid: ""
 backup_disk_label: backups
 

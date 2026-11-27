@@ -14,5 +14,5 @@ galaxy_info:
     - opensuse
 
 # Production-profile rule `meta-no-dependencies`: do not chain roles here.
-# Order them explicitly in the playbook (site.yml) instead.
+# Order them explicitly in the playbook (the host playbook) instead.
 dependencies: []

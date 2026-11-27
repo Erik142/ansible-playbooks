@@ -4,7 +4,7 @@ Generic helper role that renders a single Podman **Quadlet** (`.container`)
 template to the target and restarts its systemd service — but only when the
 rendered unit actually changes (idempotent).
 
-You normally don't list this role in `site.yml`. Instead, a *service* role
+You normally don't list this role in a host playbook. Instead, a *service* role
 includes it once per container.
 
 ## Role variables
@@ -45,7 +45,7 @@ includes it once per container.
    a `{{ role_path }}`-based path: `include_role` vars are templated lazily, so
    `role_path` would resolve to the `container` role, not yours.
 
-4. Add `- role: tandoor` to `site.yml`.
+4. Add `- role: tandoor` to the matching `collections/homelab/playbooks/<host>.yml`.
 
 ## Why `flush_handlers` instead of a plain handler?
 

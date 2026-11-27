@@ -33,7 +33,7 @@ The hub connects **to** this agent (not the other way around) — see
 `roles/beszel_hub/README.md` for why. That means `beszel_agent_port`
 (default `45876`) must be reachable from the edge host, which for
 this host means adding it to `firewall_allowed_ports` in `group_vars`
-(already done — see `inventories/production/group_vars/all/vars.yml`).
+(already done — see `inventories/ops/group_vars/all/vars.yml`).
 
 ## Podman container stats without running as root
 

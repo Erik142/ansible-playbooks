@@ -1,7 +1,7 @@
 ---
 # String-level checks of the optional per-source keys. No command runs and
 # nothing on the host is read, so this also runs under pytest on localhost
-# (tests/unit/test_btrbk_sources.py). Imported first by main.yml.
+# Imported first by main.yml.
 # `snapshot_dir`: GS-FR-92, GS-E-22. `mount_path`: GS-FR-75, GS-FR-76.
 - name: Validate the per-source snapshot_dir
   ansible.builtin.assert:

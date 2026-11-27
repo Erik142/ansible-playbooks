@@ -33,7 +33,7 @@ firewall_rich_rules: []
 # Applied after firewall_rich_rules.
 firewall_extra_rich_rules: []
 
-# Name of the ZeroTier network interface on the VM (fed by `vm_zt_iface`).
+# Name of the ZeroTier network interface on the host (fed by `vm_zt_iface`).
 # Empty (steps 0 to 2): the zone binding and its rules are skipped (SH-FR-194).
 firewall_zerotier_interface: ""
 

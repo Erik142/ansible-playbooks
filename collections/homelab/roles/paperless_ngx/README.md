@@ -19,7 +19,7 @@ Ansible Vault.
 `paperless_ngx_inbox_dir` defaults to a subdirectory of `samba_share_path` (from
 the `samba` role's defaults) — the scan-to-folder inbox lives **inside** the
 guest Samba share, so anyone on the LAN can drop a document in for OCR. Run
-`samba` before this role in `site.yml` (already the case).
+`samba` before this role in `collections/homelab/playbooks/nas.yml` (already the case).
 
 ## Register the OIDC client in Pocket ID
 
@@ -48,7 +48,7 @@ stock policy rule letting a confined container touch Samba's file type). The
 other volumes (data/media/export) are exclusively paperless-ngx's own and
 keep their normal `:Z` labeling.
 
-Because `samba`'s role runs before this one in `site.yml`, and its
+Because `samba`'s role runs before this one in `nas.yml`, and its
 `restorecon` is recursive over the whole Samba data tree, an already-wrong
 label left over from before this fix existed corrects itself on the next
 full playbook run — no manual `restorecon` needed.

@@ -6,7 +6,7 @@
 // See roles/n8n/README.md ("Trusted-header login") and roles/n8n/templates/n8n.container.j2.
 //
 // Depends on n8n internals (cookie-parser layer name, AuthService.issueJWT/issueCookie,
-// the n8n-auth cookie name). The CI test tests/n8n-hook/run.sh checks them per image.
+// the n8n-auth cookie name). Check them by hand per image when bumping n8n_image.
 
 const path = require('node:path');
 

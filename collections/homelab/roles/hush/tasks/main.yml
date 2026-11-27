@@ -144,7 +144,7 @@
   tags: [hush]
 
 # Hush hook guard: the drop-ins call hush-systemd-event and read hook.env, which
-# notify_failure deploys earlier in site.yml. Skipped in check mode (copies do not run).
+# notify_failure deploys earlier in the host playbook. Skipped in check mode (copies do not run).
 - name: Stat the hush hook script and environment file
   ansible.builtin.stat:
     path: "{{ item }}"

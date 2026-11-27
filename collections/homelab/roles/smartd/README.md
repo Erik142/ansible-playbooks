@@ -4,7 +4,7 @@ Enables `smartd` and monitors the disks in `smartd_devices`. When smartd logs a
 warning, a hook emails the owner through Resend (credentials from
 `notify_failure`, so that role must run first). Not gated by
 `backup_disk_enabled`: the main data HDD is watched from day one. Spec:
-[reqs/smartd-main-disk.md](../../reqs/smartd-main-disk.md).
+The spec was removed from the repo (see git history).
 
 ## What it does
 

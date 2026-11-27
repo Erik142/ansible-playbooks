@@ -97,7 +97,7 @@ password Postgres doesn't recognize yet (BR-04).
    ```
 
 2. Update `vault_tandoor_db_password` in Vault to the same new password.
-3. Run `ansible-playbook site.yml --tags tandoor,db_dump` — tagging
+3. Run `ansible-playbook wahlberger.homelab.nas --tags tandoor,db_dump` — tagging
    `db_dump` too is required so the `db_dump` role picks up the new password
    (`tandoor_db_password`) before the next dump, not just the `tandoor` app
    container.
