@@ -1,0 +1,56 @@
+---
+# Asserts the nas host's container-ok configuration, using the values the real nas
+# inventory sets (security role pins: patch method, 03:00 slot, best-effort reboots).
+# The dup-timer and rebootmgr checks in ../base/verify.yml do not apply here.
+- name: Verify the nas container-ok roles
+  hosts: nas
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Dump the effective sshd configuration
+      ansible.builtin.command: sshd -T
+      register: nas_sshd
+      changed_when: false
+
+    - name: Assert the nas sshd policy
+      ansible.builtin.assert:
+        that:
+          - nas_sshd.stdout_lines | select('match', '(?i)^permitrootlogin no$') | list | length == 1
+          - nas_sshd.stdout_lines | select('match', '(?i)^passwordauthentication no$') | list | length == 1
+          - nas_sshd.stdout_lines | select('match', '(?i)^allowusers erikwahlberger$') | list | length == 1
+        quiet: true
+
+    - name: Assert the real nas SSH keys are installed for the test user
+      ansible.builtin.slurp:
+        src: /root/.ssh/authorized_keys
+      register: nas_keys
+
+    - name: Check the key content
+      ansible.builtin.assert:
+        that:
+          - "(nas_keys.content | b64decode).splitlines() | select('match', '^ssh-') | list | length >= 1"
+        quiet: true
+
+    - name: Assert the notify and disk-space units exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /usr/local/bin/notify-failure.sh
+        - /etc/systemd/system/disk-space-check.timer
+        - /etc/systemd/system/zypper-autopatch.timer
+      register: nas_files
+
+    - name: Assert they exist
+      ansible.builtin.assert:
+        that: nas_files.results | map(attribute='stat.exists') | select('equalto', false) | list | length == 0
+        quiet: true
+
+    - name: Assert the dup timer is absent (the nas uses patch)
+      ansible.builtin.stat:
+        path: /etc/systemd/system/zypper-dup.timer
+      register: nas_dup
+
+    - name: Assert it is gone
+      ansible.builtin.assert:
+        that: not nas_dup.stat.exists
+        quiet: true

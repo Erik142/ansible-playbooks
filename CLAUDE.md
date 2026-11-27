@@ -26,6 +26,13 @@ ansible-playbook wahlberger.homelab.<host>
 `<host>` is `nas`, `ops`, `ci` or `edge`. The vault passwords come from 1Password
 through the scripts above. Unlock 1Password before running.
 
+## Linting
+
+Run `scripts/lint.sh` (yamllint, ansible-lint, syntax-check of each host playbook). It is also the CI lint job.
+Do not run `ansible-lint` or `ansible-playbook` bare for checks: `ansible.cfg` loads every
+`vault_identity_list` script at startup, so each run calls `op` (1Password) four times.
+`lint.sh` overrides the vault env vars so no 1Password call happens.
+
 ## Collection rules
 
 - **FQCN for every module** (`ansible.builtin.*`, `community.general.*`, ...).

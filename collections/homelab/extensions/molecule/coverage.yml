@@ -1,0 +1,95 @@
+---
+# Every role under roles/ has exactly one entry: either the scenario that runs it
+# (`scenario:`, checked against the scenario's converge list or tags) or a recorded
+# reason it cannot run in a container (`exclude:`). check_coverage.py enforces this.
+#
+# A role with `exclude:` and "not yet covered" in its reason is an open gap, not a
+# decision. Those are listed in the check's summary.
+roles:
+  # Covered: base scenario (converge.yml).
+  common:
+    scenario: base
+  notify_failure:
+    scenario: base
+  disk_space:
+    scenario: base
+  ssh_authorized_keys:
+    scenario: base
+  security:
+    scenario: base
+  reboot_notify:
+    scenario: base
+  netcup_network:
+    scenario: base
+  cloudflare_dns:
+    scenario: base
+  restic_backup:
+    scenario: base
+
+  # Covered: host playbook scenario (tags).
+  forgejo_runner:
+    scenario: playbook-ci
+
+  # Excluded: need block devices, btrfs subvolumes or a real disk.
+  backup_disk:
+    exclude: by-id block device, LUKS holder checks, btrfs and hdparm
+  btrbk:
+    exclude: btrfs subvolume and mount checks, zypper repo and key fetch
+  db_dump:
+    exclude: dumps a Podman Postgres and asserts the /mnt/data mount
+  garage:
+    exclude: btrfs subvolumes and lsattr; Podman container
+  smartd:
+    exclude: needs real /dev/disk/by-id SMART devices
+  snapper:
+    exclude: asserts .snapshots on mounted btrfs subvolumes
+  storage:
+    exclude: mounts btrfs subvolumes into fstab (ansible.posix.mount)
+  samba:
+    exclude: native Samba; asserts the data dir is a mounted filesystem
+
+  # Excluded: need rootful Podman, firewalld or a Quadlet network.
+  container:
+    exclude: Quadlet helper; needs a running Podman
+  podman:
+    exclude: rootful Podman socket, ip_forward sysctl, image prune
+  firewall:
+    exclude: firewalld and nftables fail in a container netns (proven on the VM)
+  zerotier:
+    exclude: needs /dev/net/tun and the tun module; Podman container
+  beszel_agent:
+    exclude: Podman socket ACL; downloads a release from github.com
+  beszel_hub:
+    exclude: Podman Quadlet; rootful Podman socket and network
+  caddy:
+    exclude: Podman container; Cloudflare DNS-01 ACME token
+  forgejo:
+    exclude: Podman Forgejo and registry; Caddy shared network
+  freshrss:
+    exclude: Podman container; public URL
+  homepage:
+    exclude: Podman container; Caddy network
+  hush:
+    exclude: Podman container; real hush host and tokens
+  immich:
+    exclude: four Podman containers; /mnt/data; Samba-dependent dirs
+  lab_grab:
+    exclude: Podman containers; labgrid serial and USB exporters
+  n8n:
+    exclude: Podman containers; oauth2-proxy; Forgejo and Hush webhooks
+  paperless_ngx:
+    exclude: Podman containers; Samba inbox directory
+  pocket_id:
+    exclude: Podman container; public OIDC URL
+  restic_server:
+    exclude: Podman Quadlet; firewalld rich rules; /mnt/data check
+  semaphore:
+    exclude: Podman containers; network Quadlet; OIDC
+  tandoor:
+    exclude: Podman containers; public URL
+  uptime_kuma:
+    exclude: Podman containers; oauth2-proxy; ZeroTier-routed monitoring
+  hush_maintenance:
+    exclude: "not yet covered: pre and post tasks POST and DELETE to the real hush host (always-tagged; skipped in playbook scenarios)"
+  hush_recovery:
+    exclude: "not yet covered: restarts listed units that are absent in a container; needs a units-list scenario"

@@ -1,0 +1,25 @@
+---
+# A real host runs NetworkManager; netcup_network's handler calls `nmcli connection
+# reload` and fails without it. Start D-Bus and NetworkManager before converge.
+- name: Prepare the container
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Start D-Bus (NetworkManager needs it)
+      ansible.builtin.systemd:
+        name: dbus
+        state: started
+
+    - name: Start NetworkManager
+      ansible.builtin.systemd:
+        name: NetworkManager
+        state: started
+
+    - name: Wait until NetworkManager answers nmcli
+      ansible.builtin.command: nmcli general status
+      register: base_nm_status
+      changed_when: false
+      retries: 10
+      delay: 2
+      until: base_nm_status.rc == 0

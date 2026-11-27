@@ -150,7 +150,9 @@ hush_config:
         tls-status.wahlberger.dev:
           {type: tls_expiry, host: edge.de.wahlberger.dev, service: uptime-kuma, address: status.wahlberger.dev, port: 443,
            server_name: status.wahlberger.dev}
-        tls-beszel.wahlberger.dev: {type: tls_expiry, host: edge.de.wahlberger.dev, address: beszel.wahlberger.dev, port: 443, server_name: beszel.wahlberger.dev}
+        tls-beszel.wahlberger.dev:
+          {type: tls_expiry, host: edge.de.wahlberger.dev, address: beszel.wahlberger.dev, port: 443,
+           server_name: beszel.wahlberger.dev}
     # TrueNAS SCALE alerts (Mattermost alert service). The secret is the last URL path
     # segment: https://hush.de.int.wahlberger.dev/ingest/truenas/<secret>. See hush docs/truenas.md.
     truenas:

@@ -1,0 +1,50 @@
+---
+# Asserts the ci host's container-ok configuration, and the forgejo_runner render
+# (Quadlet, runner config, subordinate UIDs). Checks follow the current role templates:
+# job containers get no socket mount (docker_host "-"), and the cache dir is the only
+# volume a job may bind-mount. Ported from git 8907cd4^ (netcup forgejo_runner verify),
+# with the capacity and docker_host lines updated to what the role renders now.
+- name: Verify the ci host and the forgejo_runner render
+  hosts: ci
+  gather_facts: false
+  become: true
+  vars:
+    ci_runner_quadlet: /var/lib/forgejo-runner/.config/containers/systemd/forgejo-runner.container
+    ci_runner_config: /var/lib/forgejo-runner/config/config.yaml
+  tasks:
+    - name: Read the runner Quadlet
+      ansible.builtin.slurp:
+        src: "{{ ci_runner_quadlet }}"
+      register: ci_quadlet
+
+    - name: Read the runner config
+      ansible.builtin.slurp:
+        src: "{{ ci_runner_config }}"
+      register: ci_config
+
+    - name: Read the subordinate ID ranges
+      ansible.builtin.slurp:
+        src: /etc/subuid
+      register: ci_subuid
+
+    - name: Assert the Quadlet is rootless, socket-only and resource-limited
+      ansible.builtin.assert:
+        that:
+          - "'Volume=%t/podman/podman.sock:/run/podman/podman.sock' in (ci_quadlet.content | b64decode)"
+          - "'docker.sock' not in (ci_quadlet.content | b64decode)"
+          - "'Exec=/bin/forgejo-runner daemon' in (ci_quadlet.content | b64decode)"
+          - "'User=0:0' in (ci_quadlet.content | b64decode)"
+          - "'SecurityLabelDisable=true' in (ci_quadlet.content | b64decode)"
+          - "'MemoryMax=' in (ci_quadlet.content | b64decode)"
+          - "'CPUQuota=' in (ci_quadlet.content | b64decode)"
+          - "'Requires=podman.socket' in (ci_quadlet.content | b64decode)"
+        quiet: true
+
+    - name: Assert the runner config keeps job containers off the socket and caps the cache dir
+      ansible.builtin.assert:
+        that:
+          - "'docker_host: \"-\"' in (ci_config.content | b64decode)"
+          - "'capacity: ' in (ci_config.content | b64decode)"
+          - "'labels:' in (ci_config.content | b64decode)"
+          - "'forgejo-runner:100000:65536' in (ci_subuid.content | b64decode)"
+        quiet: true

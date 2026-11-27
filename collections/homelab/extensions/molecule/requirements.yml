@@ -1,0 +1,6 @@
+---
+# Test-only collections for molecule's docker driver. Not used by the playbooks, so
+# they stay out of the root requirements.yml (production set).
+collections:
+  - name: community.docker
+    version: ">=5.4.0"

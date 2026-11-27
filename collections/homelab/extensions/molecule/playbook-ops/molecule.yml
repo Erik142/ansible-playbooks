@@ -1,0 +1,57 @@
+---
+# Playbook scenario: the real ops.yml, restricted to the roles a container can run.
+# Run with the runner from the repo root:  scripts/molecule.sh playbook-ops
+# Skipped (need devices, Podman, Caddy/Semaphore or real hosts): firewall, podman,
+# zerotier, beszel_agent, caddy, semaphore, hush, restic_backup, cloudflare_dns,
+# hush_recovery, snapper. restic_backup and cloudflare_dns run in the base scenario.
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ${MOLECULE_PROJECT_DIRECTORY}/molecule/requirements.yml
+driver:
+  name: docker
+platforms:
+  - name: ops-instance
+    image: homelab-molecule:tumbleweed
+    pre_build_image: true
+    privileged: true
+    cgroupns_mode: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /run
+      - /run/lock
+    command: /usr/lib/systemd/systemd
+    groups:
+      - ops
+provisioner:
+  name: ansible
+  options:
+    tags: common,notify_failure,disk_space,ssh_authorized_keys,security,reboot_notify
+    # Replaces molecule's default skip list, so keep molecule-notest and notest (container-only tasks).
+    skip-tags: always,molecule-notest,notest
+  playbooks:
+    converge: ${MOLECULE_PROJECT_DIRECTORY}/../../../collections/ansible_collections/wahlberger/homelab/playbooks/ops.yml
+  inventory:
+    # Real non-secret group_vars, rendered by scripts/molecule-inventory.py (vault
+    # values are a generated stub, never the encrypted vault.yml). Container-only
+    # overrides live in this scenario's inventory/host_vars.
+    links:
+      group_vars: ${MOLECULE_PROJECT_DIRECTORY}/molecule/.generated/ops/group_vars
+      host_vars: ${MOLECULE_SCENARIO_DIRECTORY}/inventory/host_vars
+  env:
+    ANSIBLE_COLLECTIONS_PATH: ${MOLECULE_PROJECT_DIRECTORY}/../../../collections:~/.ansible/collections
+    ANSIBLE_VAULT_PASSWORD_FILE: ${MOLECULE_SCENARIO_DIRECTORY}/../base/inventory/dummy-vault-pass
+    ANSIBLE_VAULT_IDENTITY_LIST: "lint@${MOLECULE_SCENARIO_DIRECTORY}/../base/inventory/dummy-vault-pass"
+verifier:
+  name: ansible
+scenario:
+  test_sequence:
+    # Destroy first: a leftover instance record from an interrupted run would be reused.
+    - destroy
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - destroy

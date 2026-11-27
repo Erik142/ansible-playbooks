@@ -1,0 +1,8 @@
+# Pinned CI tooling. Installed by .github/workflows/ci.yml (pip cache keyed on this file).
+# ansible-core matches Semaphore's bundled version: keep in step with it.
+ansible-core==2.20.8
+ansible-lint
+yamllint
+molecule
+molecule-plugins[docker]
+docker

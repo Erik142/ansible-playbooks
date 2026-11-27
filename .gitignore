@@ -14,9 +14,18 @@
 
 # Ansible runtime cache (repo-level ansible.cfg)
 .ansible_cache/
+# Ansible per-user state (collections/roles/modules/facts created by ansible tooling)
+.ansible/
+
+# Local tool state
+.pytest_cache/
+.claude/
 
 # Python bytecode
 __pycache__/
 *.pyc
 /playbooks/pi-de-int-wahlberger-dev/
 /playbooks/rpi-boras/
+
+# Rendered group_vars for molecule playbook scenarios (scripts/molecule-inventory.py)
+.generated/

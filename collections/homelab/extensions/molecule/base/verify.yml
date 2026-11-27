@@ -1,0 +1,236 @@
+---
+# Asserts what the base roles must leave behind, against the converged container.
+# Ported from the ops scenario (git 154bb1d^): the sshd policy and its guards, the
+# weekly update timer and rebootmgr settings, plus the ssh-key, NetworkManager and
+# notify/disk-space wiring. Not ported: fail2ban live jail, login-email and PAM login
+# tests (need a live sshd login path and firewall), and the ssh_authorized_keys T-04
+# block (covered by the role's own idempotence in converge).
+- name: Verify the base roles
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Dump the effective sshd configuration
+      ansible.builtin.command: sshd -T
+      register: base_sshd
+      changed_when: false
+
+    - name: Parse sshd -T into keyword -> value
+      ansible.builtin.set_fact:
+        base_sshd_effective: "{{ dict(base_sshd.stdout_lines | map('lower') | map('split', ' ', 1) | list) }}"
+
+    - name: Assert hardened sshd directives
+      ansible.builtin.assert:
+        that:
+          - base_sshd_effective['passwordauthentication'] == 'no'
+          - base_sshd_effective['kbdinteractiveauthentication'] == 'no'
+          - base_sshd_effective['x11forwarding'] == 'no'
+          - base_sshd_effective['allowtcpforwarding'] == 'no'
+          - base_sshd_effective['maxauthtries'] == '3'
+        fail_msg: "sshd effective configuration does not match the security role"
+
+    - name: Validate the sshd configuration file
+      ansible.builtin.command: sshd -t
+      changed_when: false
+
+    - name: Stat the authorized_keys file for the test user
+      ansible.builtin.stat:
+        path: /root/.ssh/authorized_keys
+      register: base_authorized_keys
+
+    - name: Read it
+      ansible.builtin.slurp:
+        src: /root/.ssh/authorized_keys
+      register: base_authorized_keys_content
+      when: base_authorized_keys.stat.exists
+
+    - name: Assert the managed key is present
+      ansible.builtin.assert:
+        that:
+          - base_authorized_keys.stat.exists
+          - "'molecule-test' in (base_authorized_keys_content.content | b64decode)"
+
+    - name: Stat the NetworkManager profile
+      ansible.builtin.stat:
+        path: /etc/NetworkManager/system-connections/molecule-test.nmconnection
+      register: base_nm_profile
+
+    - name: Assert the profile is written with the test address, mode 0600
+      ansible.builtin.assert:
+        that:
+          - base_nm_profile.stat.exists
+          - base_nm_profile.stat.mode == '0600'
+      when: base_nm_profile.stat.exists
+
+    - name: Read the profile for the address check
+      ansible.builtin.slurp:
+        src: /etc/NetworkManager/system-connections/molecule-test.nmconnection
+      register: base_nm_content
+      when: base_nm_profile.stat.exists
+
+    - name: Assert the profile carries the configured address
+      ansible.builtin.assert:
+        that:
+          - "'192.0.2.10/24' in (base_nm_content.content | b64decode)"
+      when: base_nm_profile.stat.exists
+
+    - name: Stat the notify and disk-space files
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /usr/local/bin/notify-failure.sh
+        - /etc/notify-failure/notify-failure.env
+        - /usr/local/bin/disk-space-check.sh
+        - /etc/systemd/system/disk-space-check.timer
+      register: base_files
+
+    - name: Assert the notify and disk-space files exist
+      ansible.builtin.assert:
+        that:
+          - base_files.results | map(attribute='stat') | map(attribute='exists') | list | select('equalto', false) | list | length == 0
+        fail_msg: "a notify or disk-space file is missing"
+
+# Ported from the ops scenario (git 154bb1d^, verify-security.yml, sections 1 and 2,
+# and section 6's rebootmgr and timer checks). The drop-in override and invalid-config
+# guards protect the hardened sshd policy; the timer and rebootmgr checks pin the
+# weekly maintenance schedule.
+- name: Verify a drop-in cannot override the hardened sshd policy
+  hosts: all
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Try to override hardened directives from a drop-in
+      block:
+        - name: Write the drop-in
+          ansible.builtin.copy:
+            dest: /etc/ssh/sshd_config.d/99-molecule-override.conf
+            content: "MaxAuthTries 9\nX11Forwarding yes\nUsePAM no\n"
+            owner: root
+            group: root
+            mode: "0644"
+
+        - name: Read the effective configuration again
+          ansible.builtin.command: sshd -T
+          register: base_dropin_dump
+          changed_when: false
+
+        - name: Assert the drop-in lost against the role's value
+          ansible.builtin.assert:
+            that:
+              - base_dropin_dump.stdout_lines | select('match', '(?i)^maxauthtries 3$') | list | length == 1
+              - base_dropin_dump.stdout_lines | select('match', '(?i)^x11forwarding no$') | list | length == 1
+              - base_dropin_dump.stdout_lines | select('match', '(?i)^usepam yes$') | list | length == 1
+            fail_msg: "a drop-in overrode a hardened directive: the Include sits above the role's directives"
+            quiet: true
+      always:
+        - name: Remove the drop-in
+          ansible.builtin.file:
+            path: /etc/ssh/sshd_config.d/99-molecule-override.conf
+            state: absent
+
+- name: Verify an invalid sshd configuration is rejected and not applied (SH-AC-45)
+  hosts: all
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Snapshot sshd_config checksum
+      ansible.builtin.stat:
+        path: /etc/ssh/sshd_config
+        checksum_algorithm: sha256
+      register: base_ac45_before
+
+    - name: Snapshot the effective configuration
+      ansible.builtin.command: sshd -T
+      register: base_ac45_dump_before
+      changed_when: false
+
+    - name: Run the sshd tasks with a directive sshd rejects
+      block:
+        - name: Apply the role's sshd tasks with an invalid directive
+          ansible.builtin.include_role:
+            name: wahlberger.homelab.security
+            tasks_from: sshd.yml
+          vars:
+            security_ssh_extra_directives:
+              - NoSuchDirective yes
+        - name: Remember that the role did NOT fail
+          ansible.builtin.set_fact:
+            base_ac45_failed: false
+      rescue:
+        - name: Remember the failure
+          ansible.builtin.set_fact:
+            base_ac45_failed: true
+            base_ac45_error: "{{ ansible_failed_result | to_json }}"
+
+    - name: Assert the role failed on the invalid directive
+      ansible.builtin.assert:
+        that:
+          - base_ac45_failed
+          - base_ac45_error is search('Bad configuration option')
+          - base_ac45_error is search('NoSuchDirective')
+        fail_msg: "expected a sshd -t validation failure"
+        quiet: true
+
+    - name: Snapshot sshd_config after the failed run
+      ansible.builtin.stat:
+        path: /etc/ssh/sshd_config
+        checksum_algorithm: sha256
+      register: base_ac45_after
+
+    - name: Read the effective configuration after the failed run
+      ansible.builtin.command: sshd -T
+      register: base_ac45_dump_after
+      changed_when: false
+
+    - name: Assert nothing changed
+      ansible.builtin.assert:
+        that:
+          - base_ac45_after.stat.checksum == base_ac45_before.stat.checksum
+          - base_ac45_dump_after.stdout == base_ac45_dump_before.stdout
+        fail_msg: "the invalid directive changed sshd_config or the effective configuration"
+        quiet: true
+
+- name: Verify the weekly update timer, legacy units and rebootmgr settings
+  hosts: all
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Assert the zypper-dup timer exists and its calendar expression parses
+      ansible.builtin.command: "systemd-analyze calendar 'Sun *-*-* 04:00:00 Europe/Berlin'"
+      changed_when: false
+
+    - name: Read the zypper-dup timer
+      ansible.builtin.slurp:
+        src: /etc/systemd/system/zypper-dup.timer
+      register: base_timer
+
+    - name: Assert the schedule is Sunday 04:00 Berlin
+      ansible.builtin.assert:
+        that:
+          - "'OnCalendar=Sun *-*-* 04:00:00 Europe/Berlin' in (base_timer.content | b64decode)"
+        quiet: true
+
+    - name: Stat the legacy zypper-autopatch units
+      ansible.builtin.stat:
+        path: "/etc/systemd/system/{{ item }}"
+      loop:
+        - zypper-autopatch.service
+        - zypper-autopatch.timer
+      register: base_legacy
+
+    - name: Assert the legacy units are gone
+      ansible.builtin.assert:
+        that: base_legacy.results | map(attribute='stat.exists') | select('equalto', true) | list | length == 0
+        quiet: true
+
+    - name: Read rebootmgr.conf
+      ansible.builtin.slurp:
+        src: /etc/rebootmgr/rebootmgr.conf
+      register: base_rebootmgr
+
+    - name: Assert the maintenance-window strategy and window
+      ansible.builtin.assert:
+        that:
+          - "'strategy=maint-window' in (base_rebootmgr.content | b64decode)"
+          - "'window-start=Sun 04:00' in (base_rebootmgr.content | b64decode)"
+          - "'window-duration=1h' in (base_rebootmgr.content | b64decode)"
+        quiet: true

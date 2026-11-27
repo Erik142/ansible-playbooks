@@ -1,0 +1,26 @@
+# Lint scope: the homelab collection and its molecule scenarios. Installed copies of
+# collections and local scratch files are not repo content.
+extends: default
+
+ignore: |
+  collections/ansible_collections/
+  .ansible/
+  .scratch/
+  collections/homelab/extensions/molecule/.generated/
+
+rules:
+  # Role defaults carry long URLs and comments. 160 is the longest existing line
+  # after the hush wrap, so this only stops new over-long lines.
+  line-length:
+    max: 160
+  # The repo writes inline maps as `{ key: value }`.
+  braces:
+    max-spaces-inside: 1
+  # ansible-lint's production profile requires these; file modes are written 0644 etc.
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
+  comments:
+    min-spaces-from-content: 1
+  # Comments above a task are written at the task's indentation, not the list item's.
+  comments-indentation: false
