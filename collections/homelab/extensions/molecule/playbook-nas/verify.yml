@@ -54,3 +54,41 @@
       ansible.builtin.assert:
         that: not nas_dup.stat.exists
         quiet: true
+
+    - name: Read the Hush API stand-in log
+      ansible.builtin.slurp:
+        src: /var/log/hush-mock.log
+      register: nas_hush_log
+
+    - name: Parse the maintenance window calls
+      ansible.builtin.set_fact:
+        nas_hush_posts: "{{ (nas_hush_log.content | b64decode).splitlines() | select('match', '^POST /maintenance/windows ') | list }}"
+        nas_hush_deletes: "{{ (nas_hush_log.content | b64decode).splitlines() | select('match', '^DELETE /maintenance/windows/') | list }}"
+
+    - name: Assert a window was opened and closed with the same id
+      ansible.builtin.assert:
+        that:
+          - nas_hush_posts | length >= 1
+          - nas_hush_deletes | length >= 1
+          - nas_hush_posts[0] is search('ansible-nas-')
+          - nas_hush_deletes[-1] is search(nas_hush_posts[0] | regex_search('ansible-nas-[0-9A-Za-z-]+'))
+        fail_msg: "hush maintenance window was not opened and closed for this apply"
+        quiet: true
+
+    - name: Read the list of units that receive a Hush drop-in
+      ansible.builtin.include_vars:
+        file: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/molecule/.generated/nas/group_vars/all/hush_recovery.yml"
+
+    - name: Stat the Hush drop-in for every listed unit
+      ansible.builtin.stat:
+        path: "/etc/systemd/system/{{ item }}.d/hush.conf"
+      loop: "{{ hush_recovery_units }}"
+      register: nas_hush_dropins
+
+    - name: Assert every listed unit has its Hush drop-in
+      ansible.builtin.assert:
+        that: nas_hush_dropins.results | map(attribute='stat.exists') | select('equalto', false) | list | length == 0
+        fail_msg: >-
+          hush_recovery did not write a drop-in for:
+          {{ nas_hush_dropins.results | selectattr('stat.exists', 'equalto', false) | map(attribute='item') | list }}
+        quiet: true

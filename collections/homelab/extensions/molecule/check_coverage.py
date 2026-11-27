@@ -7,7 +7,9 @@ coverage.yml maps every role to one of:
 
 The check also verifies the claims against the scenarios themselves:
   - base:           the role is in converge.yml's roles list
-  - playbook-*:     the role's name is in the scenario's molecule.yml tags
+  - playbook-*:     the role's name is in the scenario's molecule.yml tags, or the
+                    entry says `via: always` and the host playbook runs the role
+                    through always-tagged tasks that the scenario does not skip
 and fails on stale entries (role directory gone, scenario missing).
 
 Usage: check_coverage.py    (exit 0 = covered, 1 = gaps, stdlib + PyYAML)
@@ -27,8 +29,22 @@ def scenario_runs(scenario: str) -> set[str]:
         converge = yaml.safe_load((MOLECULE / "base" / "converge.yml").read_text())
         return {r["role"].removeprefix("wahlberger.homelab.") for r in converge[0]["roles"]}
     config = yaml.safe_load((MOLECULE / scenario / "molecule.yml").read_text())
-    tags = config["provisioner"]["options"]["tags"]
-    return set(tags.split(","))
+    return set(config["provisioner"]["options"]["tags"].split(","))
+
+
+def runs_via_always(scenario: str, role: str) -> bool:
+    """True when the role runs through `always`-tagged tasks in the host playbook.
+
+    Those tasks run unless the scenario skips `always`, and the host playbook must
+    name the role.
+    """
+    config = yaml.safe_load((MOLECULE / scenario / "molecule.yml").read_text())
+    skip = config["provisioner"]["options"].get("skip-tags", "").split(",")
+    if "always" in skip:
+        return False
+    host = scenario.removeprefix("playbook-")
+    playbook = (MOLECULE.parent.parent / "playbooks" / f"{host}.yml").read_text()
+    return f"wahlberger.homelab.{role}" in playbook
 
 
 def main() -> int:
@@ -61,6 +77,11 @@ def main() -> int:
         scenario = entry["scenario"]
         if not (MOLECULE / scenario / "molecule.yml").exists():
             errors.append(f"{name}: scenario '{scenario}' does not exist")
+        elif entry.get("via") == "always":
+            if runs_via_always(scenario, name):
+                covered += 1
+            else:
+                errors.append(f"{name}: scenario '{scenario}' does not run it through always-tagged tasks")
         elif name not in scenario_runs(scenario):
             errors.append(f"{name}: scenario '{scenario}' does not run this role")
         else:

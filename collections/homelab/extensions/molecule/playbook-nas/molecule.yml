@@ -27,9 +27,11 @@ platforms:
 provisioner:
   name: ansible
   options:
-    tags: common,notify_failure,disk_space,ssh_authorized_keys,security,reboot_notify
+    tags: common,notify_failure,disk_space,ssh_authorized_keys,security,reboot_notify,hush_recovery
     # Replaces molecule's default skip list, so keep molecule-notest and notest (container-only tasks).
-    skip-tags: always,molecule-notest,notest
+    # Replaces molecule's default skip list, so keep molecule-notest and notest. `always`
+    # stays allowed: the hush maintenance window open and close run through it.
+    skip-tags: molecule-notest,notest
   playbooks:
     converge: ${MOLECULE_PROJECT_DIRECTORY}/../../../collections/ansible_collections/wahlberger/homelab/playbooks/nas.yml
   inventory:

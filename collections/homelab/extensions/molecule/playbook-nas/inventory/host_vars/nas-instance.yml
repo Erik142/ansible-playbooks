@@ -6,3 +6,5 @@ ansible_python_interpreter: /usr/bin/python3
 # as the container user.
 ansible_user: root
 ssh_authorized_keys_user: root
+# The Hush API stand-in (files/hush_mock.py, started in prepare.yml), not the real host.
+hush_maintenance_base_url: "http://127.0.0.1:8099"

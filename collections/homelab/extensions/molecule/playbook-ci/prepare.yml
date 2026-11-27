@@ -2,6 +2,9 @@
 # A real host runs NetworkManager; netcup_network's handler calls `nmcli connection
 # reload` and fails without it. Start D-Bus and NetworkManager before converge.
 - name: Prepare the container
+  # molecule's tags option (the playbook's --tags) applies to every playbook it runs.
+  # Without this, the untagged tasks here would be filtered out and never run.
+  tags: [always]
   hosts: all
   become: true
   gather_facts: false

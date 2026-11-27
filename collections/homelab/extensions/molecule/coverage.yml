@@ -89,7 +89,11 @@ roles:
     exclude: Podman containers; public URL
   uptime_kuma:
     exclude: Podman containers; oauth2-proxy; ZeroTier-routed monitoring
+  # Covered: playbook-nas. Its pre and post tasks run through `always`, which the
+  # scenario does not skip; the Hush API is a local stand-in (files/hush_mock.py).
   hush_maintenance:
-    exclude: "not yet covered: pre and post tasks POST and DELETE to the real hush host (always-tagged; skipped in playbook scenarios)"
+    scenario: playbook-nas
+    via: always
+  # Covered: playbook-nas tags. The units it restarts are stand-ins from prepare.yml.
   hush_recovery:
-    exclude: "not yet covered: restarts listed units that are absent in a container; needs a units-list scenario"
+    scenario: playbook-nas

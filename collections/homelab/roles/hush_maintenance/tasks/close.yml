@@ -11,6 +11,8 @@
     timeout: 15
   no_log: true
   failed_when: false
+  # Notifies Hush; changes nothing on the host, so it is not a change for idempotence.
+  changed_when: false
   when:
     - hush_maintenance_enabled | bool
     - not ansible_check_mode

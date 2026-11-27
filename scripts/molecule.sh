@@ -24,4 +24,8 @@ cd "$repo"
 python3 scripts/molecule-inventory.py
 
 cd collections/homelab/extensions
+# Molecule keeps a "prepared" flag in its ephemeral state, and destroy does not clear it,
+# so a local rerun would skip the prepare playbook. Remove this scenario's ephemeral state
+# first, which is what a fresh CI checkout starts with.
+rm -rf "$HOME"/.ansible/tmp/molecule.*."$scenario"
 exec molecule test -s "$scenario" "$@"
