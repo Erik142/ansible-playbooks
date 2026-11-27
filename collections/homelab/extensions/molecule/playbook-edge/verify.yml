@@ -1,0 +1,44 @@
+---
+# Asserts the ops host's container-ok configuration, from its real inventory values
+# (rendered into the scenario by scripts/molecule-inventory.py).
+- name: Verify the edge container-ok roles
+  hosts: edge
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Dump the effective sshd configuration
+      ansible.builtin.command: sshd -T
+      register: edge_sshd
+      changed_when: false
+
+    - name: Assert the edge sshd policy
+      ansible.builtin.assert:
+        that:
+          - edge_sshd.stdout_lines | select('match', '(?i)^permitrootlogin no$') | list | length == 1
+          - edge_sshd.stdout_lines | select('match', '(?i)^passwordauthentication no$') | list | length == 1
+        quiet: true
+
+    - name: Assert the real edge SSH keys are installed for the test user
+      ansible.builtin.slurp:
+        src: /root/.ssh/authorized_keys
+      register: edge_keys
+
+    - name: Check the key content
+      ansible.builtin.assert:
+        that:
+          - "(edge_keys.content | b64decode).splitlines() | select('match', '^ssh-') | list | length >= 1"
+        quiet: true
+
+    - name: Assert the notify hook and the disk-space and update units exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /usr/local/bin/notify-failure.sh
+        - /etc/systemd/system/disk-space-check.timer
+        - /etc/systemd/system/zypper-dup.timer
+      register: edge_files
+
+    - name: Assert they exist
+      ansible.builtin.assert:
+        that: edge_files.results | map(attribute='stat.exists') | select('equalto', false) | list | length == 0
+        quiet: true

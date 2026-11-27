@@ -1,0 +1,12 @@
+---
+# Long-running units on this host with OnFailure=notify-failure@%n.service. Read by
+# wahlberger.homelab.hush_recovery. Every such unit must be listed (see CLAUDE.md).
+# caddy.service and semaphore.service are covered by hush_systemd_watched_units in
+# the hush role, so they are not listed here. Oneshot units (disk-space-check,
+# restic-backup, zypper-dup) are not listed either.
+# A drop-in restart of zerotier.service drops the ZeroTier link this run connects
+# over: run the apply in a window where that is acceptable.
+hush_recovery_units:
+  - beszel-agent.service
+  - ssh-login-notify.service
+  - zerotier.service

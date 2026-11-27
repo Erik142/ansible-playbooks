@@ -1,0 +1,13 @@
+---
+- name: Restart samba
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - smb
+    - nmb
+  when: not ansible_check_mode
+
+- name: Reload the systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true

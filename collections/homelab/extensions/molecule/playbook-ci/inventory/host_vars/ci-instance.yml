@@ -1,0 +1,11 @@
+---
+# Container-only overrides for the ci instance. Everything else comes from the real
+# inventories/ci group_vars (rendered into .generated/ci by scripts/molecule-inventory.py).
+ansible_python_interpreter: /usr/bin/python3
+# The real account does not exist in a bare container, and the docker connection runs
+# as the container user.
+ansible_user: root
+ssh_authorized_keys_user: root
+# Renders the runner's config and Quadlet only. The rootless Podman it runs under and
+# the ZeroTier route it needs are not in a container.
+forgejo_runner_skip_runtime: true

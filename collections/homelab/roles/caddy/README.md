@@ -1,0 +1,73 @@
+# caddy
+
+Reverse proxy with automatic HTTPS via **DNS-01** (Cloudflare), not HTTP-01:
+this host has no public inbound port (it's a home NAS reached over
+ZeroTier/LAN, not a public VM like the edge host), so Let's Encrypt
+can't reach it on port 80 to validate a certificate. DNS-01 only needs
+outbound access to Cloudflare's API and Let's Encrypt, which the host already
+has. It also creates the shared `caddy.network` Podman network that backend
+services (`tandoor`, `paperless_ngx`) attach to. `caddy_extra_networks` (default
+`[]`) lists further Quadlet networks the container joins, for example
+`garage.network`; the role that owns that network must run before this one.
+
+## Why a custom-built image
+
+The **official** `caddy:2` image has no DNS provider plugins compiled in —
+DNS-01 requires the `caddy-dns/cloudflare` Caddy module, which only ships via
+a custom build. `files/Containerfile` builds one with `xcaddy`
+(`caddy:2-builder` → `github.com/caddy-dns/cloudflare` → copied onto stock
+`caddy:2`), and the role builds it locally with `containers.podman.podman_image`
+before deploying the container — no external/third-party image required.
+
+## Role variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `caddy_acme_challenge` | `dns` | `dns`: DNS-01 via Cloudflare (default, NAS/ops/ci). `http`: HTTP-01 on port 80 with `caddy_http_image`; no Cloudflare token, no image build. Use `http` only on a host reachable from the internet (the edge host). |
+| `caddy_http_image` | `docker.io/library/caddy:2` | Stock image used when `caddy_acme_challenge` is `http`. |
+| `caddy_image` | `localhost/caddy-cloudflare:2` | Tag of the locally built image (`dns` mode only). |
+| `caddy_data_dir` | `/mnt/containers/caddy` | Host dir for the build context, Caddyfile, and state (certs in `data/`). |
+| `caddy_build_dir` | `{{ caddy_data_dir }}/build` | Host dir holding the Containerfile build context. |
+| `caddy_http_port` | `80` | Host port → container 80. |
+| `caddy_https_port` | `443` | Host port → container 443. |
+| `caddy_acme_email` | `""` | Let's Encrypt account email (optional). |
+| `caddy_sites` | `[]` | List of `{ host, upstream, extra? }` or `{ host, body }` to serve. |
+
+Cloudflare API token: set `vault_cloudflare_dns_api_token` in Ansible Vault,
+surfaced as `cloudflare_dns_api_token` in `vars.yml` — a scoped token with
+`Zone:DNS:Edit` on the `wahlberger.dev` zone (needs no other permission). If
+migrating from rpi-karlsruhe, reuse its existing token instead of minting a
+new one — same zone, same purpose.
+
+## Adding a site
+
+Add an entry to `caddy_sites` (in `group_vars`) and re-run — no host edits:
+
+```yaml
+caddy_sites:
+  - host: recipes.de.int.wahlberger.dev
+    upstream: "tandoor:80"
+```
+
+Each `host` needs a DNS **A/AAAA record** pointing at wherever clients
+actually reach this host (its LAN or ZeroTier IP) — DNS-01 doesn't require it
+to resolve to a public IP, unlike HTTP-01. Certificates persist in
+`/mnt/containers/caddy/data` — back that up.
+
+## Sites with a custom body
+
+Set `body` instead of `upstream` when a site needs its own routing. The block
+renders as `<host> { <body> }` with no generated `reverse_proxy`:
+
+```yaml
+caddy_sites:
+  - host: s3.example.test
+    body: |
+      handle {
+        reverse_proxy garage:3900
+      }
+```
+
+`body` excludes `upstream` and `extra`, and an entry needs either `body` or
+`upstream`. Any other combination fails before the role changes anything,
+naming the entry's `host`. Entries without `body` render exactly as before.

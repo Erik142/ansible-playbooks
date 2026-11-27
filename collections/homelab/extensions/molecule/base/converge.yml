@@ -1,0 +1,17 @@
+---
+# Converges the container-ok roles. Left out (need devices, Podman or real hosts):
+# firewall, podman, zerotier, beszel_agent, caddy, semaphore, samba, storage, btrbk.
+- name: Converge the base roles
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - role: wahlberger.homelab.common
+    - role: wahlberger.homelab.notify_failure
+    - role: wahlberger.homelab.disk_space
+    - role: wahlberger.homelab.ssh_authorized_keys
+    - role: wahlberger.homelab.security
+    - role: wahlberger.homelab.reboot_notify
+    - role: wahlberger.homelab.netcup_network
+    - role: wahlberger.homelab.cloudflare_dns
+    - role: wahlberger.homelab.restic_backup

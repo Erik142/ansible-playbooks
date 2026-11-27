@@ -1,0 +1,41 @@
+---
+# Weekly `zypper patch` through zypper-autopatch.timer (method patch). The reboot
+# request goes through request-reboot-if-needed.sh, as the NAS had it before.
+- name: Deploy the reboot-request script
+  ansible.builtin.template:
+    src: request-reboot-if-needed.sh.j2
+    dest: /usr/local/bin/request-reboot-if-needed.sh
+    owner: root
+    group: root
+    mode: "0700"
+  when: (security_autoupdate_enabled | bool) and (security_autoupdate_reboot | bool)
+
+- name: Deploy the automatic-patching systemd service
+  ansible.builtin.template:
+    src: zypper-autopatch.service.j2
+    dest: /etc/systemd/system/zypper-autopatch.service
+    owner: root
+    group: root
+    mode: "0644"
+  when: security_autoupdate_enabled | bool
+  notify: Reload systemd
+
+- name: Deploy the automatic-patching systemd timer
+  ansible.builtin.template:
+    src: zypper-autopatch.timer.j2
+    dest: /etc/systemd/system/zypper-autopatch.timer
+    owner: root
+    group: root
+    mode: "0644"
+  when: security_autoupdate_enabled | bool
+  notify: Reload systemd
+
+- name: Apply pending handlers before enabling the timer
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start the automatic-patching timer
+  ansible.builtin.systemd:
+    name: zypper-autopatch.timer
+    enabled: true
+    state: started
+  when: security_autoupdate_enabled | bool

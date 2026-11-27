@@ -1,0 +1,56 @@
+---
+# Renders a root-only environment file with FreshRSS's config and secrets, then deploys
+# the Quadlet via the generic `container` role. Secrets come from Ansible Vault
+# (surfaced under friendly names in group_vars). FreshRSS does not auto-create OIDC
+# users, so the entrypoint pre-creates an admin whose name must equal the OIDC claim.
+- name: Validate FreshRSS inputs are present
+  ansible.builtin.assert:
+    that:
+      - freshrss_app_url | length > 0
+      - freshrss_admin_user | length > 0
+      - freshrss_oidc_client_id | length > 0
+      - freshrss_oidc_client_secret | length > 0
+      - freshrss_oidc_crypto_key | length > 0
+      - freshrss_admin_password | length > 0
+    fail_msg: >-
+      FreshRSS is not fully configured. Set freshrss_app_url, freshrss_admin_user and
+      freshrss_oidc_client_id in group_vars, and provide the Vault secrets
+      vault_freshrss_oidc_client_secret, vault_freshrss_oidc_crypto_key and
+      vault_freshrss_admin_password (run with --ask-vault-pass). See
+      roles/freshrss/README.md.
+    quiet: true
+
+- name: Ensure the FreshRSS host directories exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ freshrss_data_dir }}"
+      owner: root
+      group: root
+      mode: "0750"
+    - path: "{{ freshrss_db_dir }}"
+      owner: "{{ freshrss_data_uid }}"
+      group: "{{ freshrss_data_gid }}"
+      mode: "0750"
+
+# 0600 so the secrets are not exposed in the world-readable Quadlet unit. A change
+# restarts the container through the handler below (flushed inside the include).
+- name: Render the FreshRSS environment file
+  ansible.builtin.template:
+    src: freshrss.env.j2
+    dest: "{{ freshrss_data_dir }}/freshrss.env"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart freshrss
+
+- name: Deploy the FreshRSS container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: freshrss
+    container_quadlet_src: freshrss.container.j2

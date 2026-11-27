@@ -1,0 +1,94 @@
+---
+# Asserts the nas host's container-ok configuration, using the values the real nas
+# inventory sets (security role pins: patch method, 03:00 slot, best-effort reboots).
+# The dup-timer and rebootmgr checks in ../base/verify.yml do not apply here.
+- name: Verify the nas container-ok roles
+  hosts: nas
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Dump the effective sshd configuration
+      ansible.builtin.command: sshd -T
+      register: nas_sshd
+      changed_when: false
+
+    - name: Assert the nas sshd policy
+      ansible.builtin.assert:
+        that:
+          - nas_sshd.stdout_lines | select('match', '(?i)^permitrootlogin no$') | list | length == 1
+          - nas_sshd.stdout_lines | select('match', '(?i)^passwordauthentication no$') | list | length == 1
+          - nas_sshd.stdout_lines | select('match', '(?i)^allowusers erikwahlberger$') | list | length == 1
+        quiet: true
+
+    - name: Assert the real nas SSH keys are installed for the test user
+      ansible.builtin.slurp:
+        src: /root/.ssh/authorized_keys
+      register: nas_keys
+
+    - name: Check the key content
+      ansible.builtin.assert:
+        that:
+          - "(nas_keys.content | b64decode).splitlines() | select('match', '^ssh-') | list | length >= 1"
+        quiet: true
+
+    - name: Assert the notify and disk-space units exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /usr/local/bin/notify-failure.sh
+        - /etc/systemd/system/disk-space-check.timer
+        - /etc/systemd/system/zypper-autopatch.timer
+      register: nas_files
+
+    - name: Assert they exist
+      ansible.builtin.assert:
+        that: nas_files.results | map(attribute='stat.exists') | select('equalto', false) | list | length == 0
+        quiet: true
+
+    - name: Assert the dup timer is absent (the nas uses patch)
+      ansible.builtin.stat:
+        path: /etc/systemd/system/zypper-dup.timer
+      register: nas_dup
+
+    - name: Assert it is gone
+      ansible.builtin.assert:
+        that: not nas_dup.stat.exists
+        quiet: true
+
+    - name: Read the Hush API stand-in log
+      ansible.builtin.slurp:
+        src: /var/log/hush-mock.log
+      register: nas_hush_log
+
+    - name: Parse the maintenance window calls
+      ansible.builtin.set_fact:
+        nas_hush_posts: "{{ (nas_hush_log.content | b64decode).splitlines() | select('match', '^POST /maintenance/windows ') | list }}"
+        nas_hush_deletes: "{{ (nas_hush_log.content | b64decode).splitlines() | select('match', '^DELETE /maintenance/windows/') | list }}"
+
+    - name: Assert a window was opened and closed with the same id
+      ansible.builtin.assert:
+        that:
+          - nas_hush_posts | length >= 1
+          - nas_hush_deletes | length >= 1
+          - nas_hush_posts[0] is search('ansible-nas-')
+          - nas_hush_deletes[-1] is search(nas_hush_posts[0] | regex_search('ansible-nas-[0-9A-Za-z-]+'))
+        fail_msg: "hush maintenance window was not opened and closed for this apply"
+        quiet: true
+
+    - name: Read the list of units that receive a Hush drop-in
+      ansible.builtin.include_vars:
+        file: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/molecule/.generated/nas/group_vars/all/hush_recovery.yml"
+
+    - name: Stat the Hush drop-in for every listed unit
+      ansible.builtin.stat:
+        path: "/etc/systemd/system/{{ item }}.d/hush.conf"
+      loop: "{{ hush_recovery_units }}"
+      register: nas_hush_dropins
+
+    - name: Assert every listed unit has its Hush drop-in
+      ansible.builtin.assert:
+        that: nas_hush_dropins.results | map(attribute='stat.exists') | select('equalto', false) | list | length == 0
+        fail_msg: >-
+          hush_recovery did not write a drop-in for:
+          {{ nas_hush_dropins.results | selectattr('stat.exists', 'equalto', false) | map(attribute='item') | list }}
+        quiet: true

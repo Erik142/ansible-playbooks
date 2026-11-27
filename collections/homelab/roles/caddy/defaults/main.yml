@@ -1,0 +1,55 @@
+---
+# Default variables for the `caddy` role.
+
+# Locally built image (see files/Containerfile): the official caddy:2 image
+# has no DNS provider plugins, but this host needs DNS-01 (no public inbound
+# port for HTTP-01), which requires the caddy-dns/cloudflare module baked in.
+caddy_image: localhost/caddy-cloudflare:2
+
+# Certificate challenge. `dns` (default) uses DNS-01 through the Cloudflare
+# module in caddy_image, for hosts with no public inbound port. `http` uses HTTP-01
+# on port 80 with the stock image in caddy_http_image, for hosts that are reachable
+# from the internet (the edge host). Other roles keep `dns`, so they render as before.
+caddy_acme_challenge: dns
+caddy_http_image: docker.io/library/caddy:2
+
+# Host directory holding the build context, the rendered Caddyfile, and
+# Caddy's persistent state. Issued certificates live in <dir>/data — back
+# that up.
+caddy_data_dir: /mnt/containers/caddy
+caddy_build_dir: "{{ caddy_data_dir }}/build"
+
+# Host ports Caddy publishes. The container always uses 80/443 internally.
+caddy_http_port: 80
+caddy_https_port: 443
+
+# Email for Let's Encrypt registration (expiry notices). Empty = no account email.
+caddy_acme_email: ""
+
+# Sites Caddy serves. Each item is a dict:
+#   host:     public hostname (must resolve to this host's LAN/ZeroTier IP —
+#             DNS-01 doesn't need it reachable from the public internet)
+#   upstream: container_name:port to reverse_proxy to
+#   extra:    (optional) raw Caddy directives inserted into the site block
+# Set the real list in inventory group_vars.
+caddy_sites: []
+
+# Extra Quadlet networks the Caddy container joins besides caddy.network, as
+# Quadlet unit names (e.g. garage.network). The network units are deployed by
+# the role that owns the backend, which must run before this role.
+caddy_extra_networks: []
+# Host networking (ops): Caddy shares the host network namespace, so it sees client
+# addresses (needed by caddy_allowed_sources) and binds caddy_bind_address only.
+# No caddy.network and no published ports in that mode. Off keeps the NAS layout.
+caddy_containerfile_src: Containerfile
+# Digest-pinned variant (files/Containerfile.pinned, security review F-02): ops only.
+# Changing this forces an image rebuild, so the NAS keeps the default.
+caddy_host_network: false
+# The only address Caddy listens on (default_bind). Empty: no default_bind line.
+# Ops sets this to vm_zt_ip. Requires caddy_host_network to be meaningful.
+caddy_bind_address: ""
+# Client networks allowed to reach the sites (CIDR); every other source gets 403.
+# Empty: no client gate (the NAS behaviour).
+caddy_allowed_sources: []
+# Admin endpoint off and no port-80 redirect listener (DNS-01 needs neither).
+caddy_no_http_redirect: false

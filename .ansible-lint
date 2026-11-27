@@ -1,0 +1,13 @@
+# Lint scope: the collection and playbooks. Installed collection copies are excluded.
+profile: production
+
+exclude_paths:
+  - collections/ansible_collections/
+  - .ansible/
+  - .scratch/
+  - .github/
+  - collections/homelab/extensions/molecule/.generated/
+
+# Never published to Galaxy: installed from the repo as type: dir (requirements.yml).
+skip_list:
+  - galaxy[no-license]

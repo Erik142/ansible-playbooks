@@ -1,0 +1,41 @@
+---
+argument_specs:
+  main:
+    short_description: Homepage dashboard behind Caddy, linking services across playbooks.
+    options:
+      homepage_image:
+        type: str
+        required: false
+        description: Homepage container image.
+      homepage_data_dir:
+        type: path
+        required: false
+        description: Host directory for Homepage's rendered config.
+      homepage_title:
+        type: str
+        required: false
+        description: Dashboard page title.
+      homepage_url:
+        type: str
+        required: true
+        description: Public https:// URL Homepage is served on.
+      homepage_pocket_id_url:
+        type: str
+        required: false
+        description: Pocket ID URL linked from the dashboard (edge host).
+      homepage_freshrss_url:
+        type: str
+        required: false
+        description: FreshRSS URL linked from the dashboard (edge host).
+      homepage_uptime_kuma_url:
+        type: str
+        required: false
+        description: Uptime Kuma URL linked from the dashboard (edge host).
+      homepage_semaphore_url:
+        type: str
+        required: false
+        description: Semaphore UI URL linked from the dashboard (ops.de.wahlberger.dev).
+      homepage_truenas_url:
+        type: str
+        required: false
+        description: TrueNAS URL linked from the dashboard (a separate host in Sweden, not managed by this repo).

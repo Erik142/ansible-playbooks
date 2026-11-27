@@ -1,0 +1,71 @@
+---
+# Default variables for the `n8n` role. Every variable here is declared in
+# meta/argument_specs.yml.
+#
+# n8n workflow automation, phase 1 of architecture/ai-incident-remediation-pipeline.md:
+# the editor only, no workflows. Editor access goes through oauth2-proxy + Pocket ID
+# (forward_auth in the Caddy vhost); the /webhook/hush path bypasses it and is
+# authenticated by HMAC in the workflow itself (phase 2).
+
+# Pinned exact tag: the stable channel (2.48.8, docs.n8n.io/changelog). v3.x is
+# early access in the docs and a prerelease on GitHub, so it stays out until stable.
+# Do not use `latest`. Renovate proposes minor/patch bumps; majors stay manual.
+n8n_image: docker.io/n8nio/n8n:2.50.2
+
+# Host layout under /mnt/containers (restic/btrbk-covered like the other containers):
+#   <n8n_data_dir>/n8n.env            root-only env file (encryption key)
+#   <n8n_data_dir>/oauth2-proxy.env   root-only env file (OIDC client secret, cookie secret)
+#   <n8n_volume_dir>/                 mounted at /home/node/.n8n (SQLite DB, credentials, settings)
+n8n_data_dir: /mnt/containers/n8n
+n8n_volume_dir: "{{ n8n_data_dir }}/data"
+
+# uid/gid the n8n image runs as (node). The volume must be owned by it, since
+# rootful Podman does no ID remapping.
+n8n_uid: 1000
+n8n_gid: 1000
+
+n8n_timezone: Europe/Berlin
+n8n_port: 5678
+
+# REQUIRED: public https:// URL, set in group_vars. Must match the caddy_sites host.
+# Also the base of the Pocket ID redirect URI.
+n8n_url: ""
+
+# Caps from the phase 1 plan (NAS: 23 GiB RAM, 4 cores, ~18 GiB free).
+n8n_memory_max: 2G
+n8n_cpu_quota: 200%
+
+# Node types that must never run. executeCommand would give a workflow a shell
+# on the NAS. Documented by n8n as NODES_EXCLUDE.
+n8n_nodes_exclude: '["n8n-nodes-base.executeCommand"]'
+
+# --- oauth2-proxy (editor auth gate, same pattern as the edge host/uptime_kuma)
+n8n_oauth2_proxy_image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.6
+n8n_oauth2_proxy_port: 4180
+
+# Emails allowed through the editor gate (oauth2-proxy). The trusted-header hook logs in
+# only as the n8n user with the same email, so this list must stay short: one owner.
+n8n_allowed_emails: []
+
+# Diagnostics for the triage workflow (architecture/n8n-triage-workflow.md). The n8n-diag
+# key may run exactly one command: n8n-diag-bundle <unit>, and only for these units.
+# Public key of the n8n-diag key (private key lives in vault_n8n_diag_ssh_key). Empty = no access.
+n8n_diag_public_key: ""
+n8n_diag_units:
+  - btrbk.service
+  - db-dump.service
+  - restic-server.service
+  - restic-server-maintenance.service
+  - backup-disk-health.service
+  - caddy.service
+  - forgejo.service
+  - n8n.service
+  - oauth2-proxy.service
+  - immich-server.service
+  - tandoor.service
+  - paperless-ngx.service
+  - lab-grab.service
+
+# Pocket ID OIDC client for the editor. Not secret (a UUID). Create it in Pocket ID
+# with redirect URI "{{ n8n_url }}/oauth2/callback", then set it in group_vars.
+n8n_oidc_client_id: ""

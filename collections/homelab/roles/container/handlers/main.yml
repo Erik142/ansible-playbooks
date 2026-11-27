@@ -1,0 +1,42 @@
+---
+# Guarded restart (GS-AC-46). In check mode the Quadlet file is not written, so
+# the unit does not exist on a fresh host and a restart would fail. Check mode
+# therefore does nothing; a real apply reloads systemd, then restarts only if
+# the unit is installed. Handlers sharing a `listen` topic run in this order.
+# Rootless units (container_user set) belong to that user's systemd --user
+# instance: escalate to container_user and pass its XDG_RUNTIME_DIR.
+- name: Restart the container service
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true
+  become_user: "{{ container_user | default(omit) }}"
+  environment: >-
+    {{ {'XDG_RUNTIME_DIR': '/run/user/' ~ container_user_uid}
+       if (container_user | default('')) | length > 0 else {} }}
+  when:
+    - not ansible_check_mode
+    - not (container_skip_restart | default(false) | bool)
+
+- name: Gather service facts for the container unit check
+  ansible.builtin.service_facts:
+  when:
+    - not ansible_check_mode
+    - not (container_skip_restart | default(false) | bool)
+  listen: Restart the container service
+
+- name: Restart the container unit if installed
+  ansible.builtin.systemd:
+    name: "{{ container_name }}.service"
+    # Rootless: the unit belongs to container_user's systemd --user instance.
+    scope: "{{ 'user' if (container_user | default('')) | length > 0 else 'system' }}"
+    state: restarted
+  become: true
+  become_user: "{{ container_user | default(omit) }}"
+  environment: >-
+    {{ {'XDG_RUNTIME_DIR': '/run/user/' ~ container_user_uid}
+       if (container_user | default('')) | length > 0 else {} }}
+  when:
+    - not ansible_check_mode
+    - not (container_skip_restart | default(false) | bool)
+    - (container_name ~ '.service') in ansible_facts.services
+  listen: Restart the container service

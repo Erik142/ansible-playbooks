@@ -1,0 +1,23 @@
+---
+# Ends the window opened by open.yml. A failed close is not fatal: the window
+# then expires after hush_maintenance_duration_seconds.
+- name: Close the hush maintenance window for this apply
+  ansible.builtin.uri:
+    url: "{{ hush_maintenance_base_url }}/maintenance/windows/{{ hush_maintenance_window_id }}"
+    method: DELETE
+    headers:
+      Authorization: "Bearer {{ hush_maintenance_ansible }}"
+    status_code: [200, 404]
+    timeout: 15
+  no_log: true
+  failed_when: false
+  # Notifies Hush; changes nothing on the host, so it is not a change for idempotence.
+  changed_when: false
+  when:
+    - hush_maintenance_enabled | bool
+    - not ansible_check_mode
+    - hush_maintenance_host_names | length > 0
+    - hush_maintenance_ansible | default('') | length > 0
+    - hush_maintenance_window_id is defined
+    - hush_maintenance_open is defined
+    - hush_maintenance_open.status | default(0) in [200, 201]

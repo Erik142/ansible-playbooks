@@ -1,0 +1,176 @@
+---
+# Variables for edge.de.wahlberger.dev (wahlberger.homelab.edge). Non-secret. Secrets
+# live in the encrypted sibling vault.yml (vault id `edge`). Values pinned to the live
+# former Debian cloud host (cloud.wahlberger.dev) carry a "pinned" comment.
+
+# --- Connection -------------------------------------------------------------
+ansible_user: erikwahlberger
+
+# --- SSH access (ssh_authorized_keys role) ----------------------------------
+# Personal key and the ops Semaphore automation key (from= restricted to ops). The
+# revoked Pi automation key is not carried over.
+ssh_authorized_keys_list:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJSKdeHoK+WkyBI69OSZqn0sVqZPPDRs082S/IVoOeSu erikwahlberger@personal"
+  - 'from="62.238.112.178,10.243.25.185,172.29.30.0/24"
+    ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFWZ1IpLXNuFDDynKMtnh6q62R8cu+ojBoB2h0/QMPlr semaphore-automation@ops.de.wahlberger.dev'
+
+# --- Hardening (security role) ----------------------------------------------
+security_ssh_permit_root_login: "no"
+security_ssh_password_authentication: "no"
+security_ssh_allow_users:
+  - erikwahlberger
+security_sudoers_passwordless:
+  - erikwahlberger
+# pinned: the live host reboots automatically after updates that need it (boolean).
+security_autoupdate_reboot: true
+
+# --- ZeroTier (zerotier role) -----------------------------------------------
+# Same network as the home LAN. The identity in /opt/podman/zerotier keeps the member
+# address 10.243.203.116 (live host), so the ops, ci and NAS pins stay valid.
+zerotier_network_id: "8056c2e21cc5c789"
+
+# --- Firewall (firewall role, firewalld) ------------------------------------
+# pinned: public zone serves ssh, http and https. The ZeroTier zone is not used on
+# this host, so no interface is bound.
+firewall_allowed_services:
+  - ssh
+  - http
+  - https
+firewall_zerotier_interface: ""
+
+# --- Podman (podman role) ---------------------------------------------------
+# pinned: service data under /opt/podman (restic_backup covers it). The root filesystem
+# is used, so there is no mountpoint to require.
+podman_data_dir: /opt/podman
+podman_require_mountpoint: false
+
+# --- Beszel agent (beszel_agent role) ---------------------------------------
+beszel_agent_port: 45876
+# Hub public key (not secret). Same hub as ops and ci. The hub keypair is restored with
+# /opt/podman/beszel-hub, so this value stays valid.
+beszel_agent_hub_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKz/U0NWhnhm19QvVrNu6sVuXiEPVdoPCrGMC8MzTNdH"
+# pinned: the live host's `beszel` account is 999:989 (getent passwd beszel).
+beszel_agent_account_uid: 999
+beszel_agent_account_gid: 989
+
+# --- DNS (cloudflare_dns role) ----------------------------------------------
+# pinned: the public IPv4 of the host (the same address as the former cloud host, cloud.wahlberger.dev). The
+# role default would use the interface address.
+cloudflare_dns_ip: "49.13.141.178"
+cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token | default('') }}"
+# Own A record for this host, and CNAMEs for caddy_sites pointing at it.
+cloudflare_dns_cname_target: edge.de.wahlberger.dev
+
+# --- Reverse proxy (caddy role) ---------------------------------------------
+# pinned: HTTP-01 with the stock image, because the host is reachable from the internet.
+caddy_acme_challenge: http
+caddy_http_image: docker.io/library/caddy:2
+caddy_data_dir: /opt/podman/caddy
+caddy_acme_email: "ewahlberger@gmail.com"
+caddy_sites:
+  - host: id.wahlberger.dev
+    upstream: "pocket-id:1411"
+  - host: rss.wahlberger.dev
+    upstream: "freshrss:80"
+  - host: beszel.wahlberger.dev
+    upstream: "beszel-hub:8090"
+  # No upstream: the whole site is the Pocket ID auth gate (oauth2-proxy), and Caddy
+  # proxies to uptime-kuma only after the check passes.
+  - host: status.wahlberger.dev
+    extra: |
+      handle /oauth2/* {
+        reverse_proxy oauth2-proxy:4180
+      }
+      handle {
+        forward_auth oauth2-proxy:4180 {
+          uri /oauth2/auth
+          @error status 401
+          handle_response @error {
+            redir * /oauth2/sign_in?rd={scheme}://{host}{uri}
+          }
+        }
+        reverse_proxy uptime-kuma:3001
+      }
+
+# --- Pocket ID (pocket_id role) ---------------------------------------------
+pocket_id_app_url: "https://id.wahlberger.dev"
+
+# --- FreshRSS (freshrss role) -----------------------------------------------
+freshrss_app_url: "https://rss.wahlberger.dev"
+# Pocket ID username, lowercase. Must equal the OIDC preferred_username claim.
+freshrss_admin_user: "erikwahlberger"
+freshrss_oidc_client_id: "bfe9129b-8c6e-45b5-b67d-3534299fe264"
+# pinned: feed refresh every 10 minutes, offset 3 past the hour.
+freshrss_cron_min: "3,13,23,33,43,53"
+freshrss_oidc_client_secret: "{{ vault_freshrss_oidc_client_secret | default('') }}"
+freshrss_oidc_crypto_key: "{{ vault_freshrss_oidc_crypto_key | default('') }}"
+freshrss_admin_password: "{{ vault_freshrss_admin_password | default('') }}"
+
+# --- Beszel hub (beszel_hub role) -------------------------------------------
+beszel_hub_url: "https://beszel.wahlberger.dev"
+
+# --- Uptime Kuma (uptime_kuma role) -----------------------------------------
+uptime_kuma_url: "https://status.wahlberger.dev"
+uptime_kuma_oidc_client_id: "2b082607-f0ae-4c38-a6ca-7d3588de2e21"
+uptime_kuma_oidc_client_secret: "{{ vault_uptime_kuma_oidc_client_secret | default('') }}"
+uptime_kuma_cookie_secret: "{{ vault_uptime_kuma_cookie_secret | default('') }}"
+
+# --- Pocket ID encryption key (pocket_id role) ------------------------------
+# MUST be the existing value from the live instance. Do not generate a new one.
+pocket_id_encryption_key: "{{ vault_pocket_id_encryption_key | default('') }}"
+
+# --- Notifications (notify_failure, reboot_notify) --------------------------
+notify_failure_resend_api_key: "{{ vault_notify_failure_resend_api_key | default('') }}"
+# pinned: keep the existing hush source names so ops and the hush dashboard see no change.
+notify_failure_hush_source: hooks-cloud
+notify_failure_hush_token: "{{ vault_hush_source_hooks_cloud | default('') }}"
+# pinned: units that were watched on the live host. The role default lists the NAS units.
+notify_failure_state_units:
+  - beszel-agent.service
+  - beszel-hub.service
+  - caddy.service
+  - freshrss.service
+  - oauth2-proxy.service
+  - pocket-id.service
+  - uptime-kuma.service
+
+# --- Backups (restic_backup role) -------------------------------------------
+# Names kept from the live host so the NAS repository and hush sources are unchanged.
+restic_backup_rest_server_host: nas.de.int.wahlberger.dev
+restic_backup_rest_server_username: cloud
+restic_backup_rest_server_password: "{{ vault_restic_backup_rest_server_password | default('') }}"
+restic_backup_repo_password: "{{ vault_restic_backup_repo_password | default('') }}"
+restic_backup_hush_source: backup-cloud
+restic_backup_hush_hmac_secret: "{{ vault_hush_source_backup_cloud | default('') }}"
+restic_backup_forget_enabled: false
+# pinned: nightly at 04:30, as on the live host.
+restic_backup_on_calendar: "*-*-* 04:30:00"
+# The staging dir holds SQLite .backup snapshots. /opt/podman covers everything else.
+# The name of each snapshot must not end in .db or .sqlite, or the exclude list below
+# would drop it.
+restic_backup_paths:
+  - "{{ restic_backup_staging_dir }}"
+  - /opt/podman
+restic_backup_sqlite_databases:
+  - src: /opt/podman/pocket-id/data/pocket-id.db
+    name: pocket-id.snapshot
+  - src: /opt/podman/uptime-kuma/data/kuma.db
+    name: uptime-kuma.snapshot
+  - src: /opt/podman/beszel-hub/data.db
+    name: beszel-hub.snapshot
+# Live database files are excluded: their consistent copies are the staged snapshots.
+# FreshRSS's db.sqlite is not in the snapshot list (its integrity_check reports a column
+# type note, which fails the script), so it is backed up as a raw file. It runs in
+# journal_mode=delete, so there is no WAL. Fixing the type note is a separate task.
+# identity.secret (ZeroTier) and env files are NOT excluded, unlike the role default,
+# so a restore can recover them.
+restic_backup_exclude:
+  - "*.db"
+  - "*.db-wal"
+  - "*.db-shm"
+  - "*.partial"
+
+# --- Hush (hush_maintenance role) -------------------------------------------
+hush_maintenance_ansible: "{{ vault_hush_maintenance_ansible | default('') }}"
+hush_maintenance_host_names:
+  - edge.de.wahlberger.dev

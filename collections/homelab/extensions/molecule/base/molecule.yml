@@ -1,0 +1,66 @@
+---
+# Shared base scenario: the container-ok roles of wahlberger.homelab in one converge.
+# Run from collections/homelab/extensions:  molecule test -s base
+# Image: build/Dockerfile (docker build -t homelab-molecule:tumbleweed build).
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ${MOLECULE_PROJECT_DIRECTORY}/molecule/requirements.yml
+driver:
+  name: docker
+platforms:
+  - name: base-instance
+    image: homelab-molecule:tumbleweed
+    pre_build_image: true
+    privileged: true
+    cgroupns_mode: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /run
+      - /run/lock
+    command: /usr/lib/systemd/systemd
+provisioner:
+  name: ansible
+  inventory:
+    host_vars:
+      base-instance:
+        ansible_python_interpreter: /usr/bin/python3
+        notify_failure_resend_api_key: "molecule-fake-key-never-used"
+        notify_failure_hush_token: "molecule-fake-hush-token-never-used"
+        notify_failure_hush_source: molecule-base
+        # Root always exists in a bare container; the real user comes from initial provisioning.
+        ssh_authorized_keys_user: root
+        ssh_authorized_keys_list:
+          - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeMoleculeTestKeyNeverUsedXXXXXXXXXXXXXXX molecule-test"
+        cloudflare_dns_own_record_enabled: false
+        cloudflare_dns_cnames_enabled: false
+        cloudflare_dns_api_token: "molecule-fake-token-never-used"
+        # Test-only values from TEST-NET-1 (RFC 5737). The role writes a profile file, it never applies it.
+        netcup_network_interface: eth0
+        netcup_network_connection_name: molecule-test
+        netcup_network_ipv4_address: 192.0.2.10/24
+        netcup_network_gateway4: 192.0.2.1
+        netcup_network_dns: ["192.0.2.53"]
+        # rebootmgr settings are only rendered when the reboot path is on (default off).
+        security_autoupdate_reboot: true
+        restic_backup_repo_password: "molecule-fake-repo-password-never-used"
+        restic_backup_rest_server_password: "molecule-fake-rest-password-never-used"
+  env:
+    # Roles come from the repo's collection copy. The vault is never decrypted: the
+    # dummy password and identity stop ansible.cfg's 1Password scripts from running.
+    ANSIBLE_COLLECTIONS_PATH: ${MOLECULE_PROJECT_DIRECTORY}/../../../collections:~/.ansible/collections
+    ANSIBLE_VAULT_PASSWORD_FILE: ${MOLECULE_SCENARIO_DIRECTORY}/inventory/dummy-vault-pass
+    ANSIBLE_VAULT_IDENTITY_LIST: "lint@${MOLECULE_SCENARIO_DIRECTORY}/inventory/dummy-vault-pass"
+verifier:
+  name: ansible
+scenario:
+  test_sequence:
+    # Destroy first: a leftover instance record from an interrupted run would be reused.
+    - destroy
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - destroy

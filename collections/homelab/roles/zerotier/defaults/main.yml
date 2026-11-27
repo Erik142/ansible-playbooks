@@ -1,0 +1,28 @@
+---
+# Default variables for the `zerotier` role.
+
+zerotier_image: docker.io/zerotier/zerotier:1.14.2
+
+# Holds ZeroTier's identity keys — MUST persist across restarts, or every
+# restart generates a brand new identity that needs re-authorizing from
+# scratch in ZeroTier Central (or your router's controller), same as
+# rejoining the network for the first time.
+zerotier_data_dir: /opt/podman/zerotier
+# Owner of the data directory and its files: the uid/gid the ZeroTier container
+# writes them as (999 in the image). Setting it here makes the role own the
+# same value the container sets, so it does not flip back and forth on each run.
+zerotier_data_uid: 999
+zerotier_data_gid: 999
+
+# REQUIRED: the 16-character network ID from ZeroTier Central (or your
+# router's controller) — the same network the home LAN and the TrueNAS
+# instance in Sweden are already members of. Not secret (membership still
+# needs separate one-time authorization regardless of who knows the ID), so
+# it lives here in plaintext.
+zerotier_network_id: ""
+
+# Load the `tun` kernel module on the host (now and at every boot) before the
+# container starts. Needed under SELinux enforcing, where the container may not
+# trigger the module load itself. Turn off only on a host that builds tun in or
+# loads it by other means.
+zerotier_load_tun_module: true

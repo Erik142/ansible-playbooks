@@ -1,0 +1,34 @@
+---
+# Default variables for the `uptime_kuma` role.
+
+uptime_kuma_image: docker.io/louislam/uptime-kuma:2.5.12
+
+# Host directory holding the rendered oauth2-proxy environment file (0600).
+uptime_kuma_data_dir: /opt/podman/uptime-kuma
+
+# Host directory bind-mounted at /app/data (SQLite DB, uploaded icons). It was a named
+# volume on the old Debian host. Under /opt/podman so restic_backup covers it.
+uptime_kuma_db_dir: "{{ uptime_kuma_data_dir }}/data"
+
+# Owner of uptime_kuma_db_dir as on the live host (verified: 1000:1000). The container
+# runs as root.
+uptime_kuma_data_uid: 1000
+uptime_kuma_data_gid: 1000
+
+# REQUIRED: public https:// URL Uptime Kuma is served on. Must match the caddy_sites
+# host and the OIDC redirect URI ("{{ uptime_kuma_url }}/oauth2/callback") registered in
+# Pocket ID.
+uptime_kuma_url: ""
+
+# --- oauth2-proxy (the auth gate; see README.md) ----------------------------
+uptime_kuma_oauth2_proxy_image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.6
+uptime_kuma_oauth2_proxy_port: 4180
+
+# REQUIRED: OAuth2 client ID issued by Pocket ID for "Uptime Kuma (oauth2-proxy)". Not
+# secret (a UUID).
+uptime_kuma_oidc_client_id: ""
+
+# REQUIRED secrets, from Ansible Vault (surfaced in group_vars).
+uptime_kuma_oidc_client_secret: ""
+# exactly 32 raw bytes, base64-encoded: openssl rand -base64 32 | tr -- '+/' '-_'
+uptime_kuma_cookie_secret: ""

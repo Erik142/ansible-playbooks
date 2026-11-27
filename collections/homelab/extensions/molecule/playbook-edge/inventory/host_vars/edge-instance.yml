@@ -1,0 +1,8 @@
+---
+# Container-only overrides for the edge instance. Everything else comes from the real
+# inventories/edge group_vars (rendered into .generated/edge by scripts/molecule-inventory.py).
+ansible_python_interpreter: /usr/bin/python3
+# The real account does not exist in a bare container, and the docker connection runs
+# as the container user.
+ansible_user: root
+ssh_authorized_keys_user: root

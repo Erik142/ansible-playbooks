@@ -1,0 +1,75 @@
+---
+argument_specs:
+  main:
+    short_description: Run FreshRSS as a Podman Quadlet with Pocket ID OIDC login.
+    options:
+      freshrss_image:
+        type: str
+        required: false
+        description: FreshRSS container image (pin a version).
+      freshrss_data_dir:
+        type: path
+        required: false
+        description: Host directory for the root-only (0600) environment file and the data directory.
+      freshrss_db_dir:
+        type: path
+        required: false
+        description: Host directory bind-mounted at /var/www/FreshRSS/data (DB and config).
+      freshrss_data_uid:
+        type: int
+        required: false
+        description: Owner UID of freshrss_db_dir (verify against the live container).
+      freshrss_data_gid:
+        type: int
+        required: false
+        description: Owner GID of freshrss_db_dir.
+      freshrss_app_url:
+        type: str
+        required: true
+        description: Public https URL FreshRSS is served on (must match DNS and the Caddy site).
+      freshrss_admin_user:
+        type: str
+        required: true
+        description: >-
+          FreshRSS admin username. MUST match the Pocket ID username exactly (lowercase),
+          or OIDC login fails with a 403.
+      freshrss_admin_email:
+        type: str
+        required: false
+        description: Optional email stamped on the admin account.
+      freshrss_language:
+        type: str
+        required: false
+        description: UI and install language code.
+      freshrss_timezone:
+        type: str
+        required: false
+        description: Container timezone (TZ).
+      freshrss_cron_min:
+        type: str
+        required: false
+        description: Minutes field of the feed-refresh cron. Empty disables auto-refresh.
+      freshrss_trusted_proxy:
+        type: str
+        required: false
+        description: CIDR(s) FreshRSS trusts as the reverse proxy (mod_remoteip).
+      freshrss_oidc_provider_metadata_url:
+        type: str
+        required: false
+        description: OIDC discovery URL. Defaults to Pocket ID's well-known endpoint.
+      freshrss_oidc_client_id:
+        type: str
+        required: true
+        description: OAuth2 client ID issued by Pocket ID for FreshRSS.
+      freshrss_oidc_scopes:
+        type: str
+        required: false
+        description: Space-separated OIDC scopes.
+      freshrss_oidc_remote_user_claim:
+        type: str
+        required: false
+        description: Claim mapped to the FreshRSS username.
+      freshrss_oidc_x_forwarded_headers:
+        type: str
+        required: false
+        description: Forwarded headers FreshRSS trusts to build the OIDC redirect URL.

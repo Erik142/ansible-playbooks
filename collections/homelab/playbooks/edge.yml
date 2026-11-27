@@ -1,0 +1,79 @@
+---
+# Full configuration of the edge host (openSUSE Tumbleweed): the public
+# ingress for Pocket ID, FreshRSS, Beszel and Uptime Kuma. Replaced the Debian
+# cloud host (cloud.wahlberger.dev).
+# Run from the repo root (check mode first, always):
+#   ansible-playbook wahlberger.homelab.edge --check --diff
+#   ansible-playbook wahlberger.homelab.edge
+# Limit to one role: ansible-playbook wahlberger.homelab.edge --tags caddy
+- name: Configure the edge host
+  hosts: edge
+  become: true
+  gather_facts: true
+  pre_tasks:
+    # Hush maintenance window for this apply. Tagged always so a --tags run
+    # opens it too.
+    - name: Open the hush maintenance window
+      ansible.builtin.include_role:
+        name: wahlberger.homelab.hush_maintenance
+        tasks_from: open
+      tags: [always]
+  roles:
+    - role: wahlberger.homelab.common
+      tags: [common]
+    # Early: other roles' units hook OnFailure= into the unit this role deploys.
+    - role: wahlberger.homelab.notify_failure
+      tags: [notify_failure]
+    - role: wahlberger.homelab.disk_space
+      tags: [disk_space]
+    # Personal and Semaphore automation SSH keys, authorized before hardening.
+    - role: wahlberger.homelab.ssh_authorized_keys
+      tags: [ssh_authorized_keys]
+    # Harden the host before anything else listens on the network.
+    - role: wahlberger.homelab.security
+      tags: [security]
+    # After notify_failure (reuses its Resend credentials) and security
+    # (enables the reboot this role emails about).
+    - role: wahlberger.homelab.reboot_notify
+      tags: [reboot_notify]
+    - role: wahlberger.homelab.firewall
+      tags: [firewall]
+    - role: wahlberger.homelab.podman
+      tags: [podman]
+    # Reports to beszel_hub below (same host, over the Podman bridge). After
+    # podman: needs the rootful API socket to exist.
+    - role: wahlberger.homelab.beszel_agent
+      tags: [beszel_agent]
+    # Route to the home LAN (uptime_kuma reaches nas/pi private IPs over it).
+    - role: wahlberger.homelab.zerotier
+      tags: [zerotier]
+    # Ensure this host's public DNS records exist before Caddy needs them.
+    - role: wahlberger.homelab.cloudflare_dns
+      tags: [cloudflare_dns]
+    # Reverse proxy (creates the shared network), then the services behind it.
+    - role: wahlberger.homelab.caddy
+      tags: [caddy]
+    - role: wahlberger.homelab.pocket_id
+      tags: [pocket_id]
+    - role: wahlberger.homelab.freshrss
+      tags: [freshrss]
+    # Monitoring hub for beszel_agent on the homelab hosts, this one included.
+    - role: wahlberger.homelab.beszel_hub
+      tags: [beszel_hub]
+    # External watcher for the infrastructure, gated by oauth2-proxy and
+    # Pocket ID.
+    - role: wahlberger.homelab.uptime_kuma
+      tags: [uptime_kuma]
+    # Last: backs up what the roles above wrote under the Podman data dir.
+    - role: wahlberger.homelab.restic_backup
+      tags: [restic_backup]
+    # Hush "ok" drop-ins for every long-running unit with an OnFailure= hook.
+    # Last, so every unit exists.
+    - role: wahlberger.homelab.hush_recovery
+      tags: [hush_recovery]
+  post_tasks:
+    - name: Close the hush maintenance window
+      ansible.builtin.include_role:
+        name: wahlberger.homelab.hush_maintenance
+        tasks_from: close
+      tags: [always]

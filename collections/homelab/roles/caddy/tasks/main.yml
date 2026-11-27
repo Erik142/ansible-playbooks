@@ -1,0 +1,130 @@
+---
+# GS-FR-97 / GS-E-23: validate every site before anything changes. `body` is a
+# complete site block, so it excludes `upstream` and `extra`. Without `body`, a site
+# needs `upstream` or `extra` (the edge host's auth-gate site has only `extra`).
+- name: Validate the caddy_sites entries
+  ansible.builtin.assert:
+    that:
+      - site.body is not defined or (site.upstream is not defined and site.extra is not defined)
+      - site.body is defined or site.upstream is defined or site.extra is defined
+      - site.host is defined
+      - site.host is string
+      - site.host is match('^([*][.])?[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$')
+    fail_msg: >-
+      caddy_sites entry '{{ site.host | default('<no host>') }}' is invalid:
+      set either body (a complete site block, no upstream or extra) or
+      upstream (optionally with extra), and host must be a hostname of letters,
+      digits, dots and hyphens (optionally starting with '*.'). See roles/caddy/README.md.
+    quiet: true
+  loop: "{{ caddy_sites }}"
+  loop_control:
+    loop_var: site
+    label: "{{ site.host | default('<no host>') }}"
+
+- name: Validate the host-network settings before anything changes
+  ansible.builtin.assert:
+    that:
+      - not caddy_host_network | bool or (caddy_bind_address | length > 0 and caddy_allowed_sources | length > 0)
+      - >-
+        caddy_bind_address | length == 0 or caddy_bind_address is match(
+        '\A((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}'
+        ~ '(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\Z')
+      - caddy_bind_address != '0.0.0.0'
+    fail_msg: >-
+      caddy_host_network needs caddy_bind_address (an IPv4 address other than
+      0.0.0.0) and a non-empty caddy_allowed_sources. caddy_bind_address is
+      vm_zt_ip on ops.
+    quiet: true
+
+- name: Validate the caddy_acme_challenge value
+  ansible.builtin.assert:
+    that:
+      - caddy_acme_challenge in ['dns', 'http']
+    fail_msg: caddy_acme_challenge must be 'dns' or 'http'. See roles/caddy/README.md.
+    quiet: true
+
+- name: Validate the Cloudflare DNS API token is present
+  ansible.builtin.assert:
+    that:
+      - cloudflare_dns_api_token | length > 0
+    fail_msg: >-
+      cloudflare_dns_api_token is empty. Provide the Vault secret
+      vault_cloudflare_dns_api_token (run with --ask-vault-pass). See
+      roles/caddy/README.md.
+    quiet: true
+  when: caddy_acme_challenge == 'dns'
+
+- name: Create the Caddy directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ caddy_data_dir }}"
+    - "{{ caddy_data_dir }}/data"
+    - "{{ caddy_data_dir }}/config"
+    - "{{ caddy_build_dir }}"
+
+- name: Copy the Caddy Containerfile
+  ansible.builtin.copy:
+    src: "{{ caddy_containerfile_src }}"
+    dest: "{{ caddy_build_dir }}/Containerfile"
+    owner: root
+    group: root
+    mode: "0644"
+  register: caddy_containerfile
+  when: caddy_acme_challenge == 'dns'
+
+# Builds a Caddy image with the Cloudflare DNS module baked in (see
+# files/Containerfile) — the official image can't do DNS-01. `force` only
+# triggers a real rebuild when the Containerfile changed; otherwise this is a
+# no-op once the image already exists. HTTP-01 uses caddy_http_image and skips this.
+- name: Build the Caddy image with the Cloudflare DNS module
+  containers.podman.podman_image:
+    name: "{{ caddy_image }}"
+    path: "{{ caddy_build_dir }}"
+    state: build
+    force: "{{ caddy_containerfile.changed }}"
+  when: caddy_acme_challenge == 'dns'
+  notify: Restart caddy
+
+- name: Deploy the Caddy network Quadlet
+  ansible.builtin.copy:
+    src: caddy.network
+    dest: /etc/containers/systemd/caddy.network
+    owner: root
+    group: root
+    mode: "0644"
+  when: not caddy_host_network | bool
+  notify: Restart caddy
+
+# Cloudflare token, rendered root-only so it never appears in the
+# world-readable Quadlet unit or Caddyfile. Referenced from the Caddyfile as
+# {env.CLOUDFLARE_API_TOKEN}.
+- name: Render the Caddy environment file
+  ansible.builtin.template:
+    src: caddy.env.j2
+    dest: "{{ caddy_data_dir }}/caddy.env"
+    owner: root
+    group: root
+    mode: "0600"
+  when: caddy_acme_challenge == 'dns'
+  notify: Restart caddy
+
+- name: Render the Caddyfile
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: "{{ caddy_data_dir }}/Caddyfile"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart caddy
+
+- name: Deploy the Caddy container
+  ansible.builtin.include_role:
+    name: container
+  vars:
+    container_name: caddy
+    container_quadlet_src: caddy.container.j2

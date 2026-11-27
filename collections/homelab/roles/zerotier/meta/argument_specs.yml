@@ -1,0 +1,29 @@
+---
+argument_specs:
+  main:
+    short_description: Joins this host to the home ZeroTier overlay network.
+    options:
+      zerotier_image:
+        type: str
+        required: false
+        description: Pinned zerotier/zerotier image tag.
+      zerotier_data_dir:
+        type: path
+        required: false
+        description: Host directory persisting ZeroTier's identity keys across restarts.
+      zerotier_data_uid:
+        type: int
+        required: false
+        description: Owner uid of zerotier_data_dir and its files, the uid the container writes them as.
+      zerotier_data_gid:
+        type: int
+        required: false
+        description: Group gid of zerotier_data_dir and its files, the gid the container writes them as.
+      zerotier_network_id:
+        type: str
+        required: true
+        description: 16-character ZeroTier network ID to join.
+      zerotier_load_tun_module:
+        type: bool
+        required: false
+        description: Load the tun kernel module on the host (modules-load.d plus modprobe) before the container starts.

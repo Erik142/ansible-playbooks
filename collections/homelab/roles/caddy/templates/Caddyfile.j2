@@ -1,0 +1,44 @@
+{# Rendered by Ansible from the caddy_sites variable — do not edit on the host. #}
+{
+{% if caddy_acme_email | length > 0 %}
+    email {{ caddy_acme_email }}
+{% endif %}
+{% if caddy_bind_address | length > 0 %}
+    # Host networking: bind the given address only (the ZeroTier address on ops).
+    default_bind {{ caddy_bind_address }}
+{% endif %}
+{% if caddy_no_http_redirect | bool %}
+    # No admin endpoint and no port-80 listener: DNS-01 needs neither.
+    admin off
+    auto_https disable_redirects
+{% endif %}
+{% if caddy_acme_challenge == 'dns' %}
+    # DNS-01 via Cloudflare: this host has no public inbound port for
+    # HTTP-01. The token comes from caddy.env, never written here.
+    acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+{% endif %}
+}
+{% for site in caddy_sites %}
+{{ site.host }} {
+{% if site.body is defined %}
+{{ site.body | trim | indent(4, true) }}
+{% else %}
+{% if caddy_allowed_sources | length > 0 %}
+    # One access-log line per request, with the client address.
+    log {
+        output stdout
+        format json
+    }
+    # Anything outside the allow list gets 403.
+    @denied not remote_ip {{ caddy_allowed_sources | join(' ') }}
+    respond @denied 403
+{% endif %}
+{% if site.upstream is defined %}
+    reverse_proxy {{ site.upstream }}
+{% endif %}
+{% if site.extra | default("", true) | length > 0 %}
+    {{ site.extra }}
+{% endif %}
+{% endif %}
+}
+{% endfor %}

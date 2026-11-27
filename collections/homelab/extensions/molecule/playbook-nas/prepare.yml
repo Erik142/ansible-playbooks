@@ -1,0 +1,76 @@
+---
+# Runs before converge in the nas scenario.
+#
+# 1. The Hush API stand-in: hush_maintenance opens and closes a window over HTTP, so
+#    a local mock records those calls (verify.yml reads the log).
+# 2. Stand-in units for hush_recovery: the role restarts every listed unit whose
+#    drop-in changed, so each listed unit must exist. The units are oneshots that do
+#    nothing; the real units are not deployed in a container.
+- name: Prepare the nas container
+  # molecule's tags option (the playbook's --tags) applies to every playbook it runs.
+  # Without this, the untagged tasks here would be filtered out and never run.
+  tags: [always]
+  hosts: nas
+  become: true
+  gather_facts: false
+  vars:
+    nas_rendered_hush: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/molecule/.generated/nas/group_vars/all/hush_recovery.yml"
+  tasks:
+    - name: Install the Hush API stand-in
+      ansible.builtin.copy:
+        src: hush_mock.py
+        dest: /usr/local/bin/hush-mock.py
+        mode: "0755"
+
+    - name: Describe the Hush API stand-in as a unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/hush-mock.service
+        content: |
+          [Unit]
+          Description=Hush API stand-in for molecule
+
+          [Service]
+          ExecStart=/usr/bin/python3 /usr/local/bin/hush-mock.py
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+        mode: "0644"
+
+    - name: Start the Hush API stand-in
+      ansible.builtin.systemd:
+        name: hush-mock
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: Wait until the Hush API stand-in answers
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 8099
+        timeout: 30
+
+    - name: Read the rendered hush_recovery list
+      ansible.builtin.include_vars:
+        file: "{{ nas_rendered_hush }}"
+
+    - name: Create a stand-in oneshot for every listed unit
+      ansible.builtin.copy:
+        dest: "/etc/systemd/system/{{ item }}"
+        content: |
+          [Unit]
+          Description=molecule stand-in for {{ item }}
+
+          [Service]
+          Type=oneshot
+          ExecStart=/bin/true
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+        mode: "0644"
+      loop: "{{ hush_recovery_units }}"
+
+    - name: Reload systemd with the stand-in units
+      ansible.builtin.systemd:
+        daemon_reload: true

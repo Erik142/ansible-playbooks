@@ -1,0 +1,55 @@
+[Unit]
+Description=Caddy reverse proxy
+{% if caddy_host_network | bool %}
+# After zerotier.service: the bind address only exists once ZeroTier is up. If it
+# is not there yet Caddy exits and Restart=always retries.
+After=network-online.target{% if caddy_bind_address | length > 0 %} zerotier.service{% endif %}
+
+Wants=network-online.target{% if caddy_bind_address | length > 0 %} zerotier.service{% endif %}
+{% else %}
+After=network-online.target caddy-network.service{% for n in caddy_extra_networks %} {{ n | regex_replace('\\.network$', '') }}-network.service{% endfor %}
+
+Wants=network-online.target
+Requires=caddy-network.service{% for n in caddy_extra_networks %} {{ n | regex_replace('\\.network$', '') }}-network.service{% endfor %}
+{% endif %}
+
+# Emails ewahlberger@gmail.com via Resend after 5 consecutive failures —
+# see the notify_failure role.
+OnFailure=notify-failure@%n.service
+
+[Container]
+ContainerName=caddy
+Image={{ caddy_http_image if caddy_acme_challenge == 'http' else caddy_image }}
+{% if caddy_host_network | bool %}
+# Host networking: Caddy sees the real client addresses (the caddy_allowed_sources
+# check depends on it) and binds caddy_bind_address through default_bind.
+Network=host
+{% else %}
+Network=caddy.network
+{% for n in caddy_extra_networks %}
+Network={{ n }}
+{% endfor %}
+PublishPort={{ caddy_http_port }}:80
+PublishPort={{ caddy_https_port }}:443
+{% endif %}
+{% if caddy_acme_challenge == 'dns' %}
+# Cloudflare DNS API token for the DNS-01 challenge, rendered to a root-only
+# 0600 file by the caddy role from Ansible Vault.
+EnvironmentFile={{ caddy_data_dir }}/caddy.env
+{% endif %}
+Volume={{ caddy_data_dir }}/Caddyfile:/etc/caddy/Caddyfile:Z,ro
+Volume={{ caddy_data_dir }}/data:/data:Z
+Volume={{ caddy_data_dir }}/config:/config:Z
+
+[Service]
+# SIGTERM (143) is the normal stop of a container; systemd would count it as a failure and fire OnFailure=.
+SuccessExitStatus=143
+Restart=always
+{% if caddy_host_network | bool %}
+# Without this, repeated bind failures (address not there yet) hit systemd's
+# start limit within seconds and the unit would stay failed.
+RestartSec=10
+{% endif %}
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,33 @@
+# Scaffold for the edge host's Ansible Vault (vault id `edge`). Copy to vault.yml,
+# fill in the values, then encrypt with:
+#   ansible-vault encrypt --encrypt-vault-id edge inventories/edge/group_vars/all/vault.yml
+# Values are copied from the Debian host's vault (edge host). Do not commit
+# plaintext.
+
+# Cloudflare API token (Zone:DNS:Edit on wahlberger.dev), for cloudflare_dns.
+vault_cloudflare_dns_api_token: ""
+
+# Resend API key for notify_failure and reboot_notify.
+vault_notify_failure_resend_api_key: ""
+
+# Hush tokens. hooks-cloud and backup-cloud keep the names of the live host.
+vault_hush_source_hooks_cloud: ""
+vault_hush_source_backup_cloud: ""
+vault_hush_maintenance_ansible: ""
+
+# Pocket ID data-encryption key. MUST equal the live instance's key.
+vault_pocket_id_encryption_key: ""
+
+# FreshRSS: OIDC client secret, crypto key, break-glass admin password.
+vault_freshrss_oidc_client_secret: ""
+vault_freshrss_oidc_crypto_key: ""
+vault_freshrss_admin_password: ""
+
+# Uptime Kuma: oauth2-proxy client secret and cookie secret.
+vault_uptime_kuma_oidc_client_secret: ""
+vault_uptime_kuma_cookie_secret: ""
+
+# restic: repository password and REST server password. Both must equal the NAS
+# values (the NAS holds the same secrets for repo `cloud`).
+vault_restic_backup_repo_password: ""
+vault_restic_backup_rest_server_password: ""

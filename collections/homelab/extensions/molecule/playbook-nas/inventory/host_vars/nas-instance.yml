@@ -1,0 +1,10 @@
+---
+# Container-only overrides for the nas instance. Everything else comes from the real
+# inventories/nas group_vars (rendered into .generated/nas by scripts/molecule-inventory.py).
+ansible_python_interpreter: /usr/bin/python3
+# The real account does not exist in a bare container, and the docker connection runs
+# as the container user.
+ansible_user: root
+ssh_authorized_keys_user: root
+# The Hush API stand-in (files/hush_mock.py, started in prepare.yml), not the real host.
+hush_maintenance_base_url: "http://127.0.0.1:8099"
