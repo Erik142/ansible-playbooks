@@ -8,7 +8,7 @@ readme: README.md
 authors:
   - Erik Wahlberger
 description: Roles and playbooks for the wahlberger.dev homelab hosts (openSUSE only).
-repository: https://github.com/Erik142/ansible-playbooks
+repository: https://github.com/Erik142/infra-homelab
 tags:
   - linux
   - networking

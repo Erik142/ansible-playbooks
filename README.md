@@ -1,6 +1,6 @@
 # infra-homelab
 
-[![CI](https://github.com/Erik142/ansible-playbooks/actions/workflows/ci.yml/badge.svg)](https://github.com/Erik142/ansible-playbooks/actions/workflows/ci.yml)
+[![CI](https://github.com/Erik142/infra-homelab/actions/workflows/ci.yml/badge.svg)](https://github.com/Erik142/infra-homelab/actions/workflows/ci.yml)
 
 Infrastructure-as-code for Erik's homelab. Four hosts share the
 `wahlberger.homelab` collection (roles and playbooks in
