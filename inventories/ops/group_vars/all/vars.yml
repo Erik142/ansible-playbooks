@@ -156,6 +156,14 @@ restic_backup_rest_server_host: nas.de.int.wahlberger.dev
 restic_backup_rest_server_port: 8000
 restic_backup_rest_server_username: ops
 restic_backup_forget_enabled: false
+# Every SQLite database on ops, each as a consistent .backup copy. Hush's database
+# was not backed up before. It is the one that holds alert history and decisions.
+# This list replaces the role default, so semaphore stays listed.
+restic_backup_sqlite_databases:
+  - src: /opt/podman/semaphore/data/database.sqlite
+    name: semaphore.sqlite
+  - src: /opt/podman/hush/data/hush.db
+    name: hush.snapshot
 # restic_backup_sqlite_required: not set, so the role default `true` applies. The
 # stopgap `false` of pull request A was deleted by pull request A3; the role is
 # first applied in step 5, after the database exists (step 4).
