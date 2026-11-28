@@ -49,9 +49,12 @@ security_autoupdate_reboot: true
 security_sudoers_passwordless: []
 
 # --- SSH access (ssh_authorized_keys role) ------------------------------------------
-# Personal key only. The ops playbook's automation key does not apply here.
+# Personal key and the ops Semaphore automation key (from= restricted to ops over
+# ZeroTier and the Semaphore container bridge). Same key as on edge.
 ssh_authorized_keys_list:
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJSKdeHoK+WkyBI69OSZqn0sVqZPPDRs082S/IVoOeSu erikwahlberger@personal"
+  - 'from="10.243.25.185,172.29.30.0/24"
+    ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFWZ1IpLXNuFDDynKMtnh6q62R8cu+ojBoB2h0/QMPlr semaphore-automation@ops.de.wahlberger.dev'
 ssh_authorized_keys_revoked: []
 
 # --- Containers / disk -------------------------------------------------------------
