@@ -2,7 +2,7 @@
 # Full configuration of the edge host (openSUSE Tumbleweed): the public
 # ingress for Pocket ID, FreshRSS, Beszel and Uptime Kuma. Replaced the Debian
 # cloud host (cloud.wahlberger.dev).
-# Run from the repo root (check mode first, always):
+# Run from ansible/ (check mode first, always):
 #   ansible-playbook wahlberger.homelab.edge --check --diff
 #   ansible-playbook wahlberger.homelab.edge
 # Limit to one role: ansible-playbook wahlberger.homelab.edge --tags caddy

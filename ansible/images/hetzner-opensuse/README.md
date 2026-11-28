@@ -93,7 +93,7 @@ Desktop on arm64: KIWI failed with `/dev/loop0p1 does not exist`).
 ```sh
 # on the builder (Debian/Ubuntu example)
 apt-get update && apt-get install -y podman git xz-utils        # or docker.io
-git clone <this repo> && cd ansible-playbooks/images/hetzner-opensuse
+git clone <this repo> && cd infra-homelab/ansible/images/hetzner-opensuse
 sudo ./build.sh --out /root/out --image-version 2026.10.11
 ```
 

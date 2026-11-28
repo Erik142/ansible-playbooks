@@ -1,10 +1,9 @@
 ---
-# Playbook scenario: the real edge.yml, restricted to the roles a container can run.
-# Run with the runner from the repo root:  scripts/molecule.sh playbook-edge
-# Skipped (need devices, Podman, Caddy or real hosts): firewall, podman, zerotier,
-# beszel_agent, caddy, pocket_id, freshrss, beszel_hub, uptime_kuma, hush,
-# cloudflare_dns, restic_backup, hush_recovery, snapper. cloudflare_dns and
-# restic_backup run in the base scenario.
+# Playbook scenario: the real ops.yml, restricted to the roles a container can run.
+# Run with the runner from ansible/:  scripts/molecule.sh playbook-ops
+# Skipped (need devices, Podman, Caddy/Semaphore or real hosts): firewall, podman,
+# zerotier, beszel_agent, caddy, semaphore, hush, restic_backup, cloudflare_dns,
+# hush_recovery, snapper. restic_backup and cloudflare_dns run in the base scenario.
 dependency:
   name: galaxy
   options:
@@ -12,7 +11,7 @@ dependency:
 driver:
   name: docker
 platforms:
-  - name: edge-instance
+  - name: ops-instance
     image: homelab-molecule:tumbleweed
     pre_build_image: true
     privileged: true
@@ -24,7 +23,7 @@ platforms:
       - /run/lock
     command: /usr/lib/systemd/systemd
     groups:
-      - edge
+      - ops
 provisioner:
   name: ansible
   options:
@@ -32,13 +31,13 @@ provisioner:
     # Replaces molecule's default skip list, so keep molecule-notest and notest (container-only tasks).
     skip-tags: always,molecule-notest,notest
   playbooks:
-    converge: ${MOLECULE_PROJECT_DIRECTORY}/../../../collections/ansible_collections/wahlberger/homelab/playbooks/edge.yml
+    converge: ${MOLECULE_PROJECT_DIRECTORY}/../../../collections/ansible_collections/wahlberger/homelab/playbooks/ops.yml
   inventory:
     # Real non-secret group_vars, rendered by scripts/molecule-inventory.py (vault
     # values are a generated stub, never the encrypted vault.yml). Container-only
     # overrides live in this scenario's inventory/host_vars.
     links:
-      group_vars: ${MOLECULE_PROJECT_DIRECTORY}/molecule/.generated/edge/group_vars
+      group_vars: ${MOLECULE_PROJECT_DIRECTORY}/molecule/.generated/ops/group_vars
       host_vars: ${MOLECULE_SCENARIO_DIRECTORY}/inventory/host_vars
   env:
     # Per-task timings in the job log (the repo's ansible.cfg enables the same callback).

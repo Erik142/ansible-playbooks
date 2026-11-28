@@ -1,12 +1,14 @@
 ---
-# Full configuration of the netcup CI host (ci.de.wahlberger.dev): a rootless Forgejo
-# Actions runner for the NAS Forgejo instance, reached over ZeroTier.
-# Run from the repo root (check mode first, always):
-#   ansible-playbook wahlberger.homelab.ci --check --diff
-#   ansible-playbook wahlberger.homelab.ci
-# Limit to one role: ansible-playbook wahlberger.homelab.ci --tags forgejo_runner
-- name: Configure the netcup CI host
-  hosts: ci
+# Full configuration of the ops host (ops.de.wahlberger.dev): Semaphore UI, Caddy,
+# hush, and the automation SSH key that Semaphore uses. Reached over ZeroTier only
+# (public SSH is key-only, but the workstation connects over ZeroTier).
+# Run from ansible/ (check mode first, always):
+#   ansible-playbook wahlberger.homelab.ops --check --diff
+#   ansible-playbook wahlberger.homelab.ops
+# Limit to one role: ansible-playbook wahlberger.homelab.ops --tags caddy
+# Semaphore's self-run skips semaphore,zerotier (see the ops README).
+- name: Configure the ops host
+  hosts: ops
   become: true
   gather_facts: true
   pre_tasks:
@@ -19,16 +21,12 @@
   roles:
     - role: wahlberger.homelab.common
       tags: [common]
-    # Static IPv4 from the NetworkManager profile. Writes the file only; never brings
-    # the connection down. Run --check --diff against the live profile first.
-    - role: wahlberger.homelab.netcup_network
-      tags: [netcup_network]
     # Early: other roles' units hook OnFailure= into the unit this role deploys.
     - role: wahlberger.homelab.notify_failure
       tags: [notify_failure]
     - role: wahlberger.homelab.disk_space
       tags: [disk_space]
-    # Authorized before hardening.
+    # Personal and Semaphore automation SSH keys, authorized before hardening.
     - role: wahlberger.homelab.ssh_authorized_keys
       tags: [ssh_authorized_keys]
     # Harden the host before anything else listens on the network.
@@ -40,18 +38,28 @@
       tags: [firewall]
     - role: wahlberger.homelab.podman
       tags: [podman]
-    # Needs ZeroTier's tun module and the rootless Podman it runs under.
+    # ZeroTier carries the UI and the monitoring traffic; it must be up before
+    # the services that bind to its address.
     - role: wahlberger.homelab.zerotier
       tags: [zerotier]
+    # After podman: needs its rootful API socket to grant this agent access.
     - role: wahlberger.homelab.beszel_agent
       tags: [beszel_agent]
-    # Publishes ci.de.int.wahlberger.dev -> the ZeroTier address (vm_zt_ip).
+    # DNS records before Caddy needs them for the DNS-01 certificate.
     - role: wahlberger.homelab.cloudflare_dns
       tags: [cloudflare_dns]
-    # Last: needs ZeroTier up (route to the NAS Forgejo) and rootless Podman.
-    - role: wahlberger.homelab.forgejo_runner
-      tags: [forgejo_runner]
-    # Last, so every unit exists; a changed drop-in restarts that unit.
+    - role: wahlberger.homelab.caddy
+      tags: [caddy]
+    - role: wahlberger.homelab.semaphore
+      tags: [semaphore]
+    # Hush alerting. ZeroTier only, behind caddy.
+    - role: wahlberger.homelab.hush
+      tags: [hush]
+    # Last: backs up what the roles above wrote under the Podman data dir.
+    - role: wahlberger.homelab.restic_backup
+      tags: [restic_backup]
+    # Hush "ok" drop-ins for the long-running units with an OnFailure= hook that the
+    # hush role does not cover. Last, so every unit exists.
     - role: wahlberger.homelab.hush_recovery
       tags: [hush_recovery]
   post_tasks:
