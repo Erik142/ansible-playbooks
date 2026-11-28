@@ -141,11 +141,15 @@ jobs:
           set -o pipefail
           scripts/molecule.sh ${{ matrix.scenario }} 2>&1 | tee molecule-output.log
 
+      # Fails on any ansible-core deprecation warning, except the two callback plugins
+      # ansible-core 2.22 reports when it lists its plugins (tree, oneline). Nothing in
+      # this repo configures them, and they are removed in 2.23: drop this exception then.
       - name: Fail on any ansible-core deprecation warning
         run: |
-          if grep -q '\[DEPRECATION WARNING\]' molecule-output.log; then
+          allowed='^\[DEPRECATION WARNING\]: (tree|oneline) has been deprecated\.'
+          if grep '\[DEPRECATION WARNING\]' molecule-output.log | grep -vE "$allowed" | grep -q .; then
             echo "::error::ansible-core deprecation warning(s) found"
-            grep '\[DEPRECATION WARNING\]' molecule-output.log
+            grep '\[DEPRECATION WARNING\]' molecule-output.log | grep -vE "$allowed"
             exit 1
           fi
 
