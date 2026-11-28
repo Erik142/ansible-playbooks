@@ -51,7 +51,7 @@ The role fails before any change when:
 The Tandoor password lives in the credentials file too, so rotate both together:
 
 ```sh
-ansible-playbook site.yml --tags tandoor,db_dump
+ansible-playbook wahlberger.homelab.nas --tags tandoor,db_dump --check --diff
 ```
 
 ## Role variables

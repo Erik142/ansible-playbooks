@@ -1,0 +1,17 @@
+---
+# One-off: partition and format the NAS backup disk. Run once per disk, against the
+# nas host, with --check first. Not a host playbook: nas.yml never imports it
+# (BD-FR-02). The init entry point refuses every destructive case itself
+# (see roles/backup_disk/README.md, "Refusal conditions").
+#
+#   ansible-playbook -i inventories/nas/hosts.yml collections/homelab/extensions/backup_disk_init.yml \
+#     -e backup_disk_init_confirm=<backup_disk_device> --check
+- name: Initialise the backup disk (once)
+  hosts: nas
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Partition and format the backup disk
+      ansible.builtin.include_role:
+        name: wahlberger.homelab.backup_disk
+        tasks_from: init

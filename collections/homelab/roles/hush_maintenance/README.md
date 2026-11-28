@@ -2,7 +2,7 @@
 
 Holds Hush alerts while an ansible apply restarts services on this host.
 
-- `tasks/open.yml` (pre_tasks in `site.yml`) opens a Hush maintenance window scoped to
+- `tasks/open.yml` (pre_tasks in each host playbook) opens a Hush maintenance window scoped to
   `hush_maintenance_host_names`, for `hush_maintenance_duration_seconds` (1800 s).
 - `tasks/close.yml` (post_tasks) ends it early.
 

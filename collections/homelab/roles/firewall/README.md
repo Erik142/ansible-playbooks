@@ -37,7 +37,7 @@ extras removed after, the ZeroTier zone's `ssh` before the interface binding.
 `group_vars` must feed `firewall_cloud_zt_ip: "{{ cloud_zt_ip }}"` next to the
 existing `firewall_zerotier_interface: "{{ vm_zt_iface }}"`.
 
-The role only ever **adds** rich rules (found on the VM, BD-AC-45): dropping an
+The role only ever **adds** rich rules (BD-AC-45): dropping an
 entry from `firewall_rich_rules` does not remove its rule. Remove it by hand with
 `firewall-cmd --permanent --zone=<zone> --remove-rich-rule='<rule>'` and the
 same command without `--permanent`.
@@ -48,8 +48,8 @@ firewalld only knows a newly created zone at runtime after it re-reads its
 permanent configuration, which this role does not trigger. On the run that
 creates the zone, the role therefore writes the zone, services, rich rule and
 interface binding to the **permanent** configuration only, and prints a message
-saying so. Until the operator makes firewalld re-read it (runbook step, see
-`<vm-dir>/README.md`), or the host boots, ZeroTier traffic still falls in the
+saying so. Until the operator makes firewalld re-read it (a firewalld reload
+or a reboot), or the host boots, ZeroTier traffic still falls in the
 public zone. The next role run finds the zone active and converges the runtime
 state too. The permanent binding by name also covers an interface that appears
 after firewalld has started (SH-FR-185).
@@ -64,8 +64,7 @@ zone-dependent tasks on it: services in the zone, the Beszel agent rich rule and
 the interface binding. On a fresh host a `--check` run therefore **skips those
 three tasks and cannot validate them**; the first real run (or a `--check` after
 the zone exists) does. The operator must not read their absence as success
-(runbook step 2 and 4). `tests/guards.d/firewall.yml` fails if a zone task loses
-the gate.
+A zone task that loses the gate is caught by review; no test covers it.
 
 ## Container traffic bypasses these rules
 
@@ -81,13 +80,12 @@ Rootful Podman publishes container ports via DNAT, which crosses firewalld's
 FORWARD/NAT path, not a plain INPUT filter. `masquerade` must stay enabled on
 the public zone or published ports stop working.
 
-## Tests
+## Verification
 
-Not provable in a container (firewalld needs nftables). `tests/guards.d/firewall.yml`
-(`tests/guard-tests.sh firewall`) is a static guard: `firewall_zerotier_zone_ready`
-is defined, depends on `ansible_check_mode`, and every zone-dependent task in
-`tasks/zerotier.yml` is gated on it. The zone behaviour itself is checked on the
-fixture VM (`tests/vm`) and live.
+Not provable in a container (firewalld needs nftables). The gate is static:
+`firewall_zerotier_zone_ready` is defined, depends on `ansible_check_mode`, and every
+zone-dependent task in `tasks/zerotier.yml` is gated on it. The zone behaviour itself
+is checked live only.
 
 ## Inspect on the host
 

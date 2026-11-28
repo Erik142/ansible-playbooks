@@ -8,6 +8,11 @@ Roles and playbooks for the homelab hosts. All roles target openSUSE only.
   (`defaults/`, `tasks/`, `meta/argument_specs.yml`, `README.md`).
 - `playbooks/nas.yml`: the NAS play (host group `nas`). It picks the roles it
   needs. Other hosts get their own playbook here and use only their subset.
+- `playbooks/ops.yml`, `ci.yml`, `edge.yml`: the same for the other hosts.
+- `extensions/molecule/`: molecule scenarios. `base` converges the roles that run in a
+  container, and each host playbook has a scenario that runs its container-capable
+  tags. `coverage.yml` maps every role to its scenario or to a reason it is excluded.
+  Run one with `scripts/molecule.sh <scenario>` from the repo root.
 
 Host data (inventory, `group_vars`, Vault) is not in this collection. It lives in
 the repo's `inventories/<host>/`.

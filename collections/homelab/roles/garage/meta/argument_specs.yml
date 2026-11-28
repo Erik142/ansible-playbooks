@@ -6,7 +6,7 @@ argument_specs:
       garage_enabled:
         type: bool
         required: false
-        description: site.yml gate; the role fails when true while backup_disk_enabled is false.
+        description: the host playbook gate; the role fails when true while backup_disk_enabled is false.
       garage_image:
         type: str
         required: false

@@ -3,8 +3,8 @@
 Deploys [Hush](https://git.de.int.wahlberger.dev/erikwahlberger/hush), the
 homelab alerting service, as a rootful Podman Quadlet on the ops VM.
 
-In `site.yml` after `semaphore`. SH-FR-13 was amended on 2026-10-24 to list it
-(`semaphore-migration/reqs/semaphore-to-hetzner.md`). Served over ZeroTier only:
+In `collections/homelab/playbooks/ops.yml` after `semaphore`. SH-FR-13 was amended on 2026-10-24 to list it
+(the migration spec was removed from the repo). Served over ZeroTier only:
 `hush.de.int.wahlberger.dev` is a CNAME to `ops.de.int` (via `caddy_sites` and
 `cloudflare_dns`), which resolves to `vm_zt_ip`.
 
@@ -41,9 +41,8 @@ The container runs as uid 10001 (`Containerfile`). Port 8080 is published on
 - **Registry login as root** (`podman_login`), because the Quadlet is a
   system unit.
 - **Trusted proxy is `127.0.0.1/32`.** Caddy runs on the host network, so hush
-  sees Caddy as loopback. The Traefik network in `deploy/hush.container` no
-  longer applies.
-- **Shadow mode on** (`hush_shadow_mode: true`) for the first week.
+  sees Caddy as loopback. The Traefik network no longer applies.
+- Shadow mode has ended (2026-10-30); `hush_shadow_mode` is false.
 
 ## Open points
 

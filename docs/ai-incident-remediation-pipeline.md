@@ -10,8 +10,8 @@ Current state (verified in this repo):
 - Semaphore on `ops.de.wahlberger.dev` (Hetzner VM, ZeroTier-only UI) is the only holder of the automation SSH key, which has passwordless sudo on all three hosts.
   Semaphore polls GitHub; there is no inbound webhook.
 - `master` has **no branch protection and no rulesets** (checked with `gh api`, which returned 404 and `[]`).
-- Renovate **auto-merges** minor/patch container bumps once CI passes (`renovate.json`). CI only runs lint, syntax and vault checks. It never applies anything.
-- `common_upgrade: true` in all three `common` roles, so every full `site.yml` run also does a full zypper/apt upgrade.
+- Renovate **auto-merges** minor/patch container bumps once CI passes (`renovate.json`). CI runs lint, the molecule scenarios and the vault check; it never applies anything. It never applies anything.
+- `common_upgrade: true` in all three `common` roles, so every full `the host playbook` run also does a full zypper/apt upgrade.
 - Two recent real incidents were caused by playbook problems:
   - 2026-09-19: the `/etc/hosts` 127.0.1.1 entry got copied into containers.
   - 2026-09-26: a Semaphore run's `zypper dup` reset `ip_forward`, and every published port on the NAS hung.
@@ -33,7 +33,7 @@ Current state (verified in this repo):
 4. **Full vision: free-form fix PRs plus merge-triggered auto-apply.**
    Pros: the fewest human steps.
    Cons: LLMs are weakest at exactly the problems that happened here (root cause not visible in logs). There is a prompt-injection path from logs to infra-as-code.
-   Without branch protection a bot token can push to `master` directly. A full `site.yml` "fix" run drags in OS upgrades, which caused the 09-26 outage.
+   Without branch protection a bot token can push to `master` directly. A full `the host playbook` "fix" run drags in OS upgrades, which caused the 09-26 outage.
    Container restarts re-fire alerts and create loops. The pipeline also dies with the thing it is supposed to fix (see risks).
 
 ### Chosen approach

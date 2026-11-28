@@ -2,8 +2,8 @@
 
 ### Context
 - Renovate opens dependency PRs on `master` (`renovate.json`). Minor/patch container bumps are automerged once CI passes. Majors, Forgejo, Pocket ID, Caddy and Postgres majors are excluded or manual.
-- Erik's scope for the gate: container bumps **and** role/collection bumps (e.g. `geerlingguy.security` in `requirements.yml`, `ansible.cfg` tooling), not majors on the excluded list.
-- Done 2026-11-23: branch protection on `master`. Required checks are the 18 CI contexts (`discover`, `validate (<dir>)`, `molecule (<dir>)`, `vault-encrypted`, `ops-static`, `nas-backup-static`). 0 required approvals, `enforce_admins: false`, no force-push, no deletion. Merging is still possible without a human once checks are green.
+- Erik's scope for the gate: container bumps **and** role/collection bumps (e.g. `ansible.posix` or `containers.podman` in `requirements.yml`, `ansible.cfg` tooling), not majors on the excluded list.
+- Done 2026-11-23: branch protection on `master`. Required check is the single `gate` job (lint, molecule matrix, vault check). Former contexts: `discover`, `validate (<dir>)`, `molecule (<dir>)`, `vault-encrypted`, `ops-static`, `nas-backup-static`). 0 required approvals, `enforce_admins: false`, no force-push, no deletion. Merging is still possible without a human once checks are green.
 - Merge does **not** apply anything. Semaphore runs by schedule (see `README.md`, "Automated runs"; the SH-BR-07 03:00-05:30 window is not documented in the repo any more, verify it), not on push. So a merge only changes the desired state; an application happens at the next scheduled run. Verify that rule before relying on it.
 - `allow_auto_merge` is `false` at repo level. Renovate's automerge therefore merges directly once checks pass, which is what protection allows with 0 approvals. Re-check after protection went on.
 - Renovate PR bodies include upstream release notes. That text is untrusted input to the LLM.
@@ -19,7 +19,7 @@ Deterministic classifier first, LLM second, merge last. The LLM never holds the 
 1. **Select.** n8n polls open PRs from `app/renovate` every 15 min. Skip a PR whose head SHA has already been decided (state in n8n).
 2. **Classify (no LLM).** Read the changed file list and diff size.
    - Allowlist (may change): `roles/*/defaults/main.yml` (versions and image tags), `roles/*/templates/**`, `requirements.yml`, `renovate.json` not included, role `meta` untouched.
-   - Denylist (any hit = human only): `**/vault.yml`, `.github/**`, `**/ssh_authorized_keys/**`, `roles/security/**`, `roles/firewall/**`, `roles/caddy/**`, `roles/zerotier/**`, `roles/podman/**`, `pi-*/**`, `ops-*/roles/semaphore/**`, `*.yml` under `tests/` and `molecule/`, and the Ansible `ansible.cfg`.
+   - Denylist (any hit = human only): `**/vault.yml`, `.github/**`, `**/ssh_authorized_keys/**`, `roles/security/**`, `roles/firewall/**`, `roles/caddy/**`, `roles/zerotier/**`, `roles/podman/**`, `playbooks/pi-de-int-wahlberger-dev/**`, `collections/homelab/roles/semaphore/**`, `collections/homelab/extensions/molecule/**`, and the Ansible `ansible.cfg`.
    - Diff budget: at most 60 changed lines and 6 files for an automerge candidate.
    - Major update types, or anything `renovate.json` excludes: human only.
    - Fails the classifier: post a comment with the reason and stop. No LLM call.

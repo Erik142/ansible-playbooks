@@ -123,10 +123,10 @@ jobs:
         run: ansible-galaxy collection install -r collections/homelab/extensions/molecule/requirements.yml -p collections --force
 
       # Layers are cached in GitHub's cache, so each leg rebuilds only what changed.
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build the shared test image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: collections/homelab/extensions/molecule/build
           tags: homelab-molecule:tumbleweed

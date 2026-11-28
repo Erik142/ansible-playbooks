@@ -48,11 +48,24 @@ ansible-playbook wahlberger.homelab.nas
 Replace `nas` with `ops`, `ci` or `edge` for those hosts (ci needs its ZeroTier address,
 see `inventories/ci/`).
 
-## CI
+## CI and tests
 
-`.github/workflows/ci.yml` validates code on each pull request: `yamllint` and
-`ansible-lint` (for playbooks that opt in with a `.yamllint`/`.ansible-lint`
-config), `ansible-galaxy` dependency resolution, `ansible-playbook --syntax-check`,
-and a repo-wide check that every committed `vault.yml` is actually
-Vault-encrypted. It only validates code: GitHub's runners can't reach the hosts,
-so real applies stay Semaphore's job (see [Automated runs](#automated-runs)).
+`.github/workflows/ci.yml` runs on every pull request and on pushes to `master`:
+
+- **lint**: `scripts/lint.sh` runs yamllint, ansible-lint (production profile), a
+  check that every role has a molecule scenario or a recorded exclusion, and
+  `--syntax-check` for each host playbook. A separate step checks that every
+  committed `vault.yml` is Ansible-Vault encrypted.
+- **molecule**: one leg per scenario (`base`, and one per host playbook). Each leg
+  runs `scripts/molecule.sh <scenario>`: converge, a second converge that must change
+  nothing, and verify. The shared test image is built from
+  `collections/homelab/extensions/molecule/build/`.
+- **gate**: the one check required on `master`. It fails if lint fails, or if code
+  changed and a molecule leg failed. Docs-only changes skip molecule.
+
+The same scripts run locally. Lint: `scripts/lint.sh`. One scenario:
+`scripts/molecule.sh playbook-nas`. The CI tooling is pinned in `requirements-ci.txt`.
+
+CI never decrypts real secrets: it uses a dummy vault password and fake values for
+everything the scenarios need. The real hosts are not reachable from GitHub's
+runners, so real applies stay Semaphore's job (see [Automated runs](#automated-runs)).

@@ -75,5 +75,5 @@ restic_backup_hush_secret_file: /etc/restic-backup/hush-backup.secret
 restic_backup_hush_hmac_secret: ""
 
 # Email a summary via Resend after each successful run. Reuses notify_failure's
-# credentials, so notify_failure must run first (it does in site.yml).
+# credentials, so notify_failure must run first (it does in the host playbook).
 restic_backup_notify_on_success: true

@@ -1,7 +1,7 @@
 ---
 # smartd monitoring of the backup disk (BD-FR-37 to BD-FR-42). Packages, the mail
 # hook and smartd.service come from the `smartd` role (applied earlier in
-# site.yml); this role only owns the backup disk's own line. Existing lines of
+# nas.yml); this role only owns the backup disk's own line. Existing lines of
 # smartd.conf (device lines, DEVICESCAN) are never removed.
 
 # smartd stops reading at DEVICESCAN, so a new line must go before it. For an

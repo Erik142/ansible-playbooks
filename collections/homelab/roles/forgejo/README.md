@@ -7,7 +7,7 @@ at `git.de.int.wahlberger.dev`. LAN/ZeroTier only (this host has no public
 inbound port). Logs in via the Pocket ID instance at `pocket_id_app_url`.
 
 - Image: `codeberg.org/forgejo/forgejo:15-rootless` (LTS series; Renovate
-  proposes minor/patch bumps, majors need a manual PR merge).
+  opens no bump PRs until the allowed major changes in `renovate.json`).
 - Web UI and registry (`/v2/`) share one vhost; Caddy needs no special
   config for large layer uploads (no request body limit, no upstream
   timeouts by default).
@@ -20,7 +20,7 @@ inbound port). Logs in via the Pocket ID instance at `pocket_id_app_url`.
 ## Role variables
 
 See `defaults/main.yml`. Required: `forgejo_url` and `forgejo_oidc_client_id`
-(group_vars) plus six Vault secrets (see `vault.yml.example`):
+(group_vars) plus six Vault secrets (see `inventories/<host>/group_vars/all/vault.yml.example`):
 `vault_forgejo_secret_key`, `_internal_token`, `_oauth2_jwt_secret`,
 `_lfs_jwt_secret`, `_admin_password`, `_oidc_client_secret`. All secrets reach
 the container through a root-only env file (`FORGEJO__<section>__<KEY>`,

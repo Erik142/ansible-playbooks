@@ -14,7 +14,7 @@
     that: security_login_notify_env.stat.exists
     fail_msg: >-
       /etc/notify-failure/notify-failure.env is missing. The notify_failure role
-      must run before security (see site.yml).
+      must run before security (see the host playbook).
     quiet: true
   when:
     - security_ssh_login_notify_enabled | bool

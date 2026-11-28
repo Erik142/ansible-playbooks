@@ -8,7 +8,7 @@ not on every individual restart. This only covers services that crash on a
 host that's still up and running — it can't tell you a host went dark
 entirely (crashed, lost power, lost network), since nothing running on a
 dead host can report its own death. That's a separate, external watcher
-(planned: Uptime Kuma on the edge host), not this role.
+(Uptime Kuma on the edge host, via the uptime_kuma role), not this role.
 
 ## How it works
 
@@ -52,8 +52,8 @@ This role deploys five things:
 This role only deploys the *mechanism*. It does not add `OnFailure=` to any
 service itself — that's a one-line addition in the monitored service's own
 role/template. Currently wired up for every container Quadlet across all
-three playbooks (deduped) plus `nas-de-int-wahlberger-dev`'s
-`btrbk.service`, `db-dump.service` and `smb`/`nmb`, and all three playbooks'
+all host playbooks (deduped) plus `nas.de.int.wahlberger.dev`'s
+`btrbk.service`, `db-dump.service` and `smb`/`nmb`, and all host playbooks'
 `disk-space-check.service` (immediate).
 
 ## What the email includes

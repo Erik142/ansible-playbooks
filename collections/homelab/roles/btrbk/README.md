@@ -120,14 +120,14 @@ refresh.
 
 - Same fingerprint, key near expiry or refresh failing: remove the old key
   (`sudo rpm -e gpg-pubkey-<id>`; list with `rpm -qa gpg-pubkey`), run
-  `site.yml --tags btrbk` and `sudo systemctl start btrbk-key-refresh.service`.
+  `wahlberger.homelab.nas --tags btrbk` and `sudo systemctl start btrbk-key-refresh.service`.
 - New fingerprint (exit 2): a true rotation always needs a human. Verify the
   new fingerprint out of band (`osc signkey filesystems | gpg --show-keys
   --with-fingerprint`), then set `btrbk_zypper_repo_gpg_fingerprint` and run
-  `site.yml --tags btrbk`. If you cannot verify it, treat it as tampering.
+  `wahlberger.homelab.nas --tags btrbk`. If you cannot verify it, treat it as tampering.
 
 ## Testing
 
-`tests/syntax-check-role.sh btrbk`. A negative test points
+A negative test points
 `btrbk_zypper_repo_key_url` at a `file://` stub key with another fingerprint and
 expects the assert to fail before any repository exists.

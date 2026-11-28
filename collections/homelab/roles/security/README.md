@@ -99,8 +99,7 @@ mail) with `@@HOST@@`, `@@TIME@@`, `@@USER@@`, `@@ADDR@@`, `@@PORT@@`,
 the login, so every value is control-character-stripped, length-capped and
 `html.escape`d, and substituted in a single pass (a user called `@@HOST@@`
 stays literal); the subject is stripped of control characters. If the template
-is unreadable the mail goes out as text only. Unit tests:
-`tests/unit/test_ssh_login_notify.py`.
+is unreadable the mail goes out as text only.
 Limitation (SH-R-01): an attacker with root can stop the service, and
 a pre-authentication exploit logs no login at all. The service is a Python 3
 script (`files/ssh-login-notify.py`), so `shellcheck` does not apply to it; the
@@ -119,8 +118,7 @@ Inspect: `systemctl list-timers zypper-dup.timer`, `journalctl -u zypper-dup.ser
 This replaces the NAS's weekly `zypper patch`. Tumbleweed is a rolling release,
 so `dup` is the supported way to update it.
 
-`common_upgrade: false` leaves the full upgrade out of the `common` role (tested by
-`tests/guards.d/security_updates.yml`); with the default (`true`) `common` still
+`common_upgrade: false` leaves the full upgrade out of the `common` role; with the default (`true`) `common` still
 upgrades on every run.
 
 ## Reboots: rebootmgr maintenance window (PA-8)
@@ -146,7 +144,7 @@ the host with `rebootmgrctl status` and `rebootmgrctl get-window` (or
 Molecule asserts the config file and what the running daemon reports
 (`rebootmgrctl get-strategy`, `get-window`). That a queued request really waits
 for the window is rebootmgr's own behaviour and is not exercised in a container; it
-is checked on the fixture VM (T-16) and live (OP-W, AC-28).
+is checked live only.
 
 ## Snapshots: snapper pre/post pairs (SH-FR-25)
 

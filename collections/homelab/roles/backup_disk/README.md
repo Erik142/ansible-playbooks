@@ -3,15 +3,15 @@
 Local backup disk: a dedicated 6 TB disk holding one btrfs filesystem with the
 single subvolume `@btrbk`. This role mounts it, scrubs it, watches it with
 smartd and checks its health daily. The disk is partitioned and formatted
-exactly once, by a **separate playbook**, `backup_disk_init.yml`, that
-`site.yml` never imports (BD-FR-02). This file documents the initialisation;
+exactly once, by a **separate playbook**, `collections/homelab/extensions/backup_disk_init.yml`, that
+the host playbook never imports (BD-FR-02). This file documents the initialisation;
 the `main` entry point (below) mounts the disk, scrubs it, watches it with
 smartd and checks it daily.
 
 ## Does not do
 
-- It never partitions, formats or creates a subvolume from `site.yml` or from
-  the `main` entry point. Only `backup_disk_init.yml` writes to the disk.
+- It never partitions, formats or creates a subvolume from the host playbook or from
+  the `main` entry point. Only `collections/homelab/extensions/backup_disk_init.yml` writes to the disk.
 - It never sets the `C` (no copy-on-write) attribute on the backup filesystem.
 - It does not create snapshots or copy data (see the `btrbk` role).
 - It does not wipe a disk that holds anything: any signature or non-zero byte
@@ -30,16 +30,21 @@ Run against one host only. Always `--check` first (it evaluates every refusal
 condition and writes nothing), then without it:
 
 ```sh
-ansible-playbook backup_disk_init.yml \
+# 1. Dry run: evaluates every refusal condition, writes nothing.
+ansible-playbook -i inventories/nas/hosts.yml collections/homelab/extensions/backup_disk_init.yml \
   -e backup_disk_init_confirm=/dev/disk/by-id/wwn-0x500003982b7021c1 --check
-ansible-playbook backup_disk_init.yml \
+# 2. The real run, only after step 1 passed.
+ansible-playbook -i inventories/nas/hosts.yml collections/homelab/extensions/backup_disk_init.yml \
   -e backup_disk_init_confirm=/dev/disk/by-id/wwn-0x500003982b7021c1
 ```
 
+The device is `backup_disk_device` (`defaults/main.yml`); the confirm value must
+match it exactly.
+
 The confirm value must equal `backup_disk_device` exactly. The run ends by
-printing the filesystem UUID; put it into `backup_disk_uuid` (runbook step 3).
+printing the filesystem UUID; put it into `backup_disk_uuid`. Record it in the nas inventory's `backup_disk_uuid`.
 A second run on the initialised, unmounted disk changes nothing and prints the
-same UUID. Test against the VM fixture first: `-i inventories/vm`.
+same UUID. 
 
 What a real run writes: a GPT with one partition from 1 MiB to the end, then
 `mkfs.btrfs -L backups`, then the subvolume `@btrbk` directly below the top
@@ -165,7 +170,7 @@ starting with `backup_disk_device` (by-id path):
   Resend with the credentials from `/etc/notify-failure/notify-failure.env`
   (role `notify_failure`); subject and body
   contain the device path and smartd's message. `smartd.service` is enabled by the
-  `smartd` role and restarted here when the line changed. Virtual disks (the VM fixture) have no SMART,
+  `smartd` role and restarted here when the line changed. Virtual disks have no SMART,
   so this part is only smoke-checked on the real host.
 
 ## Optional spindown (BD-FR-43, BD-FR-44)
@@ -184,7 +189,7 @@ reverted by removing the unit; power-cycle the disk or run `hdparm -S 0`.
 `backup-disk-health.timer` runs `backup-disk-health.service` daily at
 `backup_disk_health_on_calendar` (default `*-*-* 09:00:00`, `Persistent=true`).
 The service runs `/usr/local/bin/backup-disk-health.py` (a Python script, unit
-tested in `tests/unit/test_backup_disk_health.py`) and has
+no unit test is kept in the repo) and has
 `OnFailure=notify-failure-immediate@%n.service`, so a failure sends an email
 (the `notify_failure` role must be applied). The script is read-only: it lists
 directories and runs `findmnt`, `btrfs device stats --check` and `stat`, and
@@ -199,7 +204,7 @@ journal lines start with `FAIL:` and name the path. It fails when
   replica) is dated by its `Receive time` from `btrfs subvolume show`, else its
   `Creation time`; other children by birth time (`stat -c %W`). A path that does not exist logs
   `<path>: absent, skipped` and does not fail (for example the cloud repository
-  before runbook step 6).
+  until that repository exists).
 
 The unit has no `RequiresMountsFor=` for the backup mount on purpose: a unit
 blocked by a missing mount would not trigger `OnFailure=`, and the check exists
@@ -224,7 +229,7 @@ The `main` entry point fails by design when the filesystem is missing. To run
 the rest of the stack meanwhile:
 
 ```sh
-ansible-playbook site.yml --skip-tags backup_disk,btrbk
+ansible-playbook wahlberger.homelab.nas --skip-tags backup_disk,btrbk --check --diff
 ```
 
 Restricting the run with `--skip-tags` is the only supported way: the role has

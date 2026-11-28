@@ -20,4 +20,4 @@ User-Agent: Go-http-client/1.1
 - Project alerts have a `suppress_success_alerts` setting. The Semaphore UI on this version doesn't show it.
 
 ## What this means for Hush
-The Gotify request isn't a Hush event. Hush needs a source adapter to accept it. See the Hush prompt in the PR description.
+The Gotify request isn't a Hush event. Hush needs a source adapter to accept it. The Hush prompt is not kept in the repo.
