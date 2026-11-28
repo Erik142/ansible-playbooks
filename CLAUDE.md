@@ -1,4 +1,9 @@
-# ansible-playbooks (repo root)
+# infra-homelab (repo root)
+
+Layout: Ansible lives in `ansible/`. Run every Ansible command and script from `ansible/`;
+the paths below are relative to it. The root holds `README.md`, `CLAUDE.md`, `docs/`,
+`renovate.json` and `.github/` (CI reads only the root `.github/`). `tofu/` will hold the
+Hetzner OpenTofu code later.
 
 This file covers rules for the whole repo. Host details live in the collection
 README (`collections/homelab/README.md`) and the inventory's `group_vars`.

@@ -1,0 +1,226 @@
+---
+# Variables applied to every host in the production inventory.
+#
+# group_vars/all/ is a *directory* (not a single file) on purpose: it lets a
+# plaintext `vars.yml` sit next to an encrypted `vault.yml`, so secrets and
+# non-secrets live side by side without mixing.
+#
+# Variables for ops.de.wahlberger.dev (wahlberger.homelab.ops). Non-secret; secrets
+# live in the encrypted sibling vault.yml (vault id ops). Values that come from a live
+# step are set here; the roles that need them fail naming the variable.
+
+# --- Connection -------------------------------------------------------------
+# SSH login user. Privilege escalation (become) is turned on in the host playbook.
+ansible_user: erikwahlberger
+
+# Proxy design: primary only (Caddy on host networking, Semaphore published on
+# 127.0.0.1). The bridge fallback is not carried over to the collection.
+semaphore_design: primary
+
+# --- ZeroTier ------------------------------------------------------------------
+zerotier_network_id: "8056c2e21cc5c789"
+# This VM's member IP in Central (10.243.0.0/16), set in pull request A2 (it was
+# empty in pull request A, when Caddy and cloudflare_dns refused to run).
+vm_zt_ip: "10.243.25.185"
+# Interface name of the ZeroTier device on the host (`ip -br link`), set in pull
+# request A2. ZeroTier derives the name from the network ID, so it is the same on
+# every host of this network. Empty would make the firewall skip the zone.
+vm_zt_iface: "ztmjfaojmv"
+# the edge host's ZeroTier member IP (Beszel hub source), read from
+# ZeroTier Central at OP-02 and set together with vm_zt_iface in pull request A2.
+# Once vm_zt_iface is set, an empty value makes the firewall role fail before any
+# change, naming firewall_cloud_zt_ip.
+cloud_zt_ip: "10.243.203.116"
+# the edge host's public IPv4 (formerly cloud.wahlberger.dev; a public
+# DNS fact, not a secret). fail2ban never bans it (SH-FR-124).
+cloud_public_ip: "49.13.141.178"
+
+# --- Hardening (security role) -----------------------------------------------
+security_ssh_permit_root_login: "no"
+security_ssh_password_authentication: "no"
+security_ssh_allow_users:
+  - erikwahlberger
+security_fail2ban_enabled: true
+security_fail2ban_findtime: 600
+# SH-FR-124: loopback, the Semaphore container subnet, the home LAN, the
+# ZeroTier network and cloud's public IPv4.
+# 127.0.0.0/8 is also always added by the security role.
+security_fail2ban_ignoreip:
+  - 127.0.0.0/8
+  - "{{ semaphore_network_subnet }}"
+  - 10.10.0.0/16
+  - 10.243.0.0/16
+  - "{{ cloud_public_ip }}"
+security_ssh_login_notify_enabled: true
+# Hush-style login mail: HTML part through hush (see the security role).
+security_login_hush_html: true
+security_snapper_enabled: true
+security_autoupdate_enabled: true
+security_autoupdate_reboot: true
+# Passwordless sudo for Semaphore's unattended playbook runs against this host.
+security_sudoers_passwordless:
+  - erikwahlberger
+
+# --- SSH access (ssh_authorized_keys role) ----------------------------------
+# Entries are full authorized_keys lines (options such as from= are allowed).
+# Public keys, so plaintext. The personal key plus the new automation key,
+# which only works from the VM's addresses (SH-BR-10, SH-FR-62, SH-FR-126).
+ssh_authorized_keys_list:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJSKdeHoK+WkyBI69OSZqn0sVqZPPDRs082S/IVoOeSu erikwahlberger@personal"
+  - 'from="62.238.112.178,10.243.25.185,172.29.30.0/24"
+    ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFWZ1IpLXNuFDDynKMtnh6q62R8cu+ojBoB2h0/QMPlr semaphore-automation@ops.de.wahlberger.dev'
+# Keys listed here are removed from the host; set by pull request E.
+ssh_authorized_keys_revoked: []
+
+# --- Containers / disk space ---------------------------------------------------
+podman_data_dir: /opt/podman
+# The VM has no separate data mount: /opt/podman lives on the root filesystem.
+podman_require_mountpoint: false
+podman_image_prune_enabled: true
+disk_space_paths:
+  - /
+# SH-FR-20: email the owner when / reaches 85 % used.
+disk_space_threshold_percent: 85
+
+# --- Failure notifications -------------------------------------------------
+# Units hush-unit-state reports every 5 minutes. The role default is the NAS list.
+notify_failure_state_units:
+  - beszel-agent.service
+  - caddy.service
+  - hush.service
+  - semaphore.service
+  - ssh-login-notify.service
+# Failures of one unit within notify_failure_crash_window_seconds before the
+# owner is emailed (role default; stated so the threshold is visible here).
+notify_failure_crash_threshold: 5
+
+# --- Firewall -----------------------------------------------------------------
+# Public zone: ssh only (SH-CC-15). T-07 adds the ZeroTier zone.
+firewall_allowed_services:
+  - ssh
+firewall_zerotier_interface: "{{ vm_zt_iface }}"
+# Beszel hub source for 45876/tcp in the ZeroTier zone. Empty (and unused) until
+# cloud_zt_ip is known; see the note at cloud_zt_ip.
+firewall_cloud_zt_ip: "{{ cloud_zt_ip }}"
+
+# --- Monitoring ----------------------------------------------------------------
+beszel_agent_port: 45876
+beszel_agent_hub_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKz/U0NWhnhm19QvVrNu6sVuXiEPVdoPCrGMC8MzTNdH"
+
+# --- DNS (cloudflare_dns role) -------------------------------------------------
+# `cloudflare_dns_ip` keeps the role default (the VM's public IPv4, SH-A-19).
+cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token | default('') }}"
+cloudflare_dns_extra_a_records:
+  - record: ops.de.int.wahlberger.dev
+    value: "{{ vm_zt_ip }}"
+cloudflare_dns_cname_target: ops.de.int.wahlberger.dev
+# Pull request D: the semaphore CNAME points at the VM from the cut-over on.
+semaphore_dns_cutover_enabled: true
+cloudflare_dns_cnames_enabled: "{{ semaphore_dns_cutover_enabled }}"
+
+# --- Reverse proxy (caddy role) -------------------------------------------------
+caddy_data_dir: /opt/podman/caddy
+caddy_acme_email: "ewahlberger@gmail.com"
+caddy_bind_address: "{{ vm_zt_ip }}"
+# Host networking, bound to the ZeroTier address, client allow list (see the caddy role).
+caddy_host_network: true
+caddy_no_http_redirect: true
+caddy_containerfile_src: Containerfile.pinned
+caddy_allowed_sources:
+  - 10.243.0.0/16
+  - 10.10.0.0/16
+caddy_sites:
+  - host: semaphore.de.int.wahlberger.dev
+    upstream: "127.0.0.1:3000"
+  # Hush: ZeroTier only. Its CNAME points at ops (vm_zt_ip) like semaphore's; Caddy binds vm_zt_ip.
+  - host: hush.de.int.wahlberger.dev
+    upstream: "127.0.0.1:8080"
+
+# --- Semaphore UI ---------------------------------------------------------------
+semaphore_url: "https://semaphore.de.int.wahlberger.dev"
+semaphore_oidc_client_id: "63093482-d2cc-4c77-89df-9f6ff78b160e"
+# Production refuses to create an empty database (SH-E-01).
+semaphore_require_existing_db: true
+# Fixed bridge subnet for semaphore.network (SH-FR-127); outside 10.10.0.0/16
+# and 10.243.0.0/16. 172.29.30.0/24 is in
+# 172.16.0.0/12, which collides with neither the LAN, ZeroTier, podman's default
+# 10.88.0.0/16 nor Hetzner's public ranges.
+semaphore_network_subnet: 172.29.30.0/24
+# Container UID of the Pi's Semaphore (`podman exec semaphore id -u`, read in
+# step 3, SH-FR-200), set by pull request A3. Empty would make the semaphore role
+# fail naming this variable.
+semaphore_uid: 1001
+
+# --- Backups (restic_backup role) ------------------------------------------------
+restic_backup_rest_server_host: nas.de.int.wahlberger.dev
+restic_backup_rest_server_port: 8000
+restic_backup_rest_server_username: ops
+restic_backup_forget_enabled: false
+# Every SQLite database on ops, each as a consistent .backup copy. Hush's database
+# was not backed up before. It is the one that holds alert history and decisions.
+# This list replaces the role default, so semaphore stays listed.
+restic_backup_sqlite_databases:
+  - src: /opt/podman/semaphore/data/database.sqlite
+    name: semaphore.sqlite
+  - src: /opt/podman/hush/data/hush.db
+    name: hush.snapshot
+# restic_backup_sqlite_required: not set, so the role default `true` applies. The
+# stopgap `false` of pull request A was deleted by pull request A3; the role is
+# first applied in step 5, after the database exists (step 4).
+restic_backup_notify_on_success: true
+restic_backup_on_calendar: "*-*-* 05:00:00"
+restic_backup_repo_password: "{{ vault_restic_backup_repo_password | default('') }}"
+restic_backup_rest_server_password: "{{ vault_restic_backup_rest_server_password | default('') }}"
+
+# --- Secrets (Ansible Vault) ---------------------------------------------------------
+# Never put secrets in plaintext. They live in the encrypted sibling
+# `vault.yml`, each with a `vault_` prefix, surfaced here under a friendly
+# name; `| default('')` keeps roles failing with a clear assert when the Vault
+# is absent. The scaffold is `vault.yml.example`.
+semaphore_admin_password: "{{ vault_semaphore_admin_password | default('') }}"
+semaphore_access_key_encryption: "{{ vault_semaphore_access_key_encryption | default('') }}"
+semaphore_cookie_hash: "{{ vault_semaphore_cookie_hash | default('') }}"
+semaphore_cookie_encryption: "{{ vault_semaphore_cookie_encryption | default('') }}"
+semaphore_oidc_client_secret: "{{ vault_semaphore_oidc_client_secret | default('') }}"
+notify_failure_resend_api_key: "{{ vault_notify_failure_resend_api_key | default('') }}"
+notify_failure_hush_token: "{{ vault_hush_source_hooks_ops | default('') }}"
+notify_failure_hush_source: hooks-ops
+restic_backup_hush_hmac_secret: "{{ vault_hush_source_backup_ops | default('') }}"
+
+# --- Hush (roles/hush) ---------------------------------------------------------
+# ZeroTier only: a CNAME (caddy_sites) to ops.de.int, which resolves to vm_zt_ip.
+hush_public_host: hush.de.int.wahlberger.dev
+hush_alert_recipient: ewahlberger@gmail.com
+# Pocket ID client "hush" (not secret; its secret is vault_hush_oidc_secret).
+hush_oidc_client_id: "14fd3186-6f65-46be-b0af-7fbaffdfb745"
+hush_forgejo_pull_token: "{{ vault_hush_forgejo_pull_token | default('') }}"
+hush_heartbeat_url: "{{ vault_hush_heartbeat_url | default('') }}"
+# Pocket ID group whose members may log in to the dashboard. The group is created in Pocket ID.
+hush_allowed_groups:
+  - hush_admins
+# --- Hush maintenance window (roles/hush_maintenance) -------------------------
+# Hush host names the window for each ansible apply is scoped to.
+hush_maintenance_host_names:
+  - ops.de.wahlberger.dev
+hush_maintenance_ansible: "{{ vault_hush_maintenance_ansible | default('') }}"
+hush_secrets:
+  hush_source_kuma: "{{ vault_hush_source_kuma | default('') }}"
+  hush_source_hooks_ops: "{{ vault_hush_source_hooks_ops | default('') }}"
+  hush_source_hooks_nas: "{{ vault_hush_source_hooks_nas | default('') }}"
+  hush_source_hooks_cloud: "{{ vault_hush_source_hooks_cloud | default('') }}"
+  hush_source_hooks_netcup: "{{ vault_hush_source_hooks_netcup | default('') }}"
+  hush_n8n_webhook: "{{ vault_hush_n8n_webhook_secret | default('') }}"
+  hush_remediation_secret: "{{ vault_hush_remediation_secret | default('') }}"
+  hush_source_truenas: "{{ vault_hush_source_truenas | default('') }}"
+  hush_source_backup_ops: "{{ vault_hush_source_backup_ops | default('') }}"
+  hush_source_backup_cloud: "{{ vault_hush_source_backup_cloud | default('') }}"
+  hush_maintenance_ansible: "{{ vault_hush_maintenance_ansible | default('') }}"
+  hush_anthropic_key: "{{ vault_hush_anthropic_key | default('') }}"
+  hush_resend_key: "{{ vault_hush_resend_key | default('') }}"
+  hush_oidc_secret: "{{ vault_hush_oidc_secret | default('') }}"
+  hush_break_glass_hash: "{{ vault_hush_break_glass_hash | default('') }}"
+  hush_metrics_token: "{{ vault_hush_metrics_token | default('') }}"
+
+# Pinned to the live host (getent beszel: uid 476, gid 476).
+beszel_agent_account_uid: 476
+beszel_agent_account_gid: 476

@@ -1,0 +1,15 @@
+---
+# Collection metadata. Install into a playbook directory via its requirements.yml
+# (type: dir); see README.md.
+namespace: wahlberger
+name: homelab
+version: 0.1.0
+readme: README.md
+authors:
+  - Erik Wahlberger
+description: Roles and playbooks for the wahlberger.dev homelab hosts (openSUSE only).
+repository: https://github.com/Erik142/infra-homelab
+tags:
+  - linux
+  - networking
+  - storage

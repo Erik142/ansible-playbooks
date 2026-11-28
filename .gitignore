@@ -9,8 +9,8 @@
 /pi-de-int-wahlberger-dev/
 /rpi-boras/
 
-# Installed copy of the homelab collection (ansible-galaxy install -r requirements.yml -p ../collections)
-/collections/ansible_collections/
+# Installed copy of the homelab collection (run in ansible/: ansible-galaxy install -r requirements.yml -p collections)
+/ansible/collections/ansible_collections/
 
 # Ansible runtime cache (repo-level ansible.cfg)
 .ansible_cache/

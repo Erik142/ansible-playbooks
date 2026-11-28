@@ -1,0 +1,59 @@
+---
+# Playbook scenario: the real ci.yml, restricted to the roles a container can run.
+# Run with the runner from ansible/:  scripts/molecule.sh playbook-ci
+# forgejo_runner runs render-only here (forgejo_runner_skip_runtime, set in
+# inventory/host_vars). Skipped: zerotier, podman, beszel_agent, cloudflare_dns,
+# firewall, hush_recovery and the always-tagged hush maintenance window.
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ${MOLECULE_PROJECT_DIRECTORY}/molecule/requirements.yml
+driver:
+  name: docker
+platforms:
+  - name: ci-instance
+    image: homelab-molecule:tumbleweed
+    pre_build_image: true
+    privileged: true
+    cgroupns_mode: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /run
+      - /run/lock
+    command: /usr/lib/systemd/systemd
+    groups:
+      - ci
+provisioner:
+  name: ansible
+  options:
+    tags: common,netcup_network,notify_failure,disk_space,ssh_authorized_keys,security,reboot_notify,forgejo_runner
+    # Replaces molecule's default skip list, so keep molecule-notest and notest (container-only tasks).
+    skip-tags: always,molecule-notest,notest
+  playbooks:
+    converge: ${MOLECULE_PROJECT_DIRECTORY}/../../../collections/ansible_collections/wahlberger/homelab/playbooks/ci.yml
+  inventory:
+    # Real non-secret group_vars, rendered by scripts/molecule-inventory.py (vault
+    # values are a generated stub, never the encrypted vault.yml). Container-only
+    # overrides live in this scenario's inventory/host_vars.
+    links:
+      group_vars: ${MOLECULE_PROJECT_DIRECTORY}/molecule/.generated/ci/group_vars
+      host_vars: ${MOLECULE_SCENARIO_DIRECTORY}/inventory/host_vars
+  env:
+    # Per-task timings in the job log (the repo's ansible.cfg enables the same callback).
+    ANSIBLE_CALLBACKS_ENABLED: ansible.posix.profile_tasks
+    ANSIBLE_COLLECTIONS_PATH: ${MOLECULE_PROJECT_DIRECTORY}/../../../collections:~/.ansible/collections
+    ANSIBLE_VAULT_PASSWORD_FILE: ${MOLECULE_SCENARIO_DIRECTORY}/../base/inventory/dummy-vault-pass
+    ANSIBLE_VAULT_IDENTITY_LIST: "lint@${MOLECULE_SCENARIO_DIRECTORY}/../base/inventory/dummy-vault-pass"
+verifier:
+  name: ansible
+scenario:
+  test_sequence:
+    # Destroy first: a leftover instance record from an interrupted run would be reused.
+    - destroy
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - destroy

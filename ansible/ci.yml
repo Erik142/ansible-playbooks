@@ -1,0 +1,6 @@
+---
+# Entry point for Semaphore. Semaphore installs requirements.yml from the
+# playbook's own directory, so the host playbook is reached through this file.
+# The host playbook lives in the collection:
+# collections/homelab/playbooks/ci.yml
+- ansible.builtin.import_playbook: wahlberger.homelab.ci
