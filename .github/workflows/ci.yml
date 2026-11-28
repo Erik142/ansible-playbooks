@@ -139,6 +139,14 @@ jobs:
       - name: molecule test (${{ matrix.scenario }})
         run: |
           set -o pipefail
+          # TEMPORARY diagnostics (nas leg runs for 15-20 minutes on hosted runners): every
+          # minute, print the container's systemd job queue and the processes it is waiting on.
+          ( while sleep 60; do
+              c=$(docker ps -q --filter name=-instance | head -1)
+              [ -n "$c" ] || continue
+              echo "== watch $(date -u +%T) container=$(docker ps --format '{{.Names}}' --filter id=$c)"
+              docker exec "$c" sh -c 'systemctl list-jobs --no-pager 2>&1 | head -20; ps -eo pid,etime,stat,args 2>/dev/null | grep -vE "ps -eo|grep" | tail -25' 2>&1 | cut -c1-200
+            done ) &
           scripts/molecule.sh ${{ matrix.scenario }} 2>&1 | tee molecule-output.log
 
       # Fails on any ansible-core deprecation warning, except the two callback plugins
