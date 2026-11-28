@@ -147,6 +147,8 @@ jobs:
               echo "== watch $(date -u +%T) container=$(docker ps --format '{{.Names}}' --filter id=$c)"
               docker exec "$c" sh -c 'systemctl list-jobs --no-pager 2>&1 | head -20; ps -eo pid,etime,stat,args 2>/dev/null | grep -vE "ps -eo|grep" | tail -25' 2>&1 | cut -c1-200
             done ) &
+          watch_pid=$!
+          trap 'kill "$watch_pid" 2>/dev/null || true' EXIT
           scripts/molecule.sh ${{ matrix.scenario }} 2>&1 | tee molecule-output.log
 
       # Fails on any ansible-core deprecation warning, except the two callback plugins
