@@ -60,6 +60,13 @@ cloudflare_dns_ip: "49.13.141.178"
 cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token | default('') }}"
 # Own A record for this host, and CNAMEs for caddy_sites pointing at it.
 cloudflare_dns_cname_target: edge.de.wahlberger.dev
+# ZeroTier name for Semaphore (ops) and the operator. Points at the member address,
+# so runs do not depend on the public path, whose source IPs the automation key's
+# from= list does not cover.
+cloudflare_dns_extra_a_records:
+  - record: edge.de.int.wahlberger.dev
+    value: "{{ vm_zt_ip }}"
+vm_zt_ip: "10.243.203.116"
 
 # --- Reverse proxy (caddy role) ---------------------------------------------
 # pinned: HTTP-01 with the stock image, because the host is reachable from the internet.
