@@ -40,6 +40,8 @@ provisioner:
       group_vars: ${MOLECULE_PROJECT_DIRECTORY}/molecule/.generated/ops/group_vars
       host_vars: ${MOLECULE_SCENARIO_DIRECTORY}/inventory/host_vars
   env:
+    # Per-task timings in the job log (the repo's ansible.cfg enables the same callback).
+    ANSIBLE_CALLBACKS_ENABLED: ansible.posix.profile_tasks
     ANSIBLE_COLLECTIONS_PATH: ${MOLECULE_PROJECT_DIRECTORY}/../../../collections:~/.ansible/collections
     ANSIBLE_VAULT_PASSWORD_FILE: ${MOLECULE_SCENARIO_DIRECTORY}/../base/inventory/dummy-vault-pass
     ANSIBLE_VAULT_IDENTITY_LIST: "lint@${MOLECULE_SCENARIO_DIRECTORY}/../base/inventory/dummy-vault-pass"

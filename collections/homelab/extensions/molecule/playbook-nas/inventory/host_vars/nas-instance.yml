@@ -8,3 +8,7 @@ ansible_user: root
 ssh_authorized_keys_user: root
 # The Hush API stand-in (files/hush_mock.py, started in prepare.yml), not the real host.
 hush_maintenance_base_url: "http://127.0.0.1:8099"
+# The event hook (hush-post, run by ExecStartPost of every hush_recovery drop-in) posts to
+# this URL. Pointed at the stand-in: the real host is unreachable from hosted runners, and
+# each failed post stalls the unit's start for about 36 seconds (curl timeout and retries).
+notify_failure_hush_url: "http://127.0.0.1:8099"

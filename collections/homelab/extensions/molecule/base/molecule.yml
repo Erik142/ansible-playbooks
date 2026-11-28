@@ -47,6 +47,8 @@ provisioner:
         restic_backup_repo_password: "molecule-fake-repo-password-never-used"
         restic_backup_rest_server_password: "molecule-fake-rest-password-never-used"
   env:
+    # Per-task timings in the job log (the repo's ansible.cfg enables the same callback).
+    ANSIBLE_CALLBACKS_ENABLED: ansible.posix.profile_tasks
     # Roles come from the repo's collection copy. The vault is never decrypted: the
     # dummy password and identity stop ansible.cfg's 1Password scripts from running.
     ANSIBLE_COLLECTIONS_PATH: ${MOLECULE_PROJECT_DIRECTORY}/../../../collections:~/.ansible/collections
